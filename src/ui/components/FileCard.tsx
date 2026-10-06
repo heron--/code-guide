@@ -63,12 +63,14 @@ function Row({ line, idx, marked }: { line: Line; idx: number; marked: boolean }
 
 function Gap({
   lines,
+  isDiff,
   visible,
   from,
   to,
   onReveal,
 }: {
   lines: Line[];
+  isDiff: boolean;
   visible: boolean[];
   from: number;
   to: number;
@@ -77,7 +79,7 @@ function Gap({
   const count = to - from + 1;
   const atTop = from === 0;
   const atBottom = to === lines.length - 1;
-  const label = lines.slice(from, to + 1).every((l) => l.k === " ") ? "unchanged" : "hidden";
+  const label = isDiff && lines.slice(from, to + 1).every((l) => l.k === " ") ? "unchanged" : "hidden";
   // Like a diff hunk header: what the next shown lines sit inside, unless it's already on screen.
   const enclosing = atBottom ? undefined : enclosingLine(lines, to + 1);
   const scope = enclosing && !visible[enclosing.idx] ? enclosing.text : undefined;
@@ -146,7 +148,17 @@ export function FileCard({
     } else {
       let j = i;
       while (j + 1 < file.lines.length && !visible[j + 1]) j++;
-      rows.push(<Gap key={`g${i}`} lines={file.lines} visible={visible} from={i} to={j} onReveal={onReveal} />);
+      rows.push(
+        <Gap
+          key={`g${i}`}
+          lines={file.lines}
+          isDiff={file.status !== "unchanged"}
+          visible={visible}
+          from={i}
+          to={j}
+          onReveal={onReveal}
+        />,
+      );
       i = j + 1;
     }
   }
