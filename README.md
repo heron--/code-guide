@@ -25,7 +25,7 @@ Terms are defined in the [glossary](GLOSSARY.md). Code Chapters calls no AI serv
 
 ## Install
 
-Requires Node 20+ and git.
+Requires Node 22.12+ and git.
 
 ```sh
 npm install -g github:heron--/code-chapters   # or: git clone … && npm install && npm link

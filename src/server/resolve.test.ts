@@ -88,6 +88,23 @@ describe("change guides", () => {
   });
 });
 
+describe("working-tree change guides", () => {
+  test("include untracked files, with paths verbatim", async () => {
+    write("café.ts", lines(2));
+    try {
+      const { resolved, problems } = await check({
+        subject: { type: "change", base: "main" },
+        chapters: [{ title: "Add a file", body: "It adds [a file](café.ts#L1-L2).", excerpts: [{ path: "café.ts" }] }],
+      });
+      expect(problems).toEqual([]);
+      expect(resolved!.files["café.ts"]).toMatchObject({ status: "added", additions: 2 });
+      expect(resolved!.changed).toContainEqual({ path: "café.ts", additions: 2, deletions: 0, status: "added" });
+    } finally {
+      rmSync(join(repo, "café.ts"));
+    }
+  });
+});
+
 describe("question guides", () => {
   test("report spec violations as errors and quality issues as warnings", async () => {
     const { problems } = await check({

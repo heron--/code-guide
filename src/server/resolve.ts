@@ -12,7 +12,17 @@ import {
   type ResolvedFile,
   type ResolvedGuide,
 } from "../shared/guide.js";
-import { changedFiles, fileAt, fullFileDiff, mergeBase, repoRoot, revParse, splitLines, type RawLine } from "./git.js";
+import {
+  changedFiles,
+  diffStatus,
+  fileAt,
+  fullFileDiff,
+  mergeBase,
+  repoRoot,
+  revParse,
+  splitLines,
+  type RawLine,
+} from "./git.js";
 import { highlight } from "./highlight.js";
 
 export const LIMITS = {
@@ -121,9 +131,8 @@ export async function resolveGuide(file: string): Promise<{ resolved?: ResolvedG
     let meta: Omit<ResolvedFile, "lines">;
     const diff = base ? await fullFileDiff(repo, base, head, path) : undefined;
     if (diff) {
-      const status = diff.every((l) => l.k === "+") ? "added" : diff.every((l) => l.k === "-") ? "deleted" : "modified";
       raw = diff;
-      meta = toResolved(path, raw, status);
+      meta = toResolved(path, raw, diffStatus(diff));
     } else {
       const text = await fileAt(repo, base ? head : readRef, path);
       if (text === undefined) return undefined;
@@ -250,13 +259,12 @@ export async function resolveChangedFile(guide: ResolvedGuide, path: string): Pr
   const head = guide.refs.head === "working tree" ? undefined : guide.refs.head;
   const diff = await fullFileDiff(guide.repo, guide.refs.base, head, path);
   if (!diff) return undefined;
-  const status = diff.every((l) => l.k === "+") ? "added" : diff.every((l) => l.k === "-") ? "deleted" : "modified";
   const tokens = await highlight(
     path,
     diff.map((l) => l.text),
   );
   return {
-    ...toResolved(path, diff, status),
+    ...toResolved(path, diff, diffStatus(diff)),
     lines: diff.map(({ text: _, ...l }, i) => ({ ...l, t: tokens[i] })),
   };
 }

@@ -46,20 +46,29 @@ export function splitLines(text: string): string[] {
   return lines;
 }
 
-/** Every file changed between `base` and `head` (working tree when undefined). */
+/** Untracked, non-ignored files in the working tree. */
+async function untrackedFiles(root: string, path?: string): Promise<string[]> {
+  const out = await git(root, ["ls-files", "-z", "--others", "--exclude-standard", ...(path ? ["--", path] : [])]);
+  return out.split("\0").filter(Boolean);
+}
+
+/** Every file changed between `base` and `head` (working tree, including untracked files, when undefined). */
 export async function changedFiles(root: string, base: string, head: string | undefined) {
   const range = head ? [base, head] : [base];
-  const [numstat, names] = await Promise.all([
-    git(root, ["diff", "--no-renames", "--numstat", ...range]),
-    git(root, ["diff", "--no-renames", "--name-status", ...range]),
+  // -z: paths come out verbatim instead of quoted/escaped.
+  const [numstat, names, untracked] = await Promise.all([
+    git(root, ["diff", "-z", "--no-renames", "--numstat", ...range]),
+    git(root, ["diff", "-z", "--no-renames", "--name-status", ...range]),
+    head ? [] : untrackedFiles(root),
   ]);
   const status = new Map<string, FileStatus>();
-  for (const row of names.split("\n").filter(Boolean)) {
-    const [s, path] = row.split("\t");
-    status.set(path, s === "A" ? "added" : s === "D" ? "deleted" : "modified");
+  const nameFields = names.split("\0");
+  for (let i = 0; i + 1 < nameFields.length; i += 2) {
+    const s = nameFields[i];
+    status.set(nameFields[i + 1], s === "A" ? "added" : s === "D" ? "deleted" : "modified");
   }
-  return numstat
-    .split("\n")
+  const files = numstat
+    .split("\0")
     .filter(Boolean)
     .map((row) => {
       const [a, d, path] = row.split("\t");
@@ -67,9 +76,22 @@ export async function changedFiles(root: string, base: string, head: string | un
         path,
         additions: a === "-" ? 0 : Number(a),
         deletions: d === "-" ? 0 : Number(d),
-        status: status.get(path) ?? "modified",
+        status: status.get(path) ?? ("modified" as FileStatus),
       };
     });
+  for (const path of untracked) {
+    const text = await fileAt(root, undefined, path);
+    files.push({ path, additions: text ? splitLines(text).length : 0, deletions: 0, status: "added" });
+  }
+  return files;
+}
+
+/** Status of a whole-file diff. A diff with no text lines (binary, mode-only) counts as modified. */
+export function diffStatus(diff: RawLine[]): FileStatus {
+  if (diff.length === 0) return "modified";
+  if (diff.every((l) => l.k === "+")) return "added";
+  if (diff.every((l) => l.k === "-")) return "deleted";
+  return "modified";
 }
 
 export type RawLine = Omit<Line, "t"> & { text: string };
@@ -86,7 +108,12 @@ export async function fullFileDiff(
 ): Promise<RawLine[] | undefined> {
   const range = head ? [base, head] : [base];
   const out = await git(root, ["diff", "--no-color", "--no-renames", "--unified=100000000", ...range, "--", path]);
-  if (!out.trim()) return undefined;
+  if (!out.trim()) {
+    // An untracked file is all additions when diffing against the working tree.
+    if (head || (await untrackedFiles(root, path)).length === 0) return undefined;
+    const text = await fileAt(root, undefined, path);
+    return text === undefined ? undefined : splitLines(text).map((t, i) => ({ k: "+", n: i + 1, text: t }));
+  }
   const lines: RawLine[] = [];
   let o = 0;
   let n = 0;
