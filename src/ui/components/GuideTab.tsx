@@ -15,7 +15,7 @@ const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigat
 const MOD_KEYS = isMac ? ["⌘", "⌥", "⇧"] : ["Ctrl", "Alt", "⇧"];
 
 export function fileDomId(chapter: number, path: string) {
-  return `c${chapter}-${path.replace(/[^\w-]/g, "_")}`;
+  return `c${chapter}-${encodeURIComponent(path)}`;
 }
 
 function pad(n: number) {

@@ -13,6 +13,8 @@ export const api = {
     get<ResolvedGuide | { id: string; file: string; problems: Problem[]; guide?: undefined }>(
       `/api/guides/${encodeURIComponent(id)}`,
     ),
-  changedFile: (id: string, path: string) =>
-    get<ResolvedFile>(`/api/guides/${encodeURIComponent(id)}/file?path=${encodeURIComponent(path)}`),
+  changedFile: (id: string, path: string, refs: { base: string; head: string }) =>
+    get<ResolvedFile>(
+      `/api/guides/${encodeURIComponent(id)}/file?` + new URLSearchParams({ path, base: refs.base, head: refs.head }),
+    ),
 };

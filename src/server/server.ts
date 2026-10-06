@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readdir, readFile, stat } from "node:fs/promises";
-import { extname, join, normalize, resolve } from "node:path";
+import { dirname, extname, join, normalize, resolve } from "node:path";
+import { repoRoot } from "./git.js";
 import { resolveChangedFile, resolveGuide, summarize, guideId } from "./resolve.js";
 
 const MIME: Record<string, string> = {
@@ -76,13 +77,20 @@ export function startServer(opts: ServeOptions): Promise<{ url: string; close: (
     if (parts[1] === "guides" && parts[2]) {
       const file = guides.get(parts[2]);
       if (!file) return send(res, 404, { error: `no guide "${parts[2]}"` });
-      const { resolved, problems } = await resolveGuide(file);
-      if (!resolved) return send(res, 422, { id: parts[2], file, problems });
       if (parts[3] === "file") {
-        const path = url.searchParams.get("path") ?? "";
-        const f = await resolveChangedFile(resolved, path);
+        // One file of the Diff tab. The client passes the commits the guide resolved to,
+        // so this doesn't re-resolve the whole guide per file.
+        const q = url.searchParams;
+        const sha = /^[0-9a-f]{40}$/;
+        const [path, base, head] = [q.get("path") ?? "", q.get("base") ?? "", q.get("head") ?? ""];
+        const repo = await repoRoot(dirname(file));
+        if (!repo || !sha.test(base) || !(sha.test(head) || head === "working tree"))
+          return send(res, 400, { error: "bad file request" });
+        const f = await resolveChangedFile(repo, base, head === "working tree" ? undefined : head, path);
         return f ? send(res, 200, f) : send(res, 404, { error: `${path} is not changed` });
       }
+      const { resolved, problems } = await resolveGuide(file);
+      if (!resolved) return send(res, 422, { id: parts[2], file, problems });
       return send(res, 200, resolved);
     }
     send(res, 404, { error: "not found" });

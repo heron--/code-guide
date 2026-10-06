@@ -254,10 +254,13 @@ export async function resolveGuide(file: string): Promise<{ resolved?: ResolvedG
 }
 
 /** Resolve a single changed file for the full diff view. */
-export async function resolveChangedFile(guide: ResolvedGuide, path: string): Promise<ResolvedFile | undefined> {
-  if (!guide.refs) return undefined;
-  const head = guide.refs.head === "working tree" ? undefined : guide.refs.head;
-  const diff = await fullFileDiff(guide.repo, guide.refs.base, head, path);
+export async function resolveChangedFile(
+  repo: string,
+  base: string,
+  head: string | undefined,
+  path: string,
+): Promise<ResolvedFile | undefined> {
+  const diff = await fullFileDiff(repo, base, head, path);
   if (!diff) return undefined;
   const tokens = await highlight(
     path,

@@ -30,7 +30,7 @@ export function DiffTab({
         const f =
           data.files[path]?.status !== "unchanged" && data.files[path]
             ? data.files[path]
-            : await api.changedFile(data.id, path).catch(() => undefined);
+            : await api.changedFile(data.id, path, data.refs!).catch(() => undefined);
         if (!f || cancelled) continue;
         setFiles((prev) => ({ ...prev, [path]: f }));
         setVisible((prev) => ({ ...prev, [path]: initialVisible(f) }));
@@ -42,7 +42,7 @@ export function DiffTab({
     };
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const domId = (path: string) => `diff-${path.replace(/[^\w-]/g, "_")}`;
+  const domId = (path: string) => `diff-${encodeURIComponent(path)}`;
 
   return (
     <div className="flex min-h-0 flex-1">

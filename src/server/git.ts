@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import type { FileStatus, Line } from "../shared/guide.js";
 
@@ -34,7 +34,9 @@ export async function mergeBase(root: string, a: string, b: string): Promise<str
 /** File contents at a commit, or in the working tree when `ref` is undefined. */
 export async function fileAt(root: string, ref: string | undefined, path: string): Promise<string | undefined> {
   try {
-    return ref ? await git(root, ["show", `${ref}:${path}`]) : await readFile(join(root, path), "utf8");
+    if (ref) return await git(root, ["show", `${ref}:${path}`]);
+    const abs = resolve(root, path);
+    return abs.startsWith(root + sep) ? await readFile(abs, "utf8") : undefined;
   } catch {
     return undefined;
   }

@@ -32,7 +32,7 @@ const Code = memo(function Code({ line }: { line: Line }) {
   );
 });
 
-function Row({ line, idx, marked }: { line: Line; idx: number; marked: boolean }) {
+function Row({ line, idx, marked, deleted }: { line: Line; idx: number; marked: boolean; deleted: boolean }) {
   return (
     <div
       data-idx={idx}
@@ -51,7 +51,7 @@ function Row({ line, idx, marked }: { line: Line; idx: number; marked: boolean }
           line.k === "+" && "text-add",
         )}
       >
-        {line.k === "-" ? "–" : line.n}
+        {deleted ? line.o : line.k === "-" ? "–" : line.n}
       </span>
       <span className="whitespace-pre pr-6">
         <Code line={line} />
@@ -143,7 +143,15 @@ export function FileCard({
   const rows: React.ReactNode[] = [];
   for (let i = 0; i < file.lines.length;) {
     if (visible[i]) {
-      rows.push(<Row key={i} idx={i} line={file.lines[i]} marked={!!marked && i >= marked[0] && i <= marked[1]} />);
+      rows.push(
+        <Row
+          key={i}
+          idx={i}
+          line={file.lines[i]}
+          deleted={file.status === "deleted"}
+          marked={!!marked && i >= marked[0] && i <= marked[1]}
+        />,
+      );
       i++;
     } else {
       let j = i;

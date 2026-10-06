@@ -58,6 +58,11 @@ describe("parseBody", () => {
     ]);
     expect(p2[1]).toMatchObject({ kind: "anchor", range: { start: 7, end: 7 } });
   });
+
+  test("allows spaces in anchor paths", () => {
+    const [[anchor]] = parseBody("[it](my dir/a b.ts#L2-L3)");
+    expect(anchor).toMatchObject({ kind: "anchor", path: "my dir/a b.ts", range: { start: 2, end: 3 } });
+  });
 });
 
 describe("change guides", () => {
@@ -137,6 +142,15 @@ describe("question guides", () => {
         expect.stringContaining("link text"),
       ]),
     );
+  });
+
+  test("rejects paths that leave the repository", async () => {
+    const { resolved, problems } = await check({
+      subject: { type: "question" },
+      chapters: [{ title: "X", body: "Y", excerpts: [{ path: "../secret", lines: ["1"] }] }],
+    });
+    expect(resolved).toBeUndefined();
+    expect(problems[0].message).toContain("repository-relative");
   });
 
   test("rejects unknown refs", async () => {

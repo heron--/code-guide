@@ -5,7 +5,10 @@ export const SPEC_VERSION = "code-chapters/v1";
 const lineRange = z.string().regex(/^\d+(-\d+)?$/, 'line ranges look like "42" or "42-60"');
 
 export const excerptSchema = z.object({
-  path: z.string().min(1),
+  path: z
+    .string()
+    .min(1)
+    .refine((p) => !p.startsWith("/") && !p.split("/").includes(".."), 'paths are repository-relative, with no ".."'),
   lines: z.array(lineRange).optional(),
 });
 
@@ -52,7 +55,7 @@ export type Inline =
   | { kind: "code"; text: string }
   | { kind: "anchor"; text: string; path: string; range: Range };
 
-const INLINE_RE = /`([^`]+)`|\[([^\]]+)\]\(([^)#\s]+)#L(\d+)(?:-L?(\d+))?\)/g;
+const INLINE_RE = /`([^`]+)`|\[([^\]]+)\]\(([^)#]+)#L(\d+)(?:-L?(\d+))?\)/g;
 
 export function parseBody(body: string): Inline[][] {
   return body
