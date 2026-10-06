@@ -1,6 +1,6 @@
 ---
 name: code-chapters
-description: Write a guide that answers a question about a codebase ("how does X work?", "why do we use Y here?") or explains a change (a branch, PR, or uncommitted diff) as a few brief chapters, each paired with the exact code it is about. Use when the user asks to explain, walk through, guide, or teach some code or a change, or invokes /code-chapters.
+description: Write a guide that answers a question about a codebase ("how does X work?", "why do we use Y here?") or explains a change (a branch, PR, or uncommitted diff) as a few brief chapters, each paired with the exact code it is about. Use when the user asks to explain, walk through, guide, or teach some code or a change, or asks for code chapters.
 ---
 
 # Code Chapters: write a guide

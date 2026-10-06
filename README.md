@@ -29,21 +29,29 @@ Requires Node 22.12+ and git.
 
 ```sh
 npm install -g github:heron--/code-chapters   # or: git clone … && npm install && npm link
-code-chapters install-skill                    # copies the skill to ~/.claude/skills/code-chapters
+code-chapters install-skill                    # pick your agents from a menu
 ```
 
-`install-skill` takes a directory if your agent keeps skills somewhere else. For agents without skill support, paste `SKILL.md` into the prompt and attach `SPEC.md`.
+The skill uses the [Agent Skills](https://agentskills.io/specification) format, so the same files work in each agent:
+
+| Agent | `--agent` | Installs to (`--project`: inside this repo) | Run it with |
+| --- | --- | --- | --- |
+| Claude Code | `claude` | `~/.claude/skills` (`.claude/skills`) | `/code-chapters <question>` |
+| pi | `pi` | `~/.pi/agent/skills` (`.pi/skills`) | `/skill:code-chapters <question>` |
+| Others that read the standard location | `agents` | `~/.agents/skills` (`.agents/skills`) | depends on the agent |
+
+Skip the menu with `--agent pi,claude` (or `--agent all`), or pass a directory to install somewhere else. For agents without skill support, paste `SKILL.md` into the prompt and attach `SPEC.md`.
 
 ## Use
 
-1. In any repo, ask your agent: `/code-chapters how does request retrying work?` or `/code-chapters explain this branch`.
+1. In any repo, ask your agent: `/code-chapters how does request retrying work?` or `/code-chapters explain this branch` (in pi: `/skill:code-chapters …`).
 2. The agent writes `.code-chapters/<slug>.json` and validates it with `code-chapters check`.
 3. Run `code-chapters` anywhere inside the repo. It starts a local server and opens your browser.
 
 ```
 code-chapters [dir | guide.json]   Open the viewer (default: the repo containing .)
 code-chapters check <guide.json>…  Validate guides; exits 1 on errors
-code-chapters install-skill [dir]  Install the authoring skill
+code-chapters install-skill [dir]  Install the authoring skill (--agent claude|pi|agents|all, --project)
   --port <n>   default 4646      --no-open   don't open a browser
 ```
 
