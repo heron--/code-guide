@@ -2,6 +2,8 @@
 
 Four terms. Use these words, and only these words, for these ideas: in the spec, the skill, the viewer, issues, and conversation.
 
+**Adding, removing or redefining a term requires the project owner's approval.** Propose the change (in an issue or PR comment) and wait for a yes before editing this file or using a new term in the spec, skill or viewer.
+
 | Term | Definition | Not to be confused with |
 | --- | --- | --- |
 | **Guide** | The complete answer to one question about a codebase (or one change to it): a title, the question, a short answer, and an ordered list of chapters. | A "tour", "walkthrough" or "doc". A guide answers one question; it is not general documentation. |
