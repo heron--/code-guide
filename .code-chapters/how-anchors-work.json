@@ -1,0 +1,61 @@
+{
+  "spec": "code-chapters/v1",
+  "title": "How anchors reach their lines",
+  "question": "When I click a link in a chapter, how does the viewer find and scroll to the right code?",
+  "subject": {
+    "type": "question",
+    "ref": "6063e68df3feb5450ec9bfad9e2ead6e70a5c572"
+  },
+  "answer": "Anchors are ordinary Markdown links with a #L line fragment. The checker guarantees they point at a file the chapter shows; the viewer maps the line numbers to rows, reveals them, then scrolls while remembering where you were.",
+  "chapters": [
+    {
+      "title": "Parse anchors from prose",
+      "body": "Chapter prose is plain text. Any Markdown link whose target ends in `#L<start>-L<end>` matches [the inline pattern](src/shared/guide.ts#L55) and becomes [a typed anchor](src/shared/guide.ts#L70-L75): a file path plus a line range.",
+      "excerpts": [
+        {
+          "path": "src/shared/guide.ts",
+          "lines": [
+            "50-55",
+            "68-76"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Reject anchors to unseen code",
+      "body": "Before anyone reads a guide, the checker requires every anchor to name [one of its chapter's excerpts](src/server/resolve.ts#L215-L218).\n\nAn anchor outside the excerpt's lines only [earns a warning](src/server/resolve.ts#L225-L227), because the viewer can expand collapsed code to reach it.",
+      "excerpts": [
+        {
+          "path": "src/server/resolve.ts",
+          "lines": [
+            "205-229"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Map line numbers to rows",
+      "body": "The viewer holds each excerpt as rows, not line numbers. [The row lookup](src/ui/lib/excerpt.ts#L16-L30) finds the rows a range covers and [pulls in removed lines](src/ui/lib/excerpt.ts#L28) just above it, so an anchor on a rewritten line also shows what it replaced.",
+      "excerpts": [
+        {
+          "path": "src/ui/lib/excerpt.ts",
+          "lines": [
+            "12-30"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Reveal, scroll, remember",
+      "body": "A click [reveals and marks the rows](src/ui/components/GuideTab.tsx#L84-L87) synchronously, so they exist before [the smooth scroll](src/ui/components/GuideTab.tsx#L70-L76) measures them.\n\nThe scroll saves the old position, which [Go back](src/ui/components/GuideTab.tsx#L97-L101) restores instantly.",
+      "excerpts": [
+        {
+          "path": "src/ui/components/GuideTab.tsx",
+          "lines": [
+            "69-101"
+          ]
+        }
+      ]
+    }
+  ]
+}
