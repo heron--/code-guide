@@ -19,7 +19,7 @@ import {
   type Layout,
   type Slot,
 } from "./layout";
-import { panelState, sessionActivity } from "./status";
+import { failedTitle, panelState, sessionActivity } from "./status";
 
 type Props = {
   state: SessionState;
@@ -217,12 +217,15 @@ function PanelBody({
   channel: SessionChannel;
 }) {
   const Panel = panelFor(m.name);
-  const { job, busy, activity, failed } = panelState(m, state);
+  const { job, busy, activity, stage, failed } = panelState(m, state);
   // A failed job shows here as well as in the dock, with its retry, when the panel is in a slot.
   if (m.needsJob && failed && !job)
     return (
-      <Centered title={`Couldn't write the ${m.label.toLowerCase()}`}>
+      <Centered title={failedTitle(failed)}>
         <span className="block text-del">{failed.error}</span>
+        {failed.kind !== m.kind && (
+          <span className="mt-1 block">It shows here once it's been reviewed. Retry picks up from this step.</span>
+        )}
         <button
           onClick={() => channel.send({ type: "job.start", module: m.name, retry: failed.id })}
           className="mt-3 inline-flex h-7 items-center gap-1.5 border border-border bg-surface px-3 text-[12.5px] text-fg hover:border-fg-3"
@@ -234,7 +237,7 @@ function PanelBody({
     );
   if (m.needsJob && !job)
     return (
-      <Centered title={busy ? `Writing ${m.label.toLowerCase()}…` : `No ${m.label.toLowerCase()} yet`}>
+      <Centered title={busy ? `${stage ?? `Writing ${m.label.toLowerCase()}`}…` : `No ${m.label.toLowerCase()} yet`}>
         {activity}
       </Centered>
     );

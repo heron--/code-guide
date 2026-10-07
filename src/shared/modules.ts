@@ -15,6 +15,8 @@ export type ModuleInfo = {
   subjects?: Subject["type"][];
   /** Job kinds that must have a finished result first, e.g. a quiz needs a guide. */
   results?: string[];
+  /** The most jobs one run can take, follow-ups included (a guide: write and review, then one revision and its review). */
+  steps?: number;
 };
 
 /** Why a module can't start yet, or undefined when it can. Server and browser use the same rule. */
