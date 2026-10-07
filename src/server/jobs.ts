@@ -135,7 +135,10 @@ export class JobRunner {
     const { submit } = job.kind;
     let attempts = 0;
     let nudges = 0;
+    let submitting = false;
 
+    // It may have been cancelled while its inputs were read.
+    if (this.isOver(id)) return;
     this.session.append("job.started", { job: id });
     const harness = this.harness.start({
       cwd: ctx.repo,
@@ -146,24 +149,34 @@ export class JobRunner {
           description: submit.description,
           input: submit.input,
           run: async (input) => {
-            if (this.isOver(id)) return { text: "This job has already ended.", isError: true };
-            attempts++;
-            const { problems, result: accepted = input } = await submit.validate(input, ctx);
-            const errors = problems.filter((p) => p.level === "error");
-            this.session.append("job.submitted", { job: id, attempt: attempts, accepted: !errors.length, problems });
-            if (!errors.length) {
-              const result = await this.session.writeResult(id, accepted);
-              this.session.append("job.finished", { job: id, result, warnings: problems });
-              return { text: "Accepted. You're done; don't reply." };
+            const over = { text: "This job has already ended.", isError: true };
+            if (this.isOver(id)) return over;
+            if (submitting) return { text: "Wait for your previous submission's result first.", isError: true };
+            submitting = true;
+            try {
+              attempts++;
+              const { problems, result: accepted = input } = await submit.validate(input, ctx);
+              // Each await is a chance for the job to be cancelled or to fail.
+              if (this.isOver(id)) return over;
+              const errors = problems.filter((p) => p.level === "error");
+              this.session.append("job.submitted", { job: id, attempt: attempts, accepted: !errors.length, problems });
+              if (!errors.length) {
+                const result = await this.session.writeResult(id, accepted);
+                if (this.isOver(id)) return over;
+                this.session.append("job.finished", { job: id, result, warnings: problems });
+                return { text: "Accepted. You're done; don't reply." };
+              }
+              if (attempts >= this.opts.maxAttempts) {
+                this.fail(id, `Still had errors after ${attempts} submissions`, errors);
+                return { text: "Rejected, and out of attempts.", isError: true };
+              }
+              return {
+                text: `Rejected. Fix these errors and submit again:\n${errors.map((e) => `- ${e.where}: ${e.message}`).join("\n")}`,
+                isError: true,
+              };
+            } finally {
+              submitting = false;
             }
-            if (attempts >= this.opts.maxAttempts) {
-              this.fail(id, `Still had errors after ${attempts} submissions`, errors);
-              return { text: "Rejected, and out of attempts.", isError: true };
-            }
-            return {
-              text: `Rejected. Fix these errors and submit again:\n${errors.map((e) => `- ${e.where}: ${e.message}`).join("\n")}`,
-              isError: true,
-            };
           },
         },
       ],

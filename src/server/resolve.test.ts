@@ -108,6 +108,19 @@ describe("working-tree change guides", () => {
       rmSync(join(repo, "café.ts"));
     }
   });
+
+  test("leave out Code Guide's own session files", async () => {
+    write(".code-guide/sessions/s/events.jsonl", "{}\n");
+    try {
+      const { resolved } = await check({
+        subject: { type: "change", base: "main" },
+        chapters: [{ title: "Change line ten", body: "It edits [line ten](a.ts#L10).", excerpts: [{ path: "a.ts" }] }],
+      });
+      expect(resolved!.changed!.map((c) => c.path)).not.toContain(".code-guide/sessions/s/events.jsonl");
+    } finally {
+      rmSync(join(repo, ".code-guide"), { recursive: true });
+    }
+  });
 });
 
 describe("question guides", () => {
