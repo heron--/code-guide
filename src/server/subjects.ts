@@ -37,7 +37,8 @@ export async function suggestions(repo: string): Promise<Suggestion[]> {
   }
 
   const branch = await quiet(sh(repo, "git", ["branch", "--show-current"]));
-  if (base && branch && !base.endsWith(`/${branch}`) && base !== branch) {
+  // On the default branch itself, `origin/main..HEAD` still shows local commits not yet pushed.
+  if (base && branch && base !== branch) {
     const ahead = Number(await quiet(sh(repo, "git", ["rev-list", "--count", `${base}..HEAD`])));
     if (ahead > 0)
       out.push({
@@ -86,7 +87,14 @@ export async function preparePullRequest(repo: string, subject: Subject & { type
   const pr = JSON.parse(
     await sh(repo, "gh", ["pr", "view", String(subject.pr), "--json", "headRefOid,baseRefName"]),
   ) as { headRefOid: string; baseRefName: string };
-  await sh(repo, "git", ["fetch", "--quiet", "origin", pr.headRefOid, pr.baseRefName]);
-  const base = (await revParse(repo, `origin/${pr.baseRefName}`)) ? `origin/${pr.baseRefName}` : pr.baseRefName;
+  // Name the base's destination: a single-branch clone wouldn't otherwise keep it anywhere but FETCH_HEAD.
+  const base = `origin/${pr.baseRefName}`;
+  await sh(repo, "git", [
+    "fetch",
+    "--quiet",
+    "origin",
+    pr.headRefOid,
+    `+refs/heads/${pr.baseRefName}:refs/remotes/${base}`,
+  ]);
   return { type: "change", base, head: pr.headRefOid, pr: subject.pr };
 }

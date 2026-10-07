@@ -94,3 +94,21 @@ test("a pull request is fetched and pinned to its head commit", async () => {
   // No branch was created for it.
   expect(git(repo, "branch", "--list", "contributor/*")).toBe("");
 });
+
+test("a pull request's base is kept even when the clone only tracks another branch", async () => {
+  const other = join(dir, "other");
+  git(dir, "clone", "-q", "--single-branch", "-b", "contributor/fix", origin, other);
+  const s = await preparePullRequest(other, { type: "change", base: "main", pr: 7 });
+  expect(s).toMatchObject({ base: "origin/main", head: prCommit });
+  expect(git(other, "rev-parse", "--verify", "origin/main")).toBe(git(origin, "rev-parse", "main"));
+});
+
+test("suggests unpushed commits on the default branch itself", async () => {
+  const own = join(dir, "own");
+  git(dir, "clone", "-q", origin, own);
+  git(own, "config", "user.email", "t@t");
+  git(own, "config", "user.name", "t");
+  commit(own, "d.ts", "local");
+  const s = await suggestions(own);
+  expect(s.find((x) => x.title === "main vs origin/main")?.detail).toBe("1 commit ahead");
+});
