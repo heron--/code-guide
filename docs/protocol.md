@@ -46,10 +46,10 @@ A subject is a `change` (`base`, optional `head`, optional `pr`), a `path`, or a
 A job is queued, starts when the concurrency limit allows, reports progress, and ends in exactly one of `job.finished`, `job.failed` or `job.cancelled`.
 
 ```json
-{ "type": "job.queued", "payload": { "job": "quiz-1", "kind": "quiz", "module": "quiz", "inputs": ["guide-1"] } }
+{ "type": "job.queued", "payload": { "job": "quiz-1", "kind": "quiz", "label": "Writing the quiz", "module": "quiz", "inputs": ["guide-1"] } }
 ```
 
-`inputs` names the finished results the job reads, never their transcripts.
+`inputs` names the finished results the job reads, never their transcripts. `label` is what the job does, as the reader sees it.
 
 ```json
 { "type": "job.started", "payload": { "job": "guide-1" } }

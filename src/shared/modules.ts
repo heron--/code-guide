@@ -15,8 +15,8 @@ export type ModuleInfo = {
   subjects?: Subject["type"][];
   /** Job kinds that must have a finished result first, e.g. a quiz needs a guide. */
   results?: string[];
-  /** The most jobs one run can take, follow-ups included (a guide: write and review, then one revision and its review). */
-  steps?: number;
+  /** The most jobs one run can take, follow-ups included (today a guide's: write, review, revise, review again). */
+  maxJobs?: number;
 };
 
 /** Why a module can't start yet, or undefined when it can. Server and browser use the same rule. */
@@ -25,7 +25,7 @@ export function unavailable(m: ModuleInfo, state: SessionState): string | undefi
   if (!subject) return "Choose a subject first";
   if (m.subjects && !m.subjects.includes(subject.type)) return `${m.label} needs a ${m.subjects.join(" or ")}`;
   for (const kind of m.results ?? []) {
-    // One still being written, reviewed or revised: wait, so the input is the final one.
+    // One that isn't done yet (still being written, or a follow-up is running): wait for the final one.
     const newest = state.jobOrder.findLast((id) => state.jobs[id].kind === kind);
     if (newest && moduleBusy(state, state.jobs[newest].module)) return `${m.label} waits for the ${kind} to finish`;
     if (!latestDone(state, kind)) return `${m.label} needs a finished ${kind}`;
@@ -34,9 +34,9 @@ export function unavailable(m: ModuleInfo, state: SessionState): string | undefi
 }
 
 /**
- * The newest done job of a kind: finished, and so are the follow-ups its module ran on it (a guide's review,
- * and any revision and its review). Readers never see a result that's still being reviewed, or whose review
- * failed: that shows as the failed job, with its reason and a retry.
+ * The newest done job of a kind: finished, and so are all the follow-ups its module ran on it (today, a guide's
+ * review and any revision). Readers never see an unfinished result, whatever job is left: a failed job shows
+ * instead, with its reason and a retry.
  */
 export function latestDone(state: SessionState, kind: string): string | undefined {
   return state.jobOrder.findLast((id) => state.jobs[id].kind === kind && done(state, id));
@@ -53,7 +53,7 @@ function done(state: SessionState, id: string): boolean {
   );
 }
 
-/** Whether any of a module's jobs (its own, or follow-ups like a review) is still queued or running. */
+/** Whether any of a module's jobs (its own, or its follow-ups) is still queued or running. */
 export function moduleBusy(state: SessionState, module: string): boolean {
   return state.jobOrder.some(
     (id) => state.jobs[id].module === module && ["queued", "running"].includes(state.jobs[id].status),
