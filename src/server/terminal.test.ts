@@ -146,7 +146,21 @@ test("lines are clipped by display width, and a resize redraws for the reflowed 
   expect(written.startsWith("\x1b[4A\x1b[0J")).toBe(true);
 });
 
-test("progress bars and ordinary punctuation count as one column", () => {
+test("progress bars count as one column, and every kind of wide character as two", () => {
+  const rocket = session(
+    ["job.queued", { job: "quiz-1", kind: "quiz", module: "quiz", inputs: [] }],
+    ["job.started", { job: "quiz-1" }],
+    ["job.failed", { job: "quiz-1", error: "🚀".repeat(20), problems: [] }],
+  );
+  let clipped = "";
+  showStatus(
+    { state: rocket, subscribe: () => () => {}, eventsAfter: () => [] } as unknown as Parameters<typeof showStatus>[0],
+    [quiz],
+    { harness: "h", model: "m", status: () => ({ state: "idle" }), onStatus: () => () => {} },
+    { write: (s: string) => (clipped += s), isTTY: true, columns: 40 },
+  )();
+  expect(clipped.split("\n")[1]).toBe("Quiz  failed: " + "🚀".repeat(12) + "…");
+
   let written = "";
   const fake = { state: running, subscribe: () => () => {}, eventsAfter: () => [] } as unknown as Parameters<
     typeof showStatus

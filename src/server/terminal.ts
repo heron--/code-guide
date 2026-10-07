@@ -1,3 +1,4 @@
+import { eastAsianWidth } from "get-east-asian-width";
 import type { ModuleInfo } from "../shared/modules.js";
 import { jobLabel, panelState, runProgress } from "../shared/progress.js";
 import type { SessionEvent } from "../shared/protocol.js";
@@ -69,24 +70,8 @@ export function printable(s: string): string {
   return s.replace(/\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(\x07|\x1b\\)?|[\x00-\x1f\x7f-\x9f]+/g, " ");
 }
 
-/** The usual double-width ranges: Hangul, CJK, fullwidth forms, and emoji. */
-const WIDE = [
-  [0x1100, 0x115f],
-  [0x2e80, 0xa4cf],
-  [0xac00, 0xd7a3],
-  [0xf900, 0xfaff],
-  [0xfe30, 0xfe4f],
-  [0xff00, 0xff60],
-  [0xffe0, 0xffe6],
-  [0x1f300, 0x1f64f],
-  [0x1f900, 0x1f9ff],
-  [0x20000, 0x3fffd],
-];
-/** Columns a character takes in a terminal: two for wide ones, else one. */
-const cells = (ch: string) => {
-  const c = ch.codePointAt(0)!;
-  return WIDE.some(([a, b]) => c >= a && c <= b) ? 2 : 1;
-};
+/** Columns a character takes in a terminal, by Unicode's East Asian Width (wide CJK and emoji take two). */
+const cells = (ch: string) => eastAsianWidth(ch.codePointAt(0)!);
 const widthOf = (s: string) => [...s].reduce((n, ch) => n + cells(ch), 0);
 
 /**
