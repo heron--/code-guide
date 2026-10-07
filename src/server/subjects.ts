@@ -75,7 +75,7 @@ export async function parseInput(repo: string, input: string): Promise<Subject> 
   if (range && (await revParse(repo, range[1])) && (await revParse(repo, range[2])))
     return { type: "change", base: range[1], head: range[2] };
   const abs = resolve(repo, text);
-  if (!/\s/.test(text) && (abs === repo || abs.startsWith(repo + sep)) && (await quiet(stat(abs))))
+  if ((abs === repo || abs.startsWith(repo + sep)) && (await quiet(stat(abs))))
     return { type: "path", path: text.replace(/\/+$/, "") || "." };
   return { type: "question", question: text };
 }

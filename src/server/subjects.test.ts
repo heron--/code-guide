@@ -38,6 +38,7 @@ beforeAll(() => {
   commit(repo, "b.ts", "one");
   commit(repo, "c.ts", "two");
   mkdirSync(join(repo, "src/retry"), { recursive: true });
+  mkdirSync(join(repo, "src/retry policy"), { recursive: true });
   writeFileSync(join(repo, "src/retry/policy.ts"), "x\n");
   mkdirSync(join(repo, ".code-guide/sessions/s"), { recursive: true });
   writeFileSync(join(repo, ".code-guide/sessions/s/events.jsonl"), "{}\n");
@@ -74,6 +75,7 @@ test("reads typed input as a range, a path, or a question", async () => {
   expect(await parseInput(repo, "main...feature")).toEqual({ type: "change", base: "main", head: "feature" });
   expect(await parseInput(repo, "HEAD~1..HEAD")).toEqual({ type: "change", base: "HEAD~1", head: "HEAD" });
   expect(await parseInput(repo, "src/retry/")).toEqual({ type: "path", path: "src/retry" });
+  expect(await parseInput(repo, "src/retry policy")).toEqual({ type: "path", path: "src/retry policy" });
   expect(await parseInput(repo, "How do retries work?")).toEqual({
     type: "question",
     question: "How do retries work?",

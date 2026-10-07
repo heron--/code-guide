@@ -69,6 +69,8 @@ export class SessionChannel {
     } else if (f.type === "error") {
       if (f.fatal) this.stopped = true;
       this.set({ error: f.message });
+      // A refusal is news, not a state: let it fade.
+      if (!f.fatal) setTimeout(() => this.snapshot.error === f.message && this.set({ error: undefined }), 8000);
     } else {
       const s = this.snapshot.state;
       if (s && f.seq === s.seq + 1) this.set({ state: reduce(s, f) });
