@@ -47,11 +47,12 @@ Sessions are kept in `.code-guide/sessions/` in the repository; add it to your `
 
 ### Reading a guide
 
-- **Overview**: the question, the short answer, and the chapter list.
-- **Guide**: one chapter at a time. Next/previous with the ↓ ↑ buttons, <kbd>⌘</kbd><kbd>⌥</kbd><kbd>⇧</kbd><kbd>↓</kbd>/<kbd>↑</kbd> (Ctrl+Alt+Shift elsewhere), or <kbd>J</kbd>/<kbd>K</kbd>.
-- **Anchors** (dotted underlines) smoothly scroll the code to their lines and highlight them. **Go back** (or <kbd>Esc</kbd>) jumps back instantly.
-- **Diff** (for changes): every changed file.
-- "Reviewed" marks on chapters and files are saved in your browser.
+The browser shows a workspace: two slots side by side and a dock along the bottom. Jobs that are still running wait in the dock with their progress; click a square to open it, or drag it up into a slot.
+
+- **Guide**: one chapter at a time, its prose and file list beside the code. Keys work while focus is in the panel: <kbd>J</kbd>/<kbd>K</kbd> (or <kbd>⌥</kbd><kbd>↓</kbd>/<kbd>↑</kbd>) for chapters, <kbd>[</kbd>/<kbd>]</kbd> for files, <kbd>R</kbd> to mark the chapter Reviewed.
+- **Diff** (for changes): every changed file. Open it from **New panel**.
+- **Anchors** (accent-coloured links in the prose) scroll the code to their lines and highlight them. **Go back** (or <kbd>Esc</kbd>) jumps back instantly.
+- "Reviewed" marks and the layout are saved in your browser.
 
 This repo has a guide about itself in `.code-chapters/how-anchors-work.json`; `code-guide check` validates it.
 
@@ -67,4 +68,4 @@ node dist/cli.js --no-open --port 4646 &
 npm run dev
 ```
 
-Layout: `src/shared` (guide schema and prose parsing), `src/server` (CLI, git resolution, validation, highlighting), `src/ui` (React + Tailwind + Radix/shadcn-style components).
+Layout: `src/shared` (guide schema and prose parsing), `src/server` (CLI, git resolution, validation, highlighting), `src/modules` (each module: its job and its panel), `src/ui` (React + Tailwind: the workspace).
