@@ -45,7 +45,7 @@
   --del-bg-strong: #f4d9d4;
   --mark: #c6d1f6;
   /* The one hard-edged shadow, for the active panel */
-  --shadow-active: 2px 2px 0 #1d1c19;
+  --active-shadow: 2px 2px 0 #1d1c19;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -77,7 +77,7 @@
     --del-bg: #33191a;
     --del-bg-strong: #45201f;
     --mark: #334079;
-    --shadow-active: 2px 2px 0 #000000;
+    --active-shadow: 2px 2px 0 #000000;
   }
 }
 :root[data-theme="dark"] {
@@ -108,5 +108,5 @@
   --del-bg: #33191a;
   --del-bg-strong: #45201f;
   --mark: #334079;
-  --shadow-active: 2px 2px 0 #000000;
+  --active-shadow: 2px 2px 0 #000000;
 }
