@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { parseBody, type Guide, type ResolvedFile } from "../../shared/guide";
+import type { Guide, ResolvedFile } from "../../shared/guide";
 import type { ChatContext } from "../../shared/protocol";
 import type { ChatMessage } from "../../shared/state";
-import { CiteChip } from "@/code/CiteChip";
+import { RichText } from "@/components/RichText";
 import type { PanelProps } from "@/lib/panels";
 import { cn } from "@/lib/utils";
 import { useDraft } from "@/workspace/actions";
@@ -37,66 +37,6 @@ function ContextLabel({ c }: { c: ChatContext }) {
     return <>{`${c.path.split("/").pop()} ${c.start === c.end ? c.start : `${c.start}–${c.end}`}`}</>;
   const title = guide?.chapters[c.chapter]?.title;
   return <>{`${c.kind === "prose" ? "From" : "About"} ${pad(c.chapter + 1)}${title ? ` · ${title}` : ""}`}</>;
-}
-
-/** Inline text with `code` and **bold**. */
-function Text({ text }: { text: string }) {
-  return (
-    <>
-      {text.split(/(`[^`]+`|\*\*[^*]+\*\*)/).map((t, i) =>
-        t.startsWith("`") && t.endsWith("`") && t.length > 1 ? (
-          <code key={i} className="border border-border-subtle bg-surface-3 px-0.5 font-mono text-[0.88em]">
-            {t.slice(1, -1)}
-          </code>
-        ) : t.startsWith("**") && t.endsWith("**") && t.length > 3 ? (
-          <strong key={i} className="font-semibold">
-            {t.slice(2, -2)}
-          </strong>
-        ) : (
-          t
-        ),
-      )}
-    </>
-  );
-}
-
-/** A reply: paragraphs and list items, with code citations as file:line chips. */
-function Reply({ text }: { text: string }) {
-  return (
-    <div className="flex flex-col gap-2 text-[13.5px] leading-[1.6]">
-      {text
-        .split(/\n\s*\n/)
-        .filter((p) => p.trim())
-        .map((para, pi) => {
-          const lines = para.split("\n");
-          const isList = lines.every((l) => /^\s*([-*]|\d+\.)\s/.test(l));
-          const render = (src: string, key: number) => (
-            <span key={key}>
-              {parseBody(src.replace(/^\s*([-*]|\d+\.)\s/, ""))
-                .flat()
-                .map((part, i) =>
-                  part.kind === "anchor" ? (
-                    <CiteChip key={i} path={part.path} start={part.range.start} end={part.range.end} />
-                  ) : part.kind === "code" ? (
-                    <Text key={i} text={`\`${part.text}\``} />
-                  ) : (
-                    <Text key={i} text={part.text} />
-                  ),
-                )}
-            </span>
-          );
-          return isList ? (
-            <ul key={pi} className="flex list-disc flex-col gap-1 pl-5">
-              {lines.map((l, i) => (
-                <li key={i}>{render(l, i)}</li>
-              ))}
-            </ul>
-          ) : (
-            <p key={pi}>{render(para, 0)}</p>
-          );
-        })}
-    </div>
-  );
 }
 
 /** The code a context points at, as a few numbered lines. */
@@ -252,7 +192,7 @@ function Message({ m }: { m: ChatMessage }) {
         </div>
       ) : (
         <div>
-          {m.text ? <Reply text={m.text} /> : <span className="text-[13px] text-fg-3">…</span>}
+          {m.text ? <RichText text={m.text} /> : <span className="text-[13px] text-fg-3">…</span>}
           {m.status === "streaming" && (
             <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-accent align-middle" />
           )}
