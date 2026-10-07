@@ -49,7 +49,7 @@ export function Dock({ state, modules, layout, dragging, onDragStart, onOpen, on
               onClick={() => onOpen(panel)}
               onPointerDown={(e) => onDragStart(panel, e)}
               className={cn(
-                "relative flex h-[50px] w-[54px] flex-col items-center justify-center gap-[5px] border bg-surface",
+                "relative flex h-[50px] w-[54px] touch-none flex-col items-center justify-center gap-[5px] border bg-surface",
                 s.busy && "pb-1.5",
                 s.failed ? "border-del" : "border-border hover:border-fg-3",
               )}
