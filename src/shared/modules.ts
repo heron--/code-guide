@@ -9,6 +9,8 @@ export type ModuleInfo = {
   icon: string[];
   /** Guide and Quiz run a job before they can open; Chat and Diff open at once. */
   needsJob: boolean;
+  /** The kind of job whose result the panel shows, for modules with a job. */
+  kind?: string;
   /** Subject types it works with; omit for all. */
   subjects?: Subject["type"][];
   /** Job kinds that must have a finished result first, e.g. a quiz needs a guide. */

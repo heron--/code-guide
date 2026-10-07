@@ -1,0 +1,360 @@
+import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { unavailable, type ModuleInfo } from "../../shared/modules";
+import type { SessionState } from "../../shared/state";
+import { panelFor } from "@/lib/panels";
+import type { SessionChannel } from "@/lib/session";
+import { usePersistent, usePersistentSet } from "@/lib/storage";
+import { cn } from "@/lib/utils";
+import { Icon, icons } from "./Icon";
+import { emptyLayout, open, setSplit, toDock, toggleMaximized, type Layout, type Slot } from "./layout";
+import { panelState, sessionActivity } from "./status";
+
+type Props = { state: SessionState; modules: ModuleInfo[]; channel: SessionChannel };
+
+/** The frame every module lives in: a status bar, two slots, and (below) the dock. No navigation rail. */
+export function Workspace({ state, modules, channel }: Props) {
+  const [layout, setLayout] = usePersistent<Layout>(`cg:${state.id}:layout`, emptyLayout);
+  const byName = (name?: string) => modules.find((m) => m.name === name);
+
+  const startModule = (m: ModuleInfo) => {
+    if (m.needsJob) channel.send({ type: "job.start", module: m.name });
+    else setLayout(open(layout, m.name));
+  };
+
+  const slot = (s: Slot) => {
+    const m = byName(layout[s]);
+    if (!m) return <EmptySlot slot={s} state={state} modules={modules} />;
+    return (
+      <PanelFrame
+        module={m}
+        active={layout.recent === s}
+        maximized={layout.maximized === s}
+        onFocus={() => layout.recent !== s && setLayout({ ...layout, recent: s })}
+        onMaximize={() => setLayout(toggleMaximized(layout, s))}
+        onClose={() => setLayout(toDock(layout, s))}
+      >
+        <PanelBody module={m} state={state} channel={channel} />
+      </PanelFrame>
+    );
+  };
+
+  return (
+    <div className="flex h-full flex-col overflow-hidden bg-canvas text-fg">
+      <StatusBar state={state} modules={modules} onStart={startModule} />
+      <main className="flex min-h-0 flex-1 p-2.5">
+        {layout.maximized ? (
+          slot(layout.maximized)
+        ) : (
+          <Slots
+            split={layout.split}
+            onSplit={(v) => setLayout(setSplit(layout, v))}
+            left={slot("left")}
+            right={slot("right")}
+          />
+        )}
+      </main>
+    </div>
+  );
+}
+
+function Slots({
+  split,
+  onSplit,
+  left,
+  right,
+}: {
+  split: number;
+  onSplit: (v: number) => void;
+  left: ReactNode;
+  right: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => {
+    if (!dragging) return;
+    const move = (e: PointerEvent) => {
+      const r = ref.current!.getBoundingClientRect();
+      onSplit((e.clientX - r.left) / r.width);
+    };
+    const up = () => setDragging(false);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, [dragging, onSplit]);
+
+  return (
+    <div ref={ref} className={cn("flex min-w-0 flex-1", dragging && "cursor-col-resize select-none")}>
+      <div className="flex min-w-0" style={{ flex: `${split} 1 0` }}>
+        {left}
+      </div>
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize slots"
+        tabIndex={0}
+        onPointerDown={() => setDragging(true)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowLeft") onSplit(split - 0.05);
+          if (e.key === "ArrowRight") onSplit(split + 0.05);
+        }}
+        className="flex w-[9px] flex-none cursor-col-resize items-center justify-center focus-visible:outline-1 focus-visible:outline-accent"
+      >
+        <span className="h-7 w-[3px] border-x border-border" />
+      </div>
+      <div className="flex min-w-0" style={{ flex: `${1 - split} 1 0` }}>
+        {right}
+      </div>
+    </div>
+  );
+}
+
+function PanelFrame(props: {
+  module: ModuleInfo;
+  active: boolean;
+  maximized: boolean;
+  onFocus: () => void;
+  onMaximize: () => void;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const { module: m, active } = props;
+  return (
+    <section
+      aria-label={m.label}
+      onPointerDownCapture={props.onFocus}
+      className={cn(
+        "relative flex min-w-0 flex-1 flex-col bg-surface",
+        active ? "border border-rule shadow-active" : "border border-border-strong",
+      )}
+    >
+      <header
+        className={cn(
+          "flex h-7 flex-none items-center gap-[7px] pr-[5px] pl-[9px]",
+          active ? "border-b border-rule bg-surface-3" : "border-b border-border-strong bg-surface-4",
+        )}
+      >
+        <Icon paths={m.icon} size={13} className="text-fg-2" />
+        <span className="text-xs font-semibold">{m.label}</span>
+        <span className="flex-1" />
+        <TitleButton
+          label={props.maximized ? "Restore" : "Maximize"}
+          onClick={props.onMaximize}
+          paths={icons.maximize}
+        />
+        <TitleButton label="Send to dock" onClick={props.onClose} paths={icons.close} />
+      </header>
+      <div className="flex min-h-0 flex-1 flex-col">{props.children}</div>
+    </section>
+  );
+}
+
+function TitleButton({ label, onClick, paths }: { label: string; onClick: () => void; paths: string[] }) {
+  return (
+    <button
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className="flex size-[18px] items-center justify-center border border-border bg-surface text-fg-2 hover:border-fg-3 hover:text-fg"
+    >
+      <Icon paths={paths} size={10} />
+    </button>
+  );
+}
+
+/** A module's own panel, or a placeholder until its module has one. */
+function PanelBody({
+  module: m,
+  state,
+  channel,
+}: {
+  module: ModuleInfo;
+  state: SessionState;
+  channel: SessionChannel;
+}) {
+  const Panel = panelFor(m.name);
+  const { job, busy, activity } = panelState(m, state);
+  if (m.needsJob && !job)
+    return (
+      <Centered title={busy ? `Writing ${m.label.toLowerCase()}…` : `No ${m.label.toLowerCase()} yet`}>
+        {activity}
+      </Centered>
+    );
+  if (!Panel) return <Centered title={`${m.label} panel`}>This module's panel isn't built yet.</Centered>;
+  return (
+    <Suspense fallback={<Centered title="Loading…" />}>
+      <Panel module={m} state={state} channel={channel} job={job} />
+    </Suspense>
+  );
+}
+
+function EmptySlot({ slot, state, modules }: { slot: Slot; state: SessionState; modules: ModuleInfo[] }) {
+  const guide = modules.find((m) => m.name === "guide");
+  const writing = slot === "left" && guide && panelState(guide, state).busy && !panelState(guide, state).job;
+  return (
+    <div className="flex min-w-0 flex-1 items-center justify-center border border-dashed border-border">
+      {writing ? (
+        <Centered title="Your guide is being written">
+          It will wait in the dock below, marked when it’s ready. Nothing opens on its own.
+        </Centered>
+      ) : (
+        <Centered title="Empty slot">Open Chat or Diff from New panel, or drag a square up from the dock.</Centered>
+      )}
+    </div>
+  );
+}
+
+function Centered({ title, children }: { title: string; children?: ReactNode }) {
+  return (
+    <div className="m-auto flex max-w-[300px] flex-col items-center gap-2 p-4 text-center">
+      <span className="text-[13px] font-medium text-fg-2">{title}</span>
+      {children && <span className="text-[12.5px] leading-normal text-fg-3">{children}</span>}
+    </div>
+  );
+}
+
+function StatusBar({
+  state,
+  modules,
+  onStart,
+}: {
+  state: SessionState;
+  modules: ModuleInfo[];
+  onStart: (m: ModuleInfo) => void;
+}) {
+  const subject = state.subject?.subject;
+  const activity = sessionActivity(state);
+  const guide = modules.find((m) => m.name === "guide");
+  const guideJob = guide && panelState(guide, state).job;
+  return (
+    <div className="relative z-20 flex h-[30px] flex-none items-center gap-3.5 border-b border-rule bg-chrome pr-2 pl-3 text-xs whitespace-nowrap">
+      <div className="flex min-w-0 flex-1 items-center gap-3.5 overflow-hidden">
+        <span className="flex items-center gap-[7px] font-semibold">
+          <span className="size-[9px] bg-accent" />
+          Code Guide
+        </span>
+        <Sep />
+        <span className="flex min-w-0 items-center gap-1.5 font-mono text-[11.5px]">
+          {subject?.type === "change" && <Icon paths={icons.branch} size={12} className="text-fg-2" />}
+          <span className="truncate">{state.subject?.label}</span>
+        </span>
+        {state.harness && (
+          <>
+            <Sep />
+            <span className="font-mono text-[11.5px] text-fg-2">
+              {state.harness.harness} · {state.harness.model}
+            </span>
+          </>
+        )}
+        {activity && (
+          <>
+            <Sep />
+            <span className="flex items-center gap-1.5 font-mono text-[11.5px] text-fg-2">
+              <span className="size-1.5 animate-pulse bg-accent" />
+              {activity}
+            </span>
+          </>
+        )}
+        <span className="flex-1" />
+      </div>
+      {guideJob ? (
+        <ReviewedCount session={state.id} job={guideJob} />
+      ) : (
+        <span className="font-mono text-[11.5px] text-fg-2">Guide not ready</span>
+      )}
+      <Sep />
+      <NewPanel state={state} modules={modules} onStart={onStart} />
+    </div>
+  );
+}
+
+const Sep = () => <span className="h-3.5 w-px flex-none bg-border" />;
+
+function ReviewedCount({ session, job }: { session: string; job: string }) {
+  const [chapters, setChapters] = useState<number>();
+  const [reviewed] = usePersistentSet(`cc:${session}:${job}:chapters`);
+  useEffect(() => {
+    fetch(`/api/results/${encodeURIComponent(job)}`)
+      .then((r) => r.json())
+      .then(
+        (g: { chapters?: unknown[] }) => setChapters(g.chapters?.length),
+        () => {},
+      );
+  }, [job]);
+  if (chapters === undefined) return null;
+  return (
+    <span className="flex items-center gap-2 font-mono text-[11.5px] text-fg-2">
+      <span className="flex gap-0.5" aria-hidden="true">
+        {Array.from({ length: chapters }, (_, i) => (
+          <span
+            key={i}
+            className={cn("size-[7px] border", reviewed.has(String(i)) ? "border-accent bg-accent" : "border-border")}
+          />
+        ))}
+      </span>
+      {[...reviewed].filter((c) => Number(c) < chapters).length}/{chapters} chapters reviewed
+    </span>
+  );
+}
+
+function NewPanel({
+  state,
+  modules,
+  onStart,
+}: {
+  state: SessionState;
+  modules: ModuleInfo[];
+  onStart: (m: ModuleInfo) => void;
+}) {
+  const [openMenu, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!openMenu) return;
+    const close = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    window.addEventListener("pointerdown", close);
+    return () => window.removeEventListener("pointerdown", close);
+  }, [openMenu]);
+  return (
+    <div ref={ref} className="relative">
+      <button
+        aria-label="New panel"
+        aria-expanded={openMenu}
+        onClick={() => setOpen(!openMenu)}
+        className="flex h-[22px] items-center gap-[5px] border border-border bg-surface pr-[7px] pl-[5px] text-xs hover:border-fg-3"
+      >
+        <Icon paths={icons.plus} size={12} />
+        New panel
+      </button>
+      {openMenu && (
+        <ul role="menu" className="absolute top-7 right-0 z-30 w-64 border border-rule bg-surface py-1 shadow-active">
+          {modules.map((m) => {
+            const why = unavailable(m, state);
+            return (
+              <li key={m.name} role="none">
+                <button
+                  role="menuitem"
+                  disabled={!!why}
+                  onClick={() => {
+                    onStart(m);
+                    setOpen(false);
+                  }}
+                  className="flex w-full items-start gap-2 px-2.5 py-1.5 text-left hover:bg-accent-bg disabled:hover:bg-transparent"
+                >
+                  <Icon paths={m.icon} size={14} className={why ? "text-fg-4" : "text-fg-2"} />
+                  <span className="flex min-w-0 flex-col">
+                    <span className={cn("text-[12.5px]", why && "text-fg-3")}>{m.label}</span>
+                    <span className="text-[11px] text-fg-3">
+                      {why ?? (m.needsJob ? "Runs a job, then waits in the dock" : "Opens now")}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
