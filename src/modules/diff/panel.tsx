@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { FileStatus, ResolvedFile } from "../../shared/guide";
 import { ChangeCount, FileCard, LangTag, splitPath } from "@/code/FileCard";
-import { initialVisible } from "@/code/excerpt";
+import { indexRange, initialVisible } from "@/code/excerpt";
 import type { PanelProps } from "@/lib/panels";
 import { cn } from "@/lib/utils";
+import { useLineShower, type LinesTarget } from "@/workspace/actions";
 
 type Changed = { path: string; additions: number; deletions: number; status: FileStatus };
 const domId = (path: string) => `diff-${encodeURIComponent(path)}`;
@@ -14,6 +15,15 @@ export default function DiffPanel({ state }: PanelProps) {
   const [error, setError] = useState<string>();
   const scroller = useRef<HTMLDivElement>(null);
   const subject = state.subject?.subject;
+  // A citation to a changed file: scroll to it, and the file marks its lines once loaded.
+  const [target, setTarget] = useState<LinesTarget & { nonce: number }>();
+  useLineShower("diff", {
+    canShow: (path) => !!changed?.some((f) => f.path === path),
+    show: (t) => setTarget({ ...t, nonce: Date.now() }),
+  });
+  useEffect(() => {
+    if (target && changed) jump(target.path);
+  }, [target, changed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetch("/api/diff")
@@ -24,16 +34,17 @@ export default function DiffPanel({ state }: PanelProps) {
       );
   }, []);
 
+  function jump(path: string) {
+    const el = document.getElementById(domId(path));
+    const p = scroller.current;
+    if (el && p) p.scrollTo({ top: el.offsetTop - 12, behavior: "smooth" });
+  }
+
   if (error) return <p className="m-auto p-6 text-[13px] text-fg-2">{error}</p>;
   if (!changed) return <p className="m-auto p-6 text-[13px] text-fg-2">Loading the change…</p>;
 
   const add = changed.reduce((n, f) => n + f.additions, 0);
   const del = changed.reduce((n, f) => n + f.deletions, 0);
-  const jump = (path: string) => {
-    const el = document.getElementById(domId(path));
-    const p = scroller.current;
-    if (el && p) p.scrollTo({ top: el.offsetTop - 12, behavior: "smooth" });
-  };
 
   return (
     <div ref={scroller} className="relative min-h-0 flex-1 overflow-y-auto bg-surface-4">
@@ -75,7 +86,12 @@ export default function DiffPanel({ state }: PanelProps) {
       </nav>
       <div className="flex flex-col gap-3 p-3 pb-[40vh]">
         {changed.map((f) => (
-          <DiffFile key={f.path} path={f.path} scroller={scroller} />
+          <DiffFile
+            key={f.path}
+            path={f.path}
+            scroller={scroller}
+            target={target?.path === f.path ? target : undefined}
+          />
         ))}
       </div>
     </div>
@@ -83,11 +99,36 @@ export default function DiffPanel({ state }: PanelProps) {
 }
 
 /** One file's diff, loaded when it first comes near the screen. */
-function DiffFile({ path, scroller }: { path: string; scroller: React.RefObject<HTMLDivElement | null> }) {
+function DiffFile({
+  path,
+  scroller,
+  target,
+}: {
+  path: string;
+  scroller: React.RefObject<HTMLDivElement | null>;
+  target?: LinesTarget & { nonce: number };
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [file, setFile] = useState<ResolvedFile>();
   const [visible, setVisible] = useState<boolean[]>();
   const [near, setNear] = useState(false);
+  const [marked, setMarked] = useState<[number, number]>();
+
+  useEffect(() => {
+    if (target) setNear(true);
+  }, [target]);
+  useEffect(() => {
+    // A citation in another file takes the mark with it.
+    if (!target) return setMarked(undefined);
+    if (!file) return;
+    const ir = indexRange(file, { start: target.start, end: target.end });
+    if (!ir) return;
+    setVisible((v) => v && v.map((shown, i) => shown || (i >= ir[0] && i <= ir[1])));
+    setMarked(ir);
+    requestAnimationFrame(() =>
+      ref.current?.querySelector(`[data-idx="${ir[0]}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" }),
+    );
+  }, [target, file]);
   const [failed, setFailed] = useState<string>();
 
   useEffect(() => {
@@ -120,6 +161,7 @@ function DiffFile({ path, scroller }: { path: string; scroller: React.RefObject<
           id={`${domId(path)}-card`}
           file={file}
           visible={visible}
+          marked={marked}
           onReveal={(from, to) => setVisible((v) => v && v.map((shown, i) => shown || (i >= from && i <= to)))}
         />
       ) : (
