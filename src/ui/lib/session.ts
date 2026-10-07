@@ -13,6 +13,8 @@ export type ChannelSnapshot = {
   modules: ModuleInfo[];
   /** The last refusal or failure the server sent. */
   error?: string;
+  /** The server ended the connection for good (e.g. a different protocol version): no reconnect is coming. */
+  fatal?: boolean;
 };
 
 /**
@@ -32,6 +34,9 @@ export class SessionChannel {
   ) {
     this.connect();
   }
+
+  /** Clears the latest refusal; each new one restarts it. */
+  private fade?: ReturnType<typeof setTimeout>;
 
   private set(patch: Partial<ChannelSnapshot>) {
     this.snapshot = { ...this.snapshot, ...patch };
@@ -68,7 +73,10 @@ export class SessionChannel {
       });
     } else if (f.type === "error") {
       if (f.fatal) this.stopped = true;
-      this.set({ error: f.message });
+      this.set({ error: f.message, ...(f.fatal && { fatal: true }) });
+      // A refusal is news, not a state: let it fade.
+      clearTimeout(this.fade);
+      if (!f.fatal) this.fade = setTimeout(() => this.set({ error: undefined }), 8000);
     } else {
       const s = this.snapshot.state;
       if (s && f.seq === s.seq + 1) this.set({ state: reduce(s, f) });

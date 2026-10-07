@@ -29,5 +29,5 @@ export function defineModule(m: Module): Module {
 }
 
 export function moduleInfo({ job, startsWithSession: _, next: __, ...m }: Module): ModuleInfo {
-  return { ...m, needsJob: !!job };
+  return { ...m, needsJob: !!job, ...(job && { kind: job.kind }) };
 }
