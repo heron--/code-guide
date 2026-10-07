@@ -1,6 +1,7 @@
 import type { IncomingMessage, Server } from "node:http";
 import { WebSocketServer, type WebSocket } from "ws";
 import { PROTOCOL_VERSION, requestSchema, type Request, type ServerFrame } from "../shared/protocol.js";
+import type { ModuleInfo } from "../shared/modules.js";
 import type { Session } from "./session.js";
 
 /** Handles every request except "hello". Throwing refuses the request; the message goes back to that tab. */
@@ -23,7 +24,12 @@ function localOrigin(req: IncomingMessage): boolean {
  * One WebSocket per tab, carrying every event for the session. A tab says hello with the last event it saw;
  * the server replays everything after it, then streams live. Every tab gets every event, so tabs stay in sync.
  */
-export function attachChannel(server: Server, session: Session, onRequest: RequestHandler): () => void {
+export function attachChannel(
+  server: Server,
+  session: Session,
+  onRequest: RequestHandler,
+  modules: ModuleInfo[] = [],
+): () => void {
   const wss = new WebSocketServer({ noServer: true });
 
   server.on("upgrade", (req, socket, head) => {
@@ -62,7 +68,7 @@ export function attachChannel(server: Server, session: Session, onRequest: Reque
           return ws.close();
         }
         stop?.();
-        send({ type: "welcome", v: PROTOCOL_VERSION, session: session.id });
+        send({ type: "welcome", v: PROTOCOL_VERSION, session: session.id, modules });
         // Replay and subscribe in the same tick, so no event falls between them.
         for (const e of session.eventsAfter(req.session === session.id ? (req.after ?? 0) : 0)) send(e);
         stop = session.subscribe(send);

@@ -3,6 +3,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { dirname, extname, join, normalize, resolve } from "node:path";
 import { attachChannel, type RequestHandler } from "./channel.js";
 import { repoRoot } from "./git.js";
+import type { ModuleInfo } from "../shared/modules.js";
 import type { Session } from "./session.js";
 import { resolveChangedFile, resolveGuide, summarize, guideId } from "./resolve.js";
 
@@ -25,7 +26,7 @@ export type ServeOptions = {
   uiDir: string;
   port: number;
   /** The session to serve over the WebSocket channel, and what to do with its requests. */
-  session?: { session: Session; onRequest: RequestHandler };
+  session?: { session: Session; onRequest: RequestHandler; modules?: ModuleInfo[] };
 };
 
 async function discover(opts: ServeOptions): Promise<Map<string, string>> {
@@ -103,7 +104,9 @@ export function startServer(opts: ServeOptions): Promise<{ url: string; close: (
     handle(req, res).catch((e) => send(res, 500, { error: String(e?.message ?? e) }));
   });
 
-  const detach = opts.session ? attachChannel(server, opts.session.session, opts.session.onRequest) : undefined;
+  const detach = opts.session
+    ? attachChannel(server, opts.session.session, opts.session.onRequest, opts.session.modules)
+    : undefined;
 
   // Localhost only: the server reads the repository and drives an agent.
   const host = "127.0.0.1";

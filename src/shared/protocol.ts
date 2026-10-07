@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ModuleInfo } from "./modules.js";
 
 /**
  * The event protocol between the Code Guide server and the browser. See docs/protocol.md.
@@ -155,7 +156,7 @@ export type ChatContext = z.infer<typeof chatContextSchema>;
 /** Frames the server sends that aren't session events, and so aren't logged or replayed. */
 export type Notice =
   /** Reply to "hello", before any replayed events. */
-  | { type: "welcome"; v: typeof PROTOCOL_VERSION; session: string }
+  | { type: "welcome"; v: typeof PROTOCOL_VERSION; session: string; modules: ModuleInfo[] }
   /** A request was refused, or the browser speaks another protocol version. */
   | { type: "error"; message: string; fatal: boolean };
 
