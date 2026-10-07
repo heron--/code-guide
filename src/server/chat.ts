@@ -46,8 +46,12 @@ export class Chat {
     this.pending.push(entry);
     const sent = this.queue
       .then(async () => {
-        const parts = [await this.catchUp(), ...(await Promise.all(context.map((c) => this.describe(c)))), text];
+        const caught = await this.catchUp();
+        const parts = [caught.text, ...(await Promise.all(context.map((c) => this.describe(c)))), text];
+        // A fatal error while this was prepared already failed it: sending it now would take the next reply.
+        if (!this.pending.includes(entry)) return;
         this.start().send(parts.filter(Boolean).join("\n\n"));
+        for (const id of caught.jobs) this.seen.add(id);
       })
       .catch((e: Error) => {
         // It never reached the harness, so no reply will come: fail it here, or the next reply would be its.
@@ -60,18 +64,22 @@ export class Chat {
   }
 
   /** What finished since the last message: the first message gets every result so far. */
-  private async catchUp(): Promise<string> {
+  private async catchUp(): Promise<{ text: string; jobs: string[] }> {
     const state = this.session.state;
     const out: string[] = [];
+    const jobs: string[] = [];
     for (const jobId of state.jobOrder) {
       const job = state.jobs[jobId];
       if (job.status !== "finished" || !SEEDED.includes(job.kind) || this.seen.has(jobId)) continue;
-      this.seen.add(jobId);
-      out.push(
-        `A ${job.kind} finished (${jobId}). The reader may refer to it:\n${JSON.stringify(await this.session.readResult(job.result!))}`,
-      );
+      // One that can't be read fails this message, and is skipped from then on rather than failing every one.
+      const result = await this.session.readResult(job.result!).catch((e: Error) => {
+        this.seen.add(jobId);
+        throw e;
+      });
+      jobs.push(jobId);
+      out.push(`A ${job.kind} finished (${jobId}). The reader may refer to it:\n${JSON.stringify(result)}`);
     }
-    return out.join("\n\n");
+    return { text: out.join("\n\n"), jobs };
   }
 
   private async describe(c: ChatContext): Promise<string> {
@@ -79,6 +87,8 @@ export class Chat {
       const subject = this.session.state.subject!.subject;
       const repo = this.session.state.repo!;
       const ref = subject.type === "change" && subject.head ? await revParse(repo, subject.head) : undefined;
+      // Without it, fileAt would read the working tree instead of the change.
+      if (subject.type === "change" && subject.head && !ref) throw new Error(`unknown ref "${subject.head}"`);
       const text = c.path.split("/").includes("..") ? undefined : await fileAt(repo, ref, c.path);
       const lines = text === undefined ? [] : splitLines(text).slice(c.start - 1, c.end);
       return `The reader selected ${c.path}#L${c.start}-L${c.end}:\n\`\`\`\n${lines.map((l, i) => `${c.start + i}  ${l}`).join("\n")}\n\`\`\``;
