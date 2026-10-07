@@ -6,7 +6,7 @@ import { modules } from "../modules/index.js";
 import { moduleInfo } from "../modules/types.js";
 import type { Subject } from "../shared/protocol.js";
 import { Chat } from "./chat.js";
-import { repoRoot } from "./git.js";
+import { repoRoot, revParse } from "./git.js";
 import { createHarness, DEFAULT_HARNESS, harnesses } from "./harness/index.js";
 import { JobRunner } from "./jobs.js";
 import { followUps, requestHandler } from "./requests.js";
@@ -77,6 +77,13 @@ async function serve(dir: string | undefined, flags: Flags) {
     console.error(`${target} isn't inside a git repository. Run code-guide from inside one.`);
     return 1;
   }
+  // A ref that doesn't resolve would fail every submission; say so now instead.
+  if (flags.subject?.type === "change")
+    for (const ref of [flags.subject.base, flags.subject.head])
+      if (ref && !(await revParse(root, ref))) {
+        console.error(`--change: unknown ref "${ref}"`);
+        return 1;
+      }
   const harness = createHarness(flags.harness, flags.model);
   const ok = await harness.check();
   if (!ok.ok) {
