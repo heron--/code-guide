@@ -8,7 +8,9 @@ export function SessionHome() {
   if (!state) return <Message title={status === "closed" ? "Not connected" : "Connecting…"}>{error}</Message>;
   if (!state.subject) return <SubjectPicker />;
   return (
+    // Keyed by session: a new session loads its own layout, so its job ids don't meet the last one's.
     <Workspace
+      key={state.id}
       state={state}
       modules={modules}
       channel={sessionChannel()}
