@@ -36,3 +36,11 @@ test("long summaries, bad links and missing lines are rejected", async () => {
     "b.ts doesn't exist",
   ]);
 });
+
+test("a change whose head no longer resolves is rejected, not read from the working tree", async () => {
+  const result = await overview.job!.submit.validate(
+    { summary: "See [it](a.ts#L1)." },
+    { repo, subject: { type: "change", base: "main", head: "gone" }, label: "", inputs: {} },
+  );
+  expect(result.problems.map((p) => p.message)).toEqual(['unknown ref "gone"']);
+});

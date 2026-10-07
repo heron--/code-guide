@@ -57,6 +57,7 @@ export default defineModule({
         // Cited lines are read where the reader will see them: the change's head, or the working tree.
         const head = ctx.subject.type === "change" ? ctx.subject.head : undefined;
         const ref = head ? await revParse(ctx.repo, head) : undefined;
+        if (head && !ref) return { problems: [{ level: "error", where: "summary", message: `unknown ref "${head}"` }] };
         for (const a of parseBody(summary).flat()) {
           if (a.kind !== "anchor") continue;
           const text = a.path.split(/[\\/]/).includes("..") ? undefined : await fileAt(ctx.repo, ref, a.path);
