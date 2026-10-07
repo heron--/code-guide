@@ -61,6 +61,7 @@ export function Workspace({ state, modules, channel, problem }: Props) {
   // else in a plain file view over the workspace.
   const showers = useRef(new Map<string, LineShower>());
   const pending = useRef<{ module: string; target: LinesTarget }>(undefined);
+  const latestCite = useRef(0);
   const [fileView, setFileView] = useState<{ target: LinesTarget; file: ResolvedFile }>();
   const live = useRef({ layout, state, modules });
   live.current = { layout, state, modules };
@@ -79,15 +80,22 @@ export function Workspace({ state, modules, channel, problem }: Props) {
         };
       },
       async showLines(target) {
+        // Only the latest citation clicked may move the workspace.
+        const ticket = ++latestCite.current;
         const guide = showers.current.get("guide");
         if (guide && inSlot("guide") && guide.canShow(target.path)) return guide.show(target);
         const res = await fetch(`/api/file?path=${encodeURIComponent(target.path)}`);
-        if (!res.ok) return;
+        if (!res.ok || ticket !== latestCite.current) return;
         const file = (await res.json()) as ResolvedFile;
+        if (ticket !== latestCite.current) return;
         const diff = live.current.modules.find((m) => m.name === "diff");
         if (file.status !== "unchanged" && diff && !unavailable(diff, live.current.state)) {
           const shower = showers.current.get("diff");
-          if (shower && inSlot("diff")) return shower.show(target);
+          if (shower && inSlot("diff")) {
+            // A Diff loaded before the file changed doesn't have it; the file view does.
+            if (shower.canShow(target.path)) return shower.show(target);
+            return setFileView({ target, file });
+          }
           pending.current = { module: "diff", target };
           setLayout(open(live.current.layout, "diff", elsewhere()));
           return;

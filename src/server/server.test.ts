@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
@@ -61,4 +61,11 @@ test("serves any file as the subject shows it, for citations", async () => {
   const f = await question("/api/file?path=a.ts");
   expect([f.body.status, f.body.lines.length]).toEqual(["unchanged", 2]);
   expect((await question("/api/file?path=../etc/passwd")).status).toBe(404);
+  // Nor through a symlink that leads out of the repository.
+  const outside = mkdtempSync(join(tmpdir(), "cg-outside-"));
+  writeFileSync(join(outside, "secret.txt"), "s\n");
+  symlinkSync(outside, join(repo, "out"));
+  expect((await question("/api/file?path=out/secret.txt")).status).toBe(404);
+  rmSync(join(repo, "out"));
+  rmSync(outside, { recursive: true, force: true });
 });
