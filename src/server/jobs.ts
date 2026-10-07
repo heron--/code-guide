@@ -26,8 +26,11 @@ export type JobKind = {
     tool: string;
     description: string;
     input: z.ZodObject;
-    /** Errors reject the submission; warnings are recorded but don't. */
-    validate(input: unknown, ctx: JobContext): Promise<Problem[]>;
+    /**
+     * Errors reject the submission; warnings are recorded but don't. `result` is what's stored when it's
+     * accepted; it defaults to the input.
+     */
+    validate(input: unknown, ctx: JobContext): Promise<{ problems: Problem[]; result?: unknown }>;
   };
 };
 
@@ -152,13 +155,13 @@ export class JobRunner {
             submitting = true;
             try {
               attempts++;
-              const problems = await submit.validate(input, ctx);
+              const { problems, result: accepted = input } = await submit.validate(input, ctx);
               // Each await is a chance for the job to be cancelled or to fail.
               if (this.isOver(id)) return over;
               const errors = problems.filter((p) => p.level === "error");
               this.session.append("job.submitted", { job: id, attempt: attempts, accepted: !errors.length, problems });
               if (!errors.length) {
-                const result = await this.session.writeResult(id, input);
+                const result = await this.session.writeResult(id, accepted);
                 if (this.isOver(id)) return over;
                 this.session.append("job.finished", { job: id, result, warnings: problems });
                 return { text: "Accepted. You're done; don't reply." };
