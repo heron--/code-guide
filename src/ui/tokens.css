@@ -1,0 +1,112 @@
+/*
+ * Code Guide's design tokens, from the Claude Design workspace reference: a modern tool that echoes early
+ * desktop GUIs through structure (1px rules, square corners, one hard shadow), never costume (no bevels,
+ * pixel fonts, stripes or dithering). Every component reads color and type from here; light and dark are
+ * both first-class, and switching needs no per-component code.
+ */
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+
+:root {
+  color-scheme: light;
+  /* Grounds, back to front */
+  --canvas: #e9e7e1; /* the workspace behind the slots */
+  --chrome: #f6f5f1; /* status bar, dock */
+  --surface: #ffffff; /* panels, controls */
+  --surface-2: #fafaf7; /* a quieter area inside a panel */
+  --surface-3: #f3f2ee; /* gutters, collapsed-line rows */
+  --surface-4: #f5f4f0;
+  /* Text */
+  --fg: #1d1c19;
+  --fg-2: #54524c;
+  --fg-3: #706e67;
+  --fg-4: #86837b; /* line numbers */
+  /* Lines */
+  --rule: #1d1c19; /* the one strong line: under the status bar, above the dock */
+  --border: #c9c7c0;
+  --border-subtle: #e3e1db;
+  --border-strong: #a3a19a;
+  /* The single accent */
+  --accent: #2a46c4;
+  --accent-fg: #2a46c4; /* accent-colored text */
+  --accent-bg: #e8ecfb;
+  --accent-bg-strong: #c6d1f6;
+  --accent-underline: rgb(42 70 196 / 0.38);
+  /* Diffs and status */
+  --add: #1d7436;
+  --add-bg: #eaf5ec;
+  --add-bg-strong: #d6ecdb;
+  --del: #b02a20;
+  --del-bg: #fbedea;
+  --del-bg-strong: #f4d9d4;
+  --mark: #c6d1f6;
+  /* The one hard-edged shadow, for the active panel */
+  --shadow-active: 2px 2px 0 #1d1c19;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --canvas: #0f0f0e;
+    --chrome: #191917;
+    --surface: #1c1c1a;
+    --surface-2: #1f1f1c;
+    --surface-3: #232320;
+    --surface-4: #21211e;
+    --fg: #eceae4;
+    --fg-2: #b6b3ab;
+    --fg-3: #97948c;
+    --fg-4: #8c8981;
+    --rule: #d3d0c8;
+    --border: #43423e;
+    --border-subtle: #2d2c29;
+    --border-strong: #4a4945;
+    --accent: #8e9eff;
+    --accent-fg: #a3b0ff;
+    --accent-bg: #252b49;
+    --accent-bg-strong: #334079;
+    --accent-underline: rgb(142 158 255 / 0.45);
+    --add: #6ccb88;
+    --add-bg: #16291c;
+    --add-bg-strong: #1c3624;
+    --del: #f2897f;
+    --del-bg: #33191a;
+    --del-bg-strong: #45201f;
+    --mark: #334079;
+    --shadow-active: 2px 2px 0 #000000;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #0f0f0e;
+  --chrome: #191917;
+  --surface: #1c1c1a;
+  --surface-2: #1f1f1c;
+  --surface-3: #232320;
+  --surface-4: #21211e;
+  --fg: #eceae4;
+  --fg-2: #b6b3ab;
+  --fg-3: #97948c;
+  --fg-4: #8c8981;
+  --rule: #d3d0c8;
+  --border: #43423e;
+  --border-subtle: #2d2c29;
+  --border-strong: #4a4945;
+  --accent: #8e9eff;
+  --accent-fg: #a3b0ff;
+  --accent-bg: #252b49;
+  --accent-bg-strong: #334079;
+  --accent-underline: rgb(142 158 255 / 0.45);
+  --add: #6ccb88;
+  --add-bg: #16291c;
+  --add-bg-strong: #1c3624;
+  --del: #f2897f;
+  --del-bg: #33191a;
+  --del-bg-strong: #45201f;
+  --mark: #334079;
+  --shadow-active: 2px 2px 0 #000000;
+}

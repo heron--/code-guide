@@ -171,7 +171,7 @@ export function GuideTab({
         {back !== undefined && (
           <button
             onClick={goBack}
-            className="absolute left-6 top-4 z-20 inline-flex items-center gap-1.5 rounded-full border border-border bg-popover py-2 pl-3 pr-4 text-[15px] shadow-lg hover:bg-accent"
+            className="absolute left-6 top-4 z-20 inline-flex items-center gap-1.5 border border-border bg-popover py-2 pl-3 pr-4 text-[15px] shadow-lg hover:bg-surface-3"
           >
             <ChevronLeft className="size-4" />
             Go back
@@ -250,7 +250,7 @@ function ChapterRail({
             <button onClick={() => onSelect(i)} className="flex h-2 w-full items-center" aria-label={t}>
               <span
                 className={cn(
-                  "block h-[2px] rounded-full transition-all",
+                  "block h-[2px] transition-all",
                   i === current ? "w-4 bg-foreground" : "w-2.5 bg-muted-foreground/40 hover:bg-muted-foreground",
                   i !== current && reviewed.has(String(i)) && "bg-add/70",
                 )}
