@@ -68,6 +68,8 @@ export const eventPayloads = {
   "job.queued": z.object({
     job: z.string(),
     kind: z.string(),
+    /** What it does, as the reader sees it, e.g. "Reviewing the guide". */
+    label: z.string().optional(),
     module: z.string(),
     /** Finished results this job reads, by the job that produced them. */
     inputs: z.array(z.string()),

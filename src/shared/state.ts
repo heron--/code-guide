@@ -5,6 +5,8 @@ type Problem = EventPayload<"job.submitted">["problems"][number];
 export type JobState = {
   id: string;
   kind: string;
+  /** What it does, as the reader sees it, e.g. "Reviewing the guide". */
+  label?: string;
   module: string;
   inputs: string[];
   status: "queued" | "running" | "finished" | "failed" | "cancelled";
