@@ -24,10 +24,16 @@ import {
 } from "./layout";
 import { panelState, sessionActivity } from "./status";
 
-type Props = { state: SessionState; modules: ModuleInfo[]; channel: SessionChannel };
+type Props = {
+  state: SessionState;
+  modules: ModuleInfo[];
+  channel: SessionChannel;
+  /** A lost connection or a refused request, shown in the status bar. */
+  problem?: string;
+};
 
 /** The frame every module lives in: a status bar, two slots, and (below) the dock. No navigation rail. */
-export function Workspace({ state, modules, channel }: Props) {
+export function Workspace({ state, modules, channel, problem }: Props) {
   const [stored, setLayout] = usePersistent<Layout>(`cg:${state.id}:layout`, emptyLayout);
   const layout = { ...emptyLayout, ...stored };
   const byName = (name?: string) => modules.find((m) => m.name === name);
@@ -68,18 +74,25 @@ export function Workspace({ state, modules, channel }: Props) {
       if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 4) dragged.current = true;
       setDrag({ ...drag, x: e.clientX, y: e.clientY });
     };
+    // The click that follows a drag must not also restore the square; after that, clicks (and keys) work again.
+    const end = () => {
+      setDrag(undefined);
+      setTimeout(() => (dragged.current = false));
+    };
     const up = () => {
       const target = dragged.current ? dragOver(drag, mainRef.current, layout) : undefined;
       if (target) setLayout(target.layout);
-      setDrag(undefined);
+      end();
     };
-    const cancel = (e: KeyboardEvent) => e.key === "Escape" && setDrag(undefined);
+    const cancel = (e: KeyboardEvent) => e.key === "Escape" && end();
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", end);
     window.addEventListener("keydown", cancel);
     return () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", end);
       window.removeEventListener("keydown", cancel);
     };
   });
@@ -113,7 +126,7 @@ export function Workspace({ state, modules, channel }: Props) {
         drag && dragged.current && "cursor-grabbing select-none",
       )}
     >
-      <StatusBar state={state} modules={modules} onStart={startModule} />
+      <StatusBar state={state} modules={modules} onStart={startModule} problem={problem} />
       <main ref={mainRef} className="flex min-h-0 flex-1 p-2.5">
         {over?.whole && dragged.current ? (
           slot("left")
@@ -209,9 +222,11 @@ function Slots({
     const up = () => setDragging(false);
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
     return () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
     };
   }, [dragging, onSplit]);
 
@@ -307,7 +322,21 @@ function PanelBody({
   channel: SessionChannel;
 }) {
   const Panel = panelFor(m.name);
-  const { job, busy, activity } = panelState(m, state);
+  const { job, busy, activity, failed } = panelState(m, state);
+  // A failed job shows here as well as in the dock, with its retry, when the panel is in a slot.
+  if (m.needsJob && failed && !job)
+    return (
+      <Centered title={`Couldn't write the ${m.label.toLowerCase()}`}>
+        <span className="block text-del">{failed.error}</span>
+        <button
+          onClick={() => channel.send({ type: "job.start", module: m.name, retry: failed.id })}
+          className="mt-3 inline-flex h-7 items-center gap-1.5 border border-border bg-surface px-3 text-[12.5px] text-fg hover:border-fg-3"
+        >
+          <Icon paths={icons.retry} size={12} />
+          Retry
+        </button>
+      </Centered>
+    );
   if (m.needsJob && !job)
     return (
       <Centered title={busy ? `Writing ${m.label.toLowerCase()}…` : `No ${m.label.toLowerCase()} yet`}>
@@ -351,10 +380,12 @@ function StatusBar({
   state,
   modules,
   onStart,
+  problem,
 }: {
   state: SessionState;
   modules: ModuleInfo[];
   onStart: (m: ModuleInfo) => void;
+  problem?: string;
 }) {
   const subject = state.subject?.subject;
   const activity = sessionActivity(state);
@@ -391,6 +422,11 @@ function StatusBar({
         )}
         <span className="flex-1" />
       </div>
+      {problem && (
+        <span role="status" className="max-w-[40%] truncate text-[11.5px] text-del" title={problem}>
+          {problem}
+        </span>
+      )}
       {guideJob ? (
         <ReviewedCount session={state.id} job={guideJob} />
       ) : (
