@@ -89,3 +89,22 @@ test("what happened before the status started is logged first", () => {
   )();
   expect(written).toBe("Subject: src\n✓ Writing the guide (guide-1)\n");
 });
+
+test("on a terminal, each live line takes one row", () => {
+  const failed = session(
+    ["job.queued", { job: "quiz-1", kind: "quiz", module: "quiz", inputs: [] }],
+    ["job.started", { job: "quiz-1" }],
+    ["job.failed", { job: "quiz-1", error: "first\nsecond", problems: [] }],
+  );
+  const fake = { state: failed, subscribe: () => () => {}, eventsAfter: () => [] } as unknown as Parameters<
+    typeof showStatus
+  >[0];
+  let written = "";
+  showStatus(
+    fake,
+    [quiz],
+    { harness: "h", model: "m", status: () => ({ state: "idle" }), onStatus: () => () => {} },
+    { write: (s: string) => (written += s), isTTY: true, columns: 200 },
+  )();
+  expect(written.split("\n")).toEqual(["Agent  h · m · context empty · idle", "Quiz  failed: first second", ""]);
+});

@@ -70,7 +70,11 @@ export function showStatus(
 ): () => void {
   let drawn = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const clip = (l: string) => (out.columns && l.length > out.columns - 1 ? l.slice(0, out.columns - 2) + "…" : l);
+  // One row per line, or the redraw would move up too few rows: no newlines (e.g. in an error), no wrapping.
+  const clip = (line: string) => {
+    const l = line.replace(/\s*\n\s*/g, " ");
+    return out.columns && l.length > out.columns - 1 ? l.slice(0, out.columns - 2) + "…" : l;
+  };
   const clear = () => {
     if (drawn) out.write(`\x1b[${drawn}A\x1b[0J`);
     drawn = 0;
