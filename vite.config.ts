@@ -8,6 +8,6 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { "@": resolve(import.meta.dirname, "src/ui") } },
   build: { outDir: resolve(import.meta.dirname, "dist/ui"), emptyOutDir: true },
-  // `npm run dev` proxies the API to a running `code-chapters --no-open` server.
+  // `npm run dev` proxies the API to a running `code-guide --no-open` server.
   server: { proxy: { "/api": "http://localhost:4646" } },
 });

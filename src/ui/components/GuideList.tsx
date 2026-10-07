@@ -18,7 +18,7 @@ export function GuideList() {
   return (
     <div className="mx-auto max-w-3xl px-8 py-12">
       <h1 className="flex items-center gap-2.5 text-[28px] font-semibold tracking-tight">
-        <BookOpen className="size-6" /> Code Chapters
+        <BookOpen className="size-6" /> Code Guide
       </h1>
       <p className="mt-1 truncate font-mono text-sm text-muted-foreground">{data.roots.join(", ")}</p>
 
@@ -28,8 +28,8 @@ export function GuideList() {
           <p className="mt-2 text-muted-foreground">
             Guides live in <code className="font-mono text-foreground">.code-chapters/*.json</code> at the repository
             root. Ask your coding agent a question with the{" "}
-            <code className="font-mono text-foreground">code-chapters</code> skill loaded, e.g.{" "}
-            <em>"/code-chapters how does auth work?"</em>, then refresh this page.
+            <code className="font-mono text-foreground">code-guide</code> skill loaded, e.g.{" "}
+            <em>"/code-guide how does auth work?"</em>, then refresh this page.
           </p>
         </div>
       ) : (

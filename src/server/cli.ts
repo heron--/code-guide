@@ -10,24 +10,24 @@ import { startServer } from "./server.js";
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(here, "..");
 
-const HELP = `code-chapters: read code as a few brief chapters
+const HELP = `code-guide: read code as a few brief chapters
 
 Usage
-  code-chapters [dir | guide.json]   Open the viewer for the repo containing dir (default: .)
-                                     or for a single guide file.
-  code-chapters check <guide.json>…  Validate guides against the spec. Exits 1 on errors.
-  code-chapters install-skill [dir]  Copy the authoring skill to dir (default: ~/.claude/skills).
+  code-guide [dir | guide.json]   Open the viewer for the repo containing dir (default: .)
+                                  or for a single guide file.
+  code-guide check <guide.json>…  Validate guides against the spec. Exits 1 on errors.
+  code-guide install-skill [dir]  Copy the authoring skill to dir (default: ~/.claude/skills).
 
 Options
   --port <n>    Port to serve on (default 4646, next free port if taken)
   --no-open     Don't open the browser
   -h, --help    Show this help
 
-Guides live in <repo>/.code-chapters/*.json. Spec: ${join(pkgRoot, "skill/code-chapters/SPEC.md")}`;
+Guides live in <repo>/.code-chapters/*.json. Spec: ${join(pkgRoot, "skill/code-guide/SPEC.md")}`;
 
 async function check(files: string[]) {
   if (files.length === 0) {
-    console.error("usage: code-chapters check <guide.json>…");
+    console.error("usage: code-guide check <guide.json>…");
     return 2;
   }
   let errors = 0;
@@ -44,10 +44,10 @@ async function check(files: string[]) {
 }
 
 async function installSkill(dir?: string) {
-  const target = join(resolve(dir ?? join(homedir(), ".claude", "skills")), "code-chapters");
+  const target = join(resolve(dir ?? join(homedir(), ".claude", "skills")), "code-guide");
   await mkdir(dirname(target), { recursive: true });
-  await cp(join(pkgRoot, "skill", "code-chapters"), target, { recursive: true });
-  console.log(`Installed the code-chapters skill to ${target}`);
+  await cp(join(pkgRoot, "skill", "code-guide"), target, { recursive: true });
+  console.log(`Installed the code-guide skill to ${target}`);
   return 0;
 }
 
@@ -69,7 +69,7 @@ async function serve(args: string[], port: number, openBrowser: boolean) {
     port,
   });
   const page = isFile ? `${url}/#/g/${encodeURIComponent(guideId(target))}/guide/1` : url;
-  console.log(`Code Chapters for ${relative(process.cwd(), root) || "."} at ${page}`);
+  console.log(`Code Guide for ${relative(process.cwd(), root) || "."} at ${page}`);
   console.log("Press Ctrl+C to stop.");
   if (openBrowser) await open(page).catch(() => console.log("(Couldn't open a browser; visit the URL above.)"));
   return new Promise<number>(() => {});
