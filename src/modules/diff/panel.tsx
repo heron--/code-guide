@@ -88,6 +88,7 @@ function DiffFile({ path }: { path: string }) {
   const [file, setFile] = useState<ResolvedFile>();
   const [visible, setVisible] = useState<boolean[]>();
   const [near, setNear] = useState(false);
+  const [failed, setFailed] = useState<string>();
 
   useEffect(() => {
     const io = new IntersectionObserver(([e]) => e.isIntersecting && setNear(true), { rootMargin: "800px" });
@@ -95,14 +96,18 @@ function DiffFile({ path }: { path: string }) {
     return () => io.disconnect();
   }, []);
   useEffect(() => {
-    if (!near || file) return;
+    if (!near || file || failed) return;
     fetch(`/api/diff/file?path=${encodeURIComponent(path)}`)
-      .then((r) => r.json())
-      .then((f: ResolvedFile) => {
-        setFile(f);
-        setVisible(initialVisible(f));
-      });
-  }, [near, file, path]);
+      .then(async (r) => (r.ok ? r.json() : Promise.reject(new Error((await r.json()).error))))
+      .then(
+        (f: ResolvedFile) => {
+          setFile(f);
+          setVisible(initialVisible(f));
+        },
+        // E.g. a working-tree file reverted since the list was made.
+        (e: Error) => setFailed(e.message),
+      );
+  }, [near, file, failed, path]);
 
   return (
     <div ref={ref} id={domId(path)}>
@@ -117,6 +122,7 @@ function DiffFile({ path }: { path: string }) {
         <div className="flex h-8 items-center gap-2 border border-border bg-surface-3 px-2.5">
           <LangTag path={path} />
           <span className="font-mono text-xs text-fg-3">{path}</span>
+          {failed && <span className="ml-auto text-[11.5px] text-del">{failed}</span>}
         </div>
       )}
     </div>
