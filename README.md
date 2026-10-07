@@ -25,7 +25,7 @@ Terms are defined in the [glossary](GLOSSARY.md). Code Guide sends nothing anywh
 
 ## Install
 
-Requires Node 22.12+, git, and Claude Code signed in (`claude`).
+Requires Node 22.12+, git, and Claude Code signed in (`claude`). To use [pi](https://github.com/badlogic/pi-mono) instead, sign in to a model with `pi` and run `code-guide --harness pi` (`--model provider/id` to choose one; otherwise pi's default).
 
 ```sh
 npm install -g github:heron--/code-chapters   # or: git clone … && npm install && npm link
