@@ -117,6 +117,7 @@ test("sends the context with the message, and records it on the message", async 
 });
 
 test("a harness that dies fails the waiting replies, and the next message starts a new one", async () => {
+  await finish("guide-1", "guide", { title: "Retries", chapters: [] });
   harness.fail = "the harness exited";
   await chat.send("Reply with exactly: lost", []);
   await until(() => replies()[0]?.status === "failed");
@@ -125,6 +126,8 @@ test("a harness that dies fails the waiting replies, and the next message starts
   await chat.send("Reply with exactly: back", []);
   await until(() => replies()[1]?.status === "done");
   expect(harness.starts).toHaveLength(2);
+  // The new harness is told about the guide again.
+  expect(harness.sent[1]).toContain("A guide finished (guide-1)");
 });
 
 test("a message that can't be prepared fails on its own and doesn't take the next reply", async () => {
