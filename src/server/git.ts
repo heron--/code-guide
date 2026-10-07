@@ -53,9 +53,20 @@ export function splitLines(text: string): string[] {
  */
 const NOT_SESSIONS = ":(exclude).code-guide";
 
+/** A file name as a pathspec that matches only that file: `a[1].ts` would otherwise also match `a1.ts`. */
+const literal = (path: string) => `:(literal)${path}`;
+
 /** Untracked, non-ignored files in the working tree. */
 async function untrackedFiles(root: string, path?: string): Promise<string[]> {
-  const out = await git(root, ["ls-files", "-z", "--others", "--exclude-standard", "--", path ?? ".", NOT_SESSIONS]);
+  const out = await git(root, [
+    "ls-files",
+    "-z",
+    "--others",
+    "--exclude-standard",
+    "--",
+    path ? literal(path) : ".",
+    NOT_SESSIONS,
+  ]);
   return out.split("\0").filter(Boolean);
 }
 
@@ -114,7 +125,15 @@ export async function fullFileDiff(
   path: string,
 ): Promise<RawLine[] | undefined> {
   const range = head ? [base, head] : [base];
-  const out = await git(root, ["diff", "--no-color", "--no-renames", "--unified=100000000", ...range, "--", path]);
+  const out = await git(root, [
+    "diff",
+    "--no-color",
+    "--no-renames",
+    "--unified=100000000",
+    ...range,
+    "--",
+    literal(path),
+  ]);
   if (!out.trim()) {
     // An untracked file is all additions when diffing against the working tree.
     if (head || (await untrackedFiles(root, path)).length === 0) return undefined;

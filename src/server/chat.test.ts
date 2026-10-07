@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
@@ -16,11 +16,13 @@ class Recording implements Harness {
   sent: string[] = [];
   fake = new FakeHarness();
   fail?: string;
+  opts?: HarnessSessionOptions;
   async check() {
     return { ok: true as const };
   }
   start(opts: HarnessSessionOptions) {
     this.starts.push(opts.instructions);
+    this.opts = opts;
     const s = this.fake.start(opts);
     return {
       ...s,
@@ -128,6 +130,27 @@ test("a harness that dies fails the waiting replies, and the next message starts
   expect(harness.starts).toHaveLength(2);
   // The new harness is told about the guide again.
   expect(harness.sent[1]).toContain("A guide finished (guide-1)");
+});
+
+test("a harness that dies between messages is replaced by the next one", async () => {
+  await finish("guide-1", "guide", { title: "Retries", chapters: [] });
+  await chat.send("Reply with exactly: one", []);
+  await until(() => replies()[0]?.status === "done");
+  harness.opts!.onEvent({ type: "error", message: "the harness exited", fatal: true });
+  await chat.send("Reply with exactly: two", []);
+  await until(() => replies()[1]?.status === "done");
+  expect(harness.starts).toHaveLength(2);
+  expect(harness.sent[1]).toContain("A guide finished (guide-1)");
+});
+
+test("code context can't reach outside the repository through a symlink", async () => {
+  const outside = mkdtempSync(join(tmpdir(), "cg-outside-"));
+  writeFileSync(join(outside, "secret.txt"), "secret\n");
+  symlinkSync(outside, join(repo, "out"));
+  await chat.send("Reply with exactly: x", [{ kind: "code", path: "out/secret.txt", start: 1, end: 1 }]);
+  expect(harness.sent[0]).not.toContain("secret\n");
+  expect(harness.sent[0]).not.toMatch(/1 {2}secret/);
+  rmSync(outside, { recursive: true, force: true });
 });
 
 test("a message that can't be prepared fails on its own and doesn't take the next reply", async () => {
