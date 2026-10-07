@@ -2,6 +2,8 @@ import { expect, test } from "vitest";
 import {
   addToDock,
   discard,
+  dropFromDock,
+  dropTarget,
   emptyLayout,
   jobStarted,
   markSeen,
@@ -71,4 +73,21 @@ test("results a panel has shown are remembered", () => {
   const l = markSeen(emptyLayout, "guide", "guide-1");
   expect(l.seen).toEqual({ guide: "guide-1" });
   expect(markSeen(l, "guide", "guide-1")).toBe(l);
+});
+
+test("dropping from the dock", () => {
+  const both = open(open(emptyLayout, "guide"), "chat");
+  // Both full: replaces the panel under the pointer; it goes to the dock.
+  expect(dropFromDock(both, "quiz", dropTarget(both, "right"))).toMatchObject({
+    left: "guide",
+    right: "quiz",
+    dock: ["chat"],
+  });
+  // One full: opens on the pointer's side, moving the other panel aside.
+  const one = open(emptyLayout, "guide");
+  expect(dropFromDock(one, "quiz", dropTarget(one, "left"))).toMatchObject({ left: "quiz", right: "guide", dock: [] });
+  expect(dropFromDock(one, "quiz", dropTarget(one, "right"))).toMatchObject({ left: "guide", right: "quiz", dock: [] });
+  // None: the whole workspace.
+  expect(dropTarget(emptyLayout, "right")).toBe("left");
+  expect(dropFromDock(addToDock(emptyLayout, "quiz"), "quiz", "left")).toMatchObject({ left: "quiz", dock: [] });
 });

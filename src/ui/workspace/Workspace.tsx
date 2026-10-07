@@ -9,11 +9,14 @@ import { Icon, icons } from "./Icon";
 import { Dock } from "./Dock";
 import {
   discard,
+  dropFromDock,
+  dropTarget,
   emptyLayout,
   jobStarted,
   markSeen,
   open,
   setSplit,
+  swap,
   toDock,
   toggleMaximized,
   type Layout,
@@ -55,17 +58,61 @@ export function Workspace({ state, modules, channel, problem }: Props) {
     else setLayout(open(layout, m.name));
   };
 
+  // Dragging: a dock square into the workspace, or a panel's title bar onto the other slot.
+  const mainRef = useRef<HTMLElement>(null);
+  const [drag, setDrag] = useState<Drag>();
+  const dragged = useRef(false);
+  const startDrag = (panel: string, from: Drag["from"], e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    dragged.current = false;
+    setDrag({ panel, from, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY });
+  };
+  const over = drag && dragOver(drag, mainRef.current, layout);
+  useEffect(() => {
+    if (!drag) return;
+    const move = (e: PointerEvent) => {
+      if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 4) dragged.current = true;
+      setDrag({ ...drag, x: e.clientX, y: e.clientY });
+    };
+    // The click that follows a drag must not also restore the square; after that, clicks (and keys) work again.
+    const end = () => {
+      setDrag(undefined);
+      setTimeout(() => (dragged.current = false));
+    };
+    const up = () => {
+      const target = dragged.current ? dragOver(drag, mainRef.current, layout) : undefined;
+      if (target) setLayout(target.layout);
+      end();
+    };
+    const cancel = (e: KeyboardEvent) => e.key === "Escape" && end();
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", end);
+    window.addEventListener("keydown", cancel);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", end);
+      window.removeEventListener("keydown", cancel);
+    };
+  });
+  const shown = over && dragged.current ? over.layout : layout;
+  const dropAt = over && dragged.current ? over.slot : undefined;
+  const draggedModule = drag && byName(drag.panel);
+
   const slot = (s: Slot) => {
-    const m = byName(layout[s]);
+    if (dropAt === s && draggedModule) return <DropZone module={draggedModule} slot={over!.whole ? undefined : s} />;
+    const m = byName(shown[s]);
     if (!m) return <EmptySlot slot={s} state={state} modules={modules} />;
     return (
       <PanelFrame
         module={m}
-        active={layout.recent === s}
-        maximized={layout.maximized === s}
+        active={shown.recent === s}
+        maximized={shown.maximized === s}
         onFocus={() => layout.recent !== s && setLayout({ ...layout, recent: s })}
         onMaximize={() => setLayout(toggleMaximized(layout, s))}
         onClose={() => setLayout(toDock(layout, s))}
+        onDragStart={(e) => startDrag(m.name, s, e)}
       >
         <PanelBody module={m} state={state} channel={channel} />
       </PanelFrame>
@@ -73,14 +120,21 @@ export function Workspace({ state, modules, channel, problem }: Props) {
   };
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-canvas text-fg">
+    <div
+      className={cn(
+        "flex h-full flex-col overflow-hidden bg-canvas text-fg",
+        drag && dragged.current && "cursor-grabbing select-none",
+      )}
+    >
       <StatusBar state={state} modules={modules} onStart={startModule} problem={problem} />
-      <main className="flex min-h-0 flex-1 p-2.5">
-        {layout.maximized ? (
-          slot(layout.maximized)
+      <main ref={mainRef} className="flex min-h-0 flex-1 p-2.5">
+        {over?.whole && dragged.current ? (
+          slot("left")
+        ) : shown.maximized ? (
+          slot(shown.maximized)
         ) : (
           <Slots
-            split={layout.split}
+            split={shown.split}
             onSplit={(v) => setLayout(setSplit(layout, v))}
             left={slot("left")}
             right={slot("right")}
@@ -91,10 +145,57 @@ export function Workspace({ state, modules, channel, problem }: Props) {
         state={state}
         modules={modules}
         layout={layout}
-        onOpen={(p) => setLayout(open(layout, p))}
+        dragging={drag?.from === "dock" && dragged.current ? drag.panel : undefined}
+        onDragStart={(p, e) => startDrag(p, "dock", e)}
+        onOpen={(p) => !dragged.current && setLayout(open(layout, p))}
         onDiscard={(p) => setLayout(discard(layout, p))}
         onRetry={(module, job) => channel.send({ type: "job.start", module, retry: job })}
       />
+      {drag && dragged.current && draggedModule && drag.from === "dock" && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed z-50 flex h-[50px] w-[54px] flex-col items-center justify-center gap-[5px] border border-accent bg-surface shadow-active"
+          style={{ left: drag.x - 27, top: drag.y - 25 }}
+        >
+          <Icon paths={draggedModule.icon} className="text-fg-2" />
+          <span className="font-mono text-[10px]">{draggedModule.label}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type Drag = { panel: string; from: "dock" | Slot; x: number; y: number; x0: number; y0: number };
+
+/** Where a drag would drop, and the layout it would make: the preview shown while dragging. */
+function dragOver(
+  drag: Drag,
+  main: HTMLElement | null,
+  l: Layout,
+): { slot: Slot; layout: Layout; whole: boolean } | undefined {
+  const r = main?.getBoundingClientRect();
+  if (!r || drag.x < r.left || drag.x > r.right || drag.y < r.top || drag.y > r.bottom) return undefined;
+  const half: Slot = drag.x < r.left + r.width * (l.left && l.right ? l.split : 0.5) ? "left" : "right";
+  if (drag.from === "dock") {
+    const slot = dropTarget(l, half);
+    return { slot, layout: dropFromDock(l, drag.panel, slot), whole: !l.left && !l.right };
+  }
+  // A title bar only swaps onto the other slot. Panels go to the dock with ×, not by dragging.
+  if (half === drag.from || l.maximized) return undefined;
+  return { slot: half, layout: swap(l), whole: false };
+}
+
+/** A crisp outline where the panel will land. */
+function DropZone({ module: m, slot }: { module: ModuleInfo; slot?: Slot }) {
+  return (
+    <div className="flex min-w-0 flex-1 items-center justify-center border-2 border-accent bg-accent-bg">
+      <div className="flex flex-col items-center gap-2 text-center">
+        <Icon paths={m.icon} size={20} className="text-accent-fg" />
+        <span className="text-[13px] font-semibold text-accent-fg">Open {m.label} here</span>
+        <span className="font-mono text-[11px] text-accent-fg">
+          {slot ? `${slot} slot` : "workspace"} · release to drop
+        </span>
+      </div>
     </div>
   );
 }
@@ -121,9 +222,11 @@ function Slots({
     const up = () => setDragging(false);
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
     return () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
     };
   }, [dragging, onSplit]);
 
@@ -160,6 +263,7 @@ function PanelFrame(props: {
   onFocus: () => void;
   onMaximize: () => void;
   onClose: () => void;
+  onDragStart: (e: React.PointerEvent) => void;
   children: ReactNode;
 }) {
   const { module: m, active } = props;
@@ -173,8 +277,9 @@ function PanelFrame(props: {
       )}
     >
       <header
+        onPointerDown={(e) => (e.target as HTMLElement).closest("button") === null && props.onDragStart(e)}
         className={cn(
-          "flex h-7 flex-none items-center gap-[7px] pr-[5px] pl-[9px]",
+          "flex h-7 flex-none cursor-grab touch-none items-center gap-[7px] pr-[5px] pl-[9px]",
           active ? "border-b border-rule bg-surface-3" : "border-b border-border-strong bg-surface-4",
         )}
       >

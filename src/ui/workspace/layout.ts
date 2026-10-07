@@ -92,3 +92,21 @@ export function toggleMaximized(l: Layout, slot: Slot): Layout {
 export function setSplit(l: Layout, split: number): Layout {
   return { ...l, split: Math.min(0.8, Math.max(0.2, split)) };
 }
+
+/**
+ * Where a square dragged from the dock would land, given which half of the workspace the pointer is over:
+ * - both slots full: it replaces the panel there, which goes to the dock
+ * - one slot full: it opens on the pointer's side, moving the other panel aside
+ * - none: it takes the whole workspace (the left slot)
+ */
+export function dropTarget(l: Layout, half: Slot): Slot {
+  if (!l.left && !l.right) return "left";
+  return half;
+}
+
+export function dropFromDock(l: Layout, panel: string, target: Slot): Layout {
+  const occupant = l[target];
+  const free = other(target);
+  if (occupant && !l[free]) return { ...open({ ...l, [target]: undefined, [free]: occupant }, panel, target) };
+  return open(l, panel, target);
+}
