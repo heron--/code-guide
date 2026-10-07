@@ -1,4 +1,4 @@
-import { latestFinished, unavailable } from "../shared/modules.js";
+import { latestDone, unavailable } from "../shared/modules.js";
 import type { Subject } from "../shared/protocol.js";
 import { moduleInfo, type Module } from "../modules/types.js";
 import type { RequestHandler } from "./channel.js";
@@ -39,7 +39,7 @@ export function requestHandler(session: Session, runner: JobRunner, modules: Mod
         runner.start(
           m.job,
           m.name,
-          (m.results ?? []).map((kind) => latestFinished(session.state, kind)!),
+          (m.results ?? []).map((kind) => latestDone(session.state, kind)!),
         );
         return;
       }
