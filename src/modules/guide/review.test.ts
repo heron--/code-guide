@@ -70,10 +70,17 @@ async function run(verdicts: Review["verdict"][]) {
     type: "subject.choose",
     subject: { type: "question", question: "Q?" },
   });
+  // The module must never look idle between a job and its follow-up: check right after each finish.
+  const idle: string[] = [];
+  session.subscribe((e) => {
+    if (e.type === "job.finished")
+      queueMicrotask(() => !moduleBusy(session.state, "guide") && idle.push(e.payload.job));
+  });
   for (let i = 0; i < 300; i++) {
     await new Promise((r) => setTimeout(r, 10));
     if (session.state.jobOrder.length && !moduleBusy(session.state, "guide")) break;
   }
+  expect(idle).toEqual([session.state.jobOrder.at(-1)]);
   return { session, harness, kinds: session.state.jobOrder.map((id) => `${id}:${session.state.jobs[id].status}`) };
 }
 

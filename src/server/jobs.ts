@@ -54,6 +54,7 @@ export class JobRunner {
   private queue: string[] = [];
   private active = new Set<string>();
   private opts: Required<JobRunnerOptions>;
+  private finished: ((job: string, result: unknown) => void)[] = [];
 
   constructor(
     private session: Session,
@@ -62,6 +63,15 @@ export class JobRunner {
     opts: JobRunnerOptions = {},
   ) {
     this.opts = { concurrency: 2, maxAttempts: 5, maxNudges: 2, ...opts };
+  }
+
+  /**
+   * Run `fn` as each job finishes, with its result, right after its `job.finished` event. A job it starts is
+   * queued in the same tick, so the module never looks idle in between.
+   */
+  onFinished(fn: (job: string, result: unknown) => void): () => void {
+    this.finished.push(fn);
+    return () => (this.finished = this.finished.filter((f) => f !== fn));
   }
 
   /** Queue a job. `inputs` are finished jobs whose results it reads. Returns the job's id. */
@@ -165,6 +175,7 @@ export class JobRunner {
                 const result = await this.session.writeResult(id, accepted);
                 if (this.isOver(id)) return over;
                 this.session.append("job.finished", { job: id, result, warnings: problems });
+                for (const fn of this.finished) fn(id, accepted);
                 return { text: "Accepted. You're done; don't reply." };
               }
               if (attempts >= this.opts.maxAttempts) {
