@@ -138,8 +138,10 @@ A chat message's context can be a `chapter`, a selected range of chapter `prose`
 ## Notices
 
 ```json
-{ "type": "welcome", "v": 1, "session": "2026-10-07-091203-k3f9" }
+{ "type": "welcome", "v": 1, "session": "2026-10-07-091203-k3f9", "modules": [{ "name": "diff", "label": "Diff", "icon": ["M3 2.5h10v11H3z", "M8 5v4M6 7h4M6 11h4"], "needsJob": false, "subjects": ["change"] }] }
 ```
+
+`welcome` lists the modules this server offers, so the browser can show them without knowing any by name.
 
 ```json
 { "type": "error", "message": "This tab speaks protocol v2; the server speaks v1. Reload the page.", "fatal": true }

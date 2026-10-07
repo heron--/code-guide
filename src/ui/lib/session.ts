@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import type { ModuleInfo } from "../../shared/modules";
 import { PROTOCOL_VERSION, type Request, type ServerFrame } from "../../shared/protocol";
 import { emptyState, reduce, type SessionState } from "../../shared/state";
 
@@ -8,6 +9,8 @@ export type ChannelSnapshot = {
   status: ChannelStatus;
   /** Undefined until the server says which session it serves. */
   state?: SessionState;
+  /** The modules the server offers. */
+  modules: ModuleInfo[];
   /** The last refusal or failure the server sent. */
   error?: string;
 };
@@ -21,7 +24,7 @@ export class SessionChannel {
   private retry = 250;
   private stopped = false;
   private listeners = new Set<() => void>();
-  snapshot: ChannelSnapshot = { status: "connecting" };
+  snapshot: ChannelSnapshot = { status: "connecting", modules: [] };
 
   constructor(
     private url: string,
@@ -57,7 +60,12 @@ export class SessionChannel {
       this.retry = 250;
       // A different session means the server restarted on a new one; it replays that one from the start.
       const s = this.snapshot.state;
-      this.set({ status: "open", error: undefined, state: s?.id === f.session ? s : emptyState(f.session) });
+      this.set({
+        status: "open",
+        error: undefined,
+        modules: f.modules,
+        state: s?.id === f.session ? s : emptyState(f.session),
+      });
     } else if (f.type === "error") {
       if (f.fatal) this.stopped = true;
       this.set({ error: f.message });
