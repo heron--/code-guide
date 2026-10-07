@@ -137,10 +137,25 @@ test("lines are clipped by display width, and a resize redraws for the reflowed 
     out,
   );
   const [, failed] = written.split("\n");
-  expect([...failed].reduce((n, ch) => n + (ch.codePointAt(0)! >= 0x1100 ? 2 : 1), 0)).toBeLessThanOrEqual(39);
+  // "Quiz  failed: " is 14 columns, each wide character 2, "…" 1: 12 wide characters make 39, within 40.
+  expect(failed).toBe("Quiz  failed: " + "错误".repeat(6) + "…");
   // Both lines were drawn under 40 columns; at 20, each now takes two rows.
   written = "";
   out.columns = 20;
   onResize();
   expect(written.startsWith("\x1b[4A\x1b[0J")).toBe(true);
+});
+
+test("progress bars and ordinary punctuation count as one column", () => {
+  let written = "";
+  const fake = { state: running, subscribe: () => () => {}, eventsAfter: () => [] } as unknown as Parameters<
+    typeof showStatus
+  >[0];
+  showStatus(
+    fake,
+    [guide],
+    { harness: "h", model: "m", status: () => ({ state: "idle" }), onStatus: () => () => {} },
+    { write: (s: string) => (written += s), isTTY: true, columns: 80 },
+  )();
+  expect(written).toContain("Guide  [░░░░░░░░░░░░░░░░] Writing the guide · job 1 of up to 4 · Reading a.ts\n");
 });
