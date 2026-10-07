@@ -53,14 +53,15 @@ function QuizView({ state, job }: PanelProps) {
       <span className="font-mono text-[11.5px] text-fg-2">
         {at < total ? `Question ${at + 1} of ${total}` : "Done"}
       </span>
-      <span className="flex gap-[3px]" aria-hidden="true">
+      <span className="flex gap-[3px]">
         {quiz.questions.map((q, i) => {
           const a = answers[i];
           const state = a == null ? "open" : q.options[a]?.correct ? "right" : "wrong";
           return (
             <button
               key={i}
-              tabIndex={-1}
+              aria-label={`Question ${i + 1}, ${state === "open" ? "unanswered" : state}`}
+              aria-current={i === at || undefined}
               onClick={() => setAt(i)}
               className={cn(
                 "h-1.5 w-[18px] border",
