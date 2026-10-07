@@ -84,7 +84,12 @@ async function run(verdicts: Review["verdict"][]) {
   }
   const last = session.state.jobOrder.at(-1)!;
   expect(idle).toEqual(session.state.jobs[last].status === "finished" ? [last] : []);
-  return { session, harness, kinds: session.state.jobOrder.map((id) => `${id}:${session.state.jobs[id].status}`) };
+  return {
+    session,
+    harness,
+    runner,
+    kinds: session.state.jobOrder.map((id) => `${id}:${session.state.jobs[id].status}`),
+  };
 }
 
 test("a guide the review accepts goes to the reader as is", async () => {
@@ -120,6 +125,15 @@ test("a guide whose review fails isn't shown; the failure is", async () => {
   const { unavailable } = await import("../../shared/modules");
   const quizLike = { name: "q", label: "Quiz", icon: [], needsJob: true, results: ["guide"] };
   expect(unavailable(quizLike, session.state)).toBe("Quiz needs a finished guide");
+});
+
+test("once a failed review is retried and passes, the guide is shown", async () => {
+  const { session, harness, runner } = await run([]);
+  (harness as unknown as { verdicts: string[] }).verdicts.push("accept");
+  runner.retry("review-1");
+  for (let i = 0; i < 300 && session.state.jobs["review-2"]?.status !== "finished"; i++)
+    await new Promise((r) => setTimeout(r, 10));
+  expect(latestDone(session.state, "guide")).toBe("guide-1");
 });
 
 test("a review can only cite chapters the guide has", async () => {
