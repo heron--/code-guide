@@ -6,15 +6,43 @@ import type { SessionChannel } from "@/lib/session";
 import { usePersistent, usePersistentSet } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { Icon, icons } from "./Icon";
-import { emptyLayout, open, setSplit, toDock, toggleMaximized, type Layout, type Slot } from "./layout";
+import { Dock } from "./Dock";
+import {
+  discard,
+  emptyLayout,
+  jobStarted,
+  markSeen,
+  open,
+  setSplit,
+  toDock,
+  toggleMaximized,
+  type Layout,
+  type Slot,
+} from "./layout";
 import { panelState, sessionActivity } from "./status";
 
 type Props = { state: SessionState; modules: ModuleInfo[]; channel: SessionChannel };
 
 /** The frame every module lives in: a status bar, two slots, and (below) the dock. No navigation rail. */
 export function Workspace({ state, modules, channel }: Props) {
-  const [layout, setLayout] = usePersistent<Layout>(`cg:${state.id}:layout`, emptyLayout);
+  const [stored, setLayout] = usePersistent<Layout>(`cg:${state.id}:layout`, emptyLayout);
+  const layout = { ...emptyLayout, ...stored };
   const byName = (name?: string) => modules.find((m) => m.name === name);
+
+  // Every new job puts its module in the dock (never in a slot), and a panel in a slot has seen its result.
+  useEffect(() => {
+    let next = layout;
+    for (const id of state.jobOrder) {
+      const m = byName(state.jobs[id].module);
+      if (m?.needsJob) next = jobStarted(next, id, m.name);
+    }
+    for (const s of ["left", "right"] as const) {
+      const m = byName(next[s]);
+      const job = m && panelState(m, state).job;
+      if (m && job) next = markSeen(next, m.name, job);
+    }
+    if (next !== layout) setLayout(next);
+  });
 
   const startModule = (m: ModuleInfo) => {
     if (m.needsJob) channel.send({ type: "job.start", module: m.name });
@@ -53,6 +81,14 @@ export function Workspace({ state, modules, channel }: Props) {
           />
         )}
       </main>
+      <Dock
+        state={state}
+        modules={modules}
+        layout={layout}
+        onOpen={(p) => setLayout(open(layout, p))}
+        onDiscard={(p) => setLayout(discard(layout, p))}
+        onRetry={(module, job) => channel.send({ type: "job.start", module, retry: job })}
+      />
     </div>
   );
 }

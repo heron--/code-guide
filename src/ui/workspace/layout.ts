@@ -14,9 +14,24 @@ export type Layout = {
   maximized?: Slot;
   /** The left slot's share of the width, 0–1. */
   split: number;
+  /** Jobs already given a dock square, so a discarded panel doesn't come back until a new job starts. */
+  known: string[];
+  /** The result each panel last showed in a slot; a newer one marks its dock square "ready". */
+  seen: Record<string, string>;
 };
 
-export const emptyLayout: Layout = { dock: [], recent: "left", split: 0.5 };
+export const emptyLayout: Layout = { dock: [], recent: "left", split: 0.5, known: [], seen: {} };
+
+/** A job started: its module's panel waits in the dock (once per job; it never opens itself). */
+export function jobStarted(l: Layout, job: string, panel: string): Layout {
+  if (l.known.includes(job)) return l;
+  return { ...addToDock(l, panel), known: [...l.known, job] };
+}
+
+/** Note the result a panel in a slot is showing. */
+export function markSeen(l: Layout, panel: string, result: string): Layout {
+  return l.seen[panel] === result ? l : { ...l, seen: { ...l.seen, [panel]: result } };
+}
 
 const other = (s: Slot): Slot => (s === "left" ? "right" : "left");
 

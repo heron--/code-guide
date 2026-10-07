@@ -10,6 +10,8 @@ export type JobState = {
   status: "queued" | "running" | "finished" | "failed" | "cancelled";
   /** Latest progress, while running. */
   activity?: string;
+  /** How many progress events it has reported: a rough measure of how far along it is. */
+  steps: number;
   /** Submissions so far, accepted or not. */
   attempts: number;
   /** File in the session directory, once finished. */
@@ -70,7 +72,10 @@ export function reduce(state: SessionState, e: SessionEvent): SessionState {
 
     case "job.queued": {
       const { job: id, ...rest } = e.payload;
-      s.jobs = { ...s.jobs, [id]: { id, ...rest, status: "queued", attempts: 0, warnings: [], problems: [] } };
+      s.jobs = {
+        ...s.jobs,
+        [id]: { id, ...rest, status: "queued", steps: 0, attempts: 0, warnings: [], problems: [] },
+      };
       s.jobOrder = [...s.jobOrder, id];
       break;
     }
@@ -78,7 +83,7 @@ export function reduce(state: SessionState, e: SessionEvent): SessionState {
       job(e.payload.job, { status: "running" });
       break;
     case "job.progress":
-      job(e.payload.job, { activity: e.payload.activity });
+      job(e.payload.job, { activity: e.payload.activity, steps: (s.jobs[e.payload.job]?.steps ?? 0) + 1 });
       break;
     case "job.submitted":
       job(e.payload.job, { attempts: e.payload.attempt, problems: e.payload.problems });

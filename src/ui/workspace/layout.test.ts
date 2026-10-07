@@ -1,5 +1,16 @@
 import { expect, test } from "vitest";
-import { addToDock, discard, emptyLayout, open, setSplit, swap, toDock, toggleMaximized } from "./layout";
+import {
+  addToDock,
+  discard,
+  emptyLayout,
+  jobStarted,
+  markSeen,
+  open,
+  setSplit,
+  swap,
+  toDock,
+  toggleMaximized,
+} from "./layout";
 
 test("a started module waits in the dock", () => {
   const l = addToDock(addToDock(emptyLayout, "guide"), "guide");
@@ -43,4 +54,21 @@ test("discard, swap, maximize and the divider", () => {
   expect(toggleMaximized(l, "right").maximized).toBeUndefined();
   expect(discard(toDock(l, "left"), "guide").dock).toEqual([]);
   expect(setSplit(l, 0.95).split).toBe(0.8);
+});
+
+test("each new job puts its module in the dock once, even after the panel was discarded", () => {
+  let l = jobStarted(emptyLayout, "guide-1", "guide");
+  expect(l.dock).toEqual(["guide"]);
+  l = discard(l, "guide");
+  expect(jobStarted(l, "guide-1", "guide").dock).toEqual([]);
+  expect(jobStarted(l, "guide-2", "guide").dock).toEqual(["guide"]);
+  // A panel already in a slot stays there.
+  l = jobStarted(open(emptyLayout, "guide"), "guide-3", "guide");
+  expect([l.left, l.dock]).toEqual(["guide", []]);
+});
+
+test("results a panel has shown are remembered", () => {
+  const l = markSeen(emptyLayout, "guide", "guide-1");
+  expect(l.seen).toEqual({ guide: "guide-1" });
+  expect(markSeen(l, "guide", "guide-1")).toBe(l);
 });
