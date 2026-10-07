@@ -73,7 +73,7 @@ export function prompt(subject: Subject): string {
       const from = subject.pr ? `pull request #${subject.pr}: ` : "";
       const diff = subject.head
         ? `\`git diff ${subject.base}...${subject.head}\``
-        : `\`git diff --merge-base ${subject.base}\` and \`git ls-files --others --exclude-standard\``;
+        : `\`git diff --merge-base ${subject.base}\` and \`git ls-files --others --exclude-standard -- . ':!.code-guide'\``;
       return `Write a guide to ${from}the change from the merge-base of \`${subject.base}\` to ${head}. See it with ${diff}. Use the question "What does this change do, and why?".`;
     }
     case "path":
