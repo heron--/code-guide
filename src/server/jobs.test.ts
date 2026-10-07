@@ -138,3 +138,32 @@ test("running and queued jobs can be cancelled", async () => {
   const next = runner.start(says("guide", "y"), "guide");
   await until(() => status(next) === "finished");
 });
+
+test("a job cancelled while its inputs are read never starts", async () => {
+  const runner = new JobRunner(session, new FakeHarness());
+  const guide = runner.start(says("guide", "g"), "guide");
+  await until(() => status(guide) === "finished");
+  const read = session.readResult.bind(session);
+  session.readResult = async (rel) => (await new Promise((r) => setTimeout(r, 50)), read(rel));
+  const quiz = runner.start(says("quiz", "q"), "quiz", [guide]);
+  await runner.cancel(quiz);
+  await new Promise((r) => setTimeout(r, 100));
+  expect(status(quiz)).toBe("cancelled");
+  expect(session.eventsAfter(0).filter((e) => e.type === "job.started" && e.payload.job === quiz)).toEqual([]);
+});
+
+test("a job cancelled while its submission is checked stays cancelled", async () => {
+  const slow = says("guide", "x");
+  const validate = slow.submit.validate;
+  slow.submit = {
+    ...slow.submit,
+    validate: async (i, c) => (await new Promise((r) => setTimeout(r, 50)), validate(i, c)),
+  };
+  const runner = new JobRunner(session, new FakeHarness());
+  const id = runner.start(slow, "guide");
+  await until(() => session.state.jobs[id].activity !== undefined);
+  await runner.cancel(id);
+  await new Promise((r) => setTimeout(r, 100));
+  expect(status(id)).toBe("cancelled");
+  expect(session.eventsAfter(0).some((e) => e.type === "job.submitted" || e.type === "job.finished")).toBe(false);
+});
