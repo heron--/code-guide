@@ -196,7 +196,7 @@ test("removed lines are read from the change's base", async () => {
   const c = new Chat(other, harness);
   await c.send("Reply with exactly: x", [{ kind: "code", path: "a.ts", start: 3, end: 3, side: "old" }]);
   expect(harness.sent.at(-1)).toContain(
-    "a.ts#L3-L3 (removed by the change; numbered as before it):\n```\n3  line 3\n```",
+    "a.ts#L3-L3 (removed by the change; numbered as before it, so don't link to these line numbers):\n```\n3  line 3\n```",
   );
   await c.send("Reply with exactly: y", [{ kind: "code", path: "a.ts", start: 3, end: 3 }]);
   expect(harness.sent.at(-1)).toContain("a.ts#L3-L3:\n```\n3  line 4\n```");

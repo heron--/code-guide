@@ -96,7 +96,9 @@ export class Chat {
       const ref = c.side === "old" ? refs!.base : refs?.head;
       const text = c.path.split(/[\\/]/).includes("..") ? undefined : await fileAt(repo, ref, c.path);
       const lines = text === undefined ? [] : splitLines(text).slice(c.start - 1, c.end);
-      const where = c.side === "old" ? " (removed by the change; numbered as before it)" : "";
+      // Links in replies point at the head, so these numbers mustn't be cited as if they were.
+      const where =
+        c.side === "old" ? " (removed by the change; numbered as before it, so don't link to these line numbers)" : "";
       return `The reader selected ${c.path}#L${c.start}-L${c.end}${where}:\n\`\`\`\n${lines.map((l, i) => `${c.start + i}  ${l}`).join("\n")}\n\`\`\``;
     }
     const job = this.session.state.jobs[c.job];
