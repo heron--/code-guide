@@ -124,3 +124,34 @@ export async function pullRequestFor(repo: string, subject: Subject): Promise<Pu
   const out = await quiet(sh(repo, "gh", ["pr", "view", which, "--json", "number,title,url,body"]));
   return out ? (JSON.parse(out) as PullRequest) : undefined;
 }
+
+/**
+ * Bring a change's base up to date before comparing against it. A stale local copy of the base moves the
+ * merge-base back, and the change then includes everyone's commits to the base since the last fetch.
+ *
+ * - A remote-tracking base (`origin/main`) is fetched from its remote.
+ * - A local branch (`main`) with an upstream fetches the upstream, and is compared as the upstream when it's
+ *   only behind it. A local branch with commits of its own stays as it is.
+ *
+ * Best effort: offline, or with no remote, the local copy is used.
+ */
+export async function prepareChange(repo: string, subject: Subject & { type: "change" }): Promise<Subject> {
+  const remotes = (await quiet(sh(repo, "git", ["remote"])))?.split("\n").filter(Boolean) ?? [];
+  const fetch = (remote: string, branch: string) =>
+    quiet(sh(repo, "git", ["fetch", "--quiet", remote, `+refs/heads/${branch}:refs/remotes/${remote}/${branch}`]));
+
+  const remote = remotes.find((r) => subject.base.startsWith(`${r}/`));
+  if (remote) {
+    await fetch(remote, subject.base.slice(remote.length + 1));
+    return subject;
+  }
+
+  const local = await quiet(sh(repo, "git", ["show-ref", "--verify", "--quiet", `refs/heads/${subject.base}`]));
+  const upstream =
+    local !== undefined && (await quiet(sh(repo, "git", ["rev-parse", "--abbrev-ref", `${subject.base}@{upstream}`])));
+  const upRemote = upstream && remotes.find((r) => upstream.startsWith(`${r}/`));
+  if (!upstream || !upRemote) return subject;
+  await fetch(upRemote, upstream.slice(upRemote.length + 1));
+  const behind = await quiet(sh(repo, "git", ["merge-base", "--is-ancestor", subject.base, upstream]));
+  return behind !== undefined ? { ...subject, base: upstream } : subject;
+}

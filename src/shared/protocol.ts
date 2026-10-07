@@ -48,6 +48,8 @@ export const chatContextSchema = z.discriminatedUnion("kind", [
     path: z.string().min(1),
     start: z.number().int().positive(),
     end: z.number().int().positive(),
+    /** Lines numbered on the change's base side: removed lines, or a deleted file. */
+    side: z.literal("old").optional(),
   }),
 ]);
 

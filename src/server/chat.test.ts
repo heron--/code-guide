@@ -184,3 +184,21 @@ test("code context from a change whose head no longer resolves is refused", asyn
   );
   await c.stop();
 });
+
+test("removed lines are read from the change's base", async () => {
+  const git = (...args: string[]) => execFileSync("git", args, { cwd: repo });
+  git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qam", "base", "--allow-empty");
+  git("add", "a.ts");
+  git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "a");
+  writeFileSync(join(repo, "a.ts"), "line 1\nline 2\nline 4\n");
+  const other = await Session.create(repo);
+  other.append("session.subject", { subject: { type: "change", base: "HEAD" }, label: "working tree" });
+  const c = new Chat(other, harness);
+  await c.send("Reply with exactly: x", [{ kind: "code", path: "a.ts", start: 3, end: 3, side: "old" }]);
+  expect(harness.sent.at(-1)).toContain(
+    "a.ts#L3-L3 (removed by the change; numbered as before it, so don't link to these line numbers):\n```\n3  line 3\n```",
+  );
+  await c.send("Reply with exactly: y", [{ kind: "code", path: "a.ts", start: 3, end: 3 }]);
+  expect(harness.sent.at(-1)).toContain("a.ts#L3-L3:\n```\n3  line 4\n```");
+  await c.stop();
+});
