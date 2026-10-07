@@ -42,6 +42,7 @@ export default defineModule({
   results: ["guide"],
   job: {
     kind: "quiz",
+    label: "Writing the quiz",
     instructions,
     prompt: (ctx) => {
       const guide = Object.values(ctx.inputs)[0] as Guide;
