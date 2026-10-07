@@ -341,7 +341,7 @@ function PanelFrame(props: {
       <header
         onPointerDown={(e) => (e.target as HTMLElement).closest("button") === null && props.onDragStart(e)}
         className={cn(
-          "flex h-7 flex-none cursor-grab items-center gap-[7px] pr-[5px] pl-[9px]",
+          "flex h-7 flex-none cursor-grab touch-none items-center gap-[7px] pr-[5px] pl-[9px]",
           active ? "border-b border-rule bg-surface-3" : "border-b border-border-strong bg-surface-4",
         )}
       >
