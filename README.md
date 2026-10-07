@@ -1,6 +1,6 @@
 # code-chapters
 
-Learn unfamiliar code and code changes faster. Ask a question ("how does auth work?", "why are modules used here?", "what does this branch change?") and get back a **guide**: a few brief **chapters**, each showing one idea next to the exact code that proves it.
+Learn unfamiliar code and code changes faster. Ask a question ("how does auth work?", "why is this split into packages?", "what does this branch change?") and get back a **guide**: a few brief **chapters**, each showing one idea next to the exact code that proves it.
 
 ```
 ┌ Retry only safe requests ─────────┐ ┌ client.ts  src ──────────────── +23 -10 ┐
