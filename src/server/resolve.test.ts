@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { parseBody } from "../shared/guide";
-import { indexRange, initialVisible } from "../ui/lib/excerpt";
+import { indexRange, initialVisible } from "../ui/code/excerpt";
 import { resolveGuide } from "./resolve";
 
 let repo: string;

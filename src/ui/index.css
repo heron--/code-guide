@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @import "./tokens.css";
 
+/* Module panels live outside src/ui. */
+@source "../modules";
+
 /* Tailwind names for the tokens. Old names (background, card, muted…) point at their new equivalents. */
 @theme inline {
   --color-canvas: var(--canvas);
@@ -95,10 +98,9 @@ body {
 
 .anchor-link {
   text-decoration-line: underline;
-  text-decoration-style: dotted;
   text-decoration-color: var(--accent-underline);
-  text-decoration-thickness: 1.5px;
-  text-underline-offset: 5px;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
 }
 .anchor-link:hover {
   text-decoration-color: var(--accent);
