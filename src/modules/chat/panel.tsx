@@ -183,7 +183,8 @@ export default function ChatPanel({ state, channel }: PanelProps) {
         <div className="flex min-h-full flex-col justify-end gap-[18px] px-4 pt-4 pb-2">
           {messages.length === 0 && (
             <p className="m-auto max-w-[280px] text-center text-[12.5px] leading-normal text-fg-3">
-              Ask anything about the code. Select lines or prose in the Guide, or use its Ask button, to attach them.
+              Ask anything about the code. Select lines in the Guide or Diff, or prose in the Guide, or use its Ask
+              button, to attach them.
             </p>
           )}
           {messages.map((m) => (
@@ -215,7 +216,7 @@ export default function ChatPanel({ state, channel }: PanelProps) {
           />
           <div className="flex items-center gap-2">
             <span className="font-mono text-[10.5px] text-fg-3">
-              {waiting ? "Answering…" : "Select code in the Guide to attach it"}
+              {waiting ? "Answering…" : "Select code in the Guide or Diff to attach it"}
             </span>
             <span className="flex-1" />
             <button

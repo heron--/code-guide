@@ -6,6 +6,7 @@ import type { PanelProps } from "@/lib/panels";
 import { usePersistent } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { useLineShower, type LinesTarget } from "@/workspace/actions";
+import { useAskSelection } from "@/workspace/ask";
 
 type Changed = { path: string; additions: number; deletions: number; status: FileStatus };
 const domId = (path: string) => `diff-${encodeURIComponent(path)}`;
@@ -15,6 +16,10 @@ export default function DiffPanel({ state }: PanelProps) {
   const [changed, setChanged] = useState<Changed[]>();
   const [error, setError] = useState<string>();
   const scroller = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLDivElement>(null);
+  // Loaded files, so a selection in one can be asked about in Chat.
+  const files = useRef(new Map<string, ResolvedFile>());
+  const selecting = useAskSelection(root, { file: (path) => files.current.get(path) });
   const subject = state.subject?.subject;
   // Every line of every changed file, instead of just the hunks.
   const [full, setFull] = usePersistent(`cg:${state.id}:diff:full`, false);
@@ -50,55 +55,71 @@ export default function DiffPanel({ state }: PanelProps) {
   const del = changed.reduce((n, f) => n + f.deletions, 0);
 
   return (
-    <div ref={scroller} className="relative min-h-0 flex-1 overflow-y-auto bg-surface-4">
-      <div className="flex items-center gap-2.5 px-3 pt-3 pb-2.5">
-        <span className="text-[13px] font-semibold">
-          {changed.length} file{changed.length === 1 ? "" : "s"} changed
-        </span>
-        <ChangeCount file={{ additions: add, deletions: del }} />
-        <span className="flex-1" />
-        <Reviewed checked={full} onChange={setFull} label="Full diff" />
-        {subject?.type === "change" && (
-          <span className="truncate font-mono text-[11px] text-fg-3">
-            {subject.pr ? `#${subject.pr}` : (subject.head ?? "working tree")} ← {subject.base}
+    <div
+      ref={root}
+      tabIndex={-1}
+      onMouseUp={selecting.onMouseUp}
+      onKeyDown={(e) => selecting.onKey(e) && e.preventDefault()}
+      onPointerDown={(e) =>
+        !(e.target as HTMLElement).closest("button,input,a,label") && root.current?.focus({ preventScroll: true })
+      }
+      className="relative flex min-h-0 flex-1 flex-col outline-none"
+    >
+      <div ref={scroller} className="relative min-h-0 flex-1 overflow-y-auto bg-surface-4">
+        <div className="flex items-center gap-2.5 px-3 pt-3 pb-2.5">
+          <span className="text-[13px] font-semibold">
+            {changed.length} file{changed.length === 1 ? "" : "s"} changed
           </span>
-        )}
-      </div>
-      <nav aria-label="Changed files" className="mx-3 border border-b-0 border-border bg-surface">
-        {changed.map((f) => {
-          const { name, dir } = splitPath(f.path);
-          return (
-            <button
-              key={f.path}
-              onClick={() => jump(f.path)}
-              className="flex h-[26px] w-full min-w-0 items-center gap-2 border-b border-border-subtle px-2.5 text-left hover:bg-surface-2"
-            >
-              <LangTag path={f.path} />
-              <span className="min-w-0 truncate font-mono text-[11.5px]">
-                <span className="text-fg-3">{dir}</span>
-                <span
-                  className={cn(f.status === "added" && "text-add", f.status === "deleted" && "text-del line-through")}
-                >
-                  {name}
+          <ChangeCount file={{ additions: add, deletions: del }} />
+          <span className="flex-1" />
+          <Reviewed checked={full} onChange={setFull} label="Full diff" />
+          {subject?.type === "change" && (
+            <span className="truncate font-mono text-[11px] text-fg-3">
+              {subject.pr ? `#${subject.pr}` : (subject.head ?? "working tree")} ← {subject.base}
+            </span>
+          )}
+        </div>
+        <nav aria-label="Changed files" className="mx-3 border border-b-0 border-border bg-surface">
+          {changed.map((f) => {
+            const { name, dir } = splitPath(f.path);
+            return (
+              <button
+                key={f.path}
+                onClick={() => jump(f.path)}
+                className="flex h-[26px] w-full min-w-0 items-center gap-2 border-b border-border-subtle px-2.5 text-left hover:bg-surface-2"
+              >
+                <LangTag path={f.path} />
+                <span className="min-w-0 truncate font-mono text-[11.5px]">
+                  <span className="text-fg-3">{dir}</span>
+                  <span
+                    className={cn(
+                      f.status === "added" && "text-add",
+                      f.status === "deleted" && "text-del line-through",
+                    )}
+                  >
+                    {name}
+                  </span>
                 </span>
-              </span>
-              <span className="flex-1" />
-              <ChangeCount file={f} />
-            </button>
-          );
-        })}
-      </nav>
-      <div className="flex flex-col gap-3 p-3 pb-[40vh]">
-        {changed.map((f) => (
-          <DiffFile
-            key={f.path}
-            path={f.path}
-            full={full}
-            scroller={scroller}
-            target={target?.path === f.path ? target : undefined}
-          />
-        ))}
+                <span className="flex-1" />
+                <ChangeCount file={f} />
+              </button>
+            );
+          })}
+        </nav>
+        <div className="flex flex-col gap-3 p-3 pb-[40vh]">
+          {changed.map((f) => (
+            <DiffFile
+              key={f.path}
+              path={f.path}
+              full={full}
+              onLoad={(f) => files.current.set(f.path, f)}
+              scroller={scroller}
+              target={target?.path === f.path ? target : undefined}
+            />
+          ))}
+        </div>
       </div>
+      {selecting.chip}
     </div>
   );
 }
@@ -107,9 +128,11 @@ export default function DiffPanel({ state }: PanelProps) {
 function DiffFile({
   path,
   full,
+  onLoad,
   scroller,
   target,
 }: {
+  onLoad: (f: ResolvedFile) => void;
   path: string;
   /** Show every line, loaded now rather than when the file nears the screen. */
   full: boolean;
@@ -154,6 +177,7 @@ function DiffFile({
       .then(async (r) => (r.ok ? r.json() : Promise.reject(new Error((await r.json()).error))))
       .then(
         (f: ResolvedFile) => {
+          onLoad(f);
           setFile(f);
           setVisible(initialVisible(f));
         },
