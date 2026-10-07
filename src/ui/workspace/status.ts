@@ -1,4 +1,4 @@
-import { latestFinished, moduleBusy, type ModuleInfo } from "../../shared/modules";
+import { latestDone, moduleBusy, type ModuleInfo } from "../../shared/modules";
 import type { JobState, SessionState } from "../../shared/state";
 
 export type PanelState = {
@@ -20,7 +20,7 @@ export function panelState(m: ModuleInfo, state: SessionState): PanelState {
   return {
     busy,
     activity: running?.activity,
-    job: m.kind ? latestFinished(state, m.kind) : undefined,
+    job: m.kind ? latestDone(state, m.kind) : undefined,
     failed: !busy && last?.status === "failed" ? last : undefined,
   };
 }
