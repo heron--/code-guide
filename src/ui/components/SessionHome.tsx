@@ -5,7 +5,7 @@ import { SubjectPicker } from "./SubjectPicker";
 
 /** The session: the subject picker until it has a subject, then the workspace. */
 export function SessionHome() {
-  const { status, state, modules, error } = useSession();
+  const { status, state, modules, error, fatal } = useSession();
   if (!state) return <Message title={status === "closed" ? "Not connected" : "Connecting…"}>{error}</Message>;
   if (!state.subject) return <SubjectPicker />;
   return (
@@ -13,7 +13,7 @@ export function SessionHome() {
       state={state}
       modules={modules}
       channel={sessionChannel()}
-      problem={status !== "open" ? "Reconnecting to Code Guide…" : error}
+      problem={!fatal && status !== "open" ? "Reconnecting to Code Guide…" : error}
     />
   );
 }
