@@ -7,6 +7,7 @@ import {
   type SDKMessage,
   type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
+import { realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import type { Harness, HarnessSession, HarnessSessionOptions } from "./types.js";
 
@@ -20,16 +21,34 @@ const GIT_UNSAFE = /^(--output|-O|--open-files-in-pager|--no-index|--ext-diff)/;
 /** Allow a Bash command only if it's one read-only git command, with nothing chained or redirected. */
 export function isReadOnlyGit(command: string): boolean {
   const c = command.trim();
-  return GIT_READ.test(c) && !/[;&|`$<>\n\\]/.test(c) && !c.split(/\s+/).some((arg) => GIT_UNSAFE.test(arg));
+  // Quotes are only grouping here (nothing else is expanded), so `'--no-index'` is checked as --no-index.
+  const args = c.split(/\s+/).map((arg) => arg.replace(/["']/g, ""));
+  return GIT_READ.test(c) && !/[;&|`$<>\n\\]/.test(c) && !args.some((arg) => GIT_UNSAFE.test(arg));
 }
 
-/** Whether every path a Read, Grep or Glob call names is inside the repository. */
+/** A path with symlinks followed, when it exists. */
+function real(p: string): string {
+  try {
+    return realpathSync(p);
+  } catch {
+    return p;
+  }
+}
+
+function inside(root: string, p: string): boolean {
+  const rel = relative(root, p);
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
+/** Whether every path a Read, Grep or Glob call names is inside the repository, after following symlinks. */
 export function staysInside(root: string, input: Record<string, unknown>): boolean {
   return ["file_path", "path", "pattern"].every((k) => {
     const v = input[k];
     if (typeof v !== "string" || (k === "pattern" && !isAbsolute(v))) return true;
-    const rel = relative(root, resolve(root, v));
-    return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+    // A symlink inside the repository can point outside it; reading it would follow the link.
+    const target = resolve(root, v);
+    const resolved = real(target);
+    return inside(root, target) && (resolved === target || inside(real(root), resolved));
   });
 }
 
