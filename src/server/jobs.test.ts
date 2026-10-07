@@ -21,11 +21,14 @@ const echo = (kind: string, prompt: (inputs: Record<string, unknown>) => string)
     input: z.object({ text: z.string() }),
     validate: async (input) => {
       const { text } = input as { text: string };
-      return text === "bad"
-        ? [{ level: "error", where: "text", message: "can't be bad" }]
-        : text === "meh"
-          ? [{ level: "warning", where: "text", message: "could be better" }]
-          : [];
+      return {
+        problems:
+          text === "bad"
+            ? [{ level: "error", where: "text", message: "can't be bad" }]
+            : text === "meh"
+              ? [{ level: "warning", where: "text", message: "could be better" }]
+              : [],
+      };
     },
   },
 });

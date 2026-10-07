@@ -49,13 +49,8 @@ export function lastLine(file: ResolvedFile): number {
 
 type Load = { guide?: Guide; problems: Problem[] };
 
-async function load(file: string): Promise<Load> {
-  let json: unknown;
-  try {
-    json = JSON.parse(await readFile(file, "utf8"));
-  } catch (e) {
-    return { problems: [{ level: "error", where: "file", message: `not valid JSON: ${(e as Error).message}` }] };
-  }
+/** Check a parsed guide against the schema. */
+export function parseGuide(json: unknown): Load {
   const parsed = guideSchema.safeParse(json);
   if (!parsed.success) {
     return {
@@ -67,6 +62,16 @@ async function load(file: string): Promise<Load> {
     };
   }
   return { guide: parsed.data, problems: [] };
+}
+
+async function load(file: string): Promise<Load> {
+  let json: unknown;
+  try {
+    json = JSON.parse(await readFile(file, "utf8"));
+  } catch (e) {
+    return { problems: [{ level: "error", where: "file", message: `not valid JSON: ${(e as Error).message}` }] };
+  }
+  return parseGuide(json);
 }
 
 export async function summarize(file: string) {
@@ -91,17 +96,25 @@ function toResolved(path: string, raw: RawLine[], status: ResolvedFile["status"]
   };
 }
 
-export async function resolveGuide(file: string): Promise<{ resolved?: ResolvedGuide; problems: Problem[] }> {
+export type Resolution = { resolved?: ResolvedGuide; problems: Problem[] };
+
+export async function resolveGuide(file: string): Promise<Resolution> {
   const { guide, problems } = await load(file);
   if (!guide) return { problems };
+  const repo = await repoRoot(dirname(file));
+  if (!repo)
+    return { problems: [{ level: "error", where: "file", message: "the guide is not inside a git repository" }] };
+  return checkGuide(guide, repo, { id: guideId(file), file });
+}
+
+/**
+ * Resolve a guide against a repository and check it against the spec: every error (it won't render) and
+ * warning (it breaks the quality bar). The guide can come from a file or from a job's submission.
+ */
+export async function checkGuide(guide: Guide, repo: string, at: { id: string; file: string }): Promise<Resolution> {
+  const problems: Problem[] = [];
   const err = (where: string, message: string) => problems.push({ level: "error", where, message });
   const warn = (where: string, message: string) => problems.push({ level: "warning", where, message });
-
-  const repo = await repoRoot(dirname(file));
-  if (!repo) {
-    err("file", "the guide is not inside a git repository");
-    return { problems };
-  }
 
   // ---- Subject ----
   const subject = guide.subject;
@@ -239,8 +252,7 @@ export async function resolveGuide(file: string): Promise<{ resolved?: ResolvedG
   });
 
   const resolved: ResolvedGuide = {
-    id: guideId(file),
-    file,
+    ...at,
     repo,
     guide,
     files,
