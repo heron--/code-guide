@@ -39,10 +39,16 @@ export function attachChannel(server: Server, session: Session, onRequest: Reque
     const send = (f: ServerFrame) => ws.send(JSON.stringify(f));
     let stop: (() => void) | undefined;
     ws.on("close", () => stop?.());
-    ws.on("message", async (data) => {
+    // One request at a time per tab, in the order sent: a quick start-then-cancel must not run backwards.
+    let queue = Promise.resolve();
+    ws.on("message", (data) => {
+      queue = queue.then(() => receive(String(data)));
+    });
+
+    async function receive(data: string) {
       let req: ReturnType<typeof requestSchema.parse>;
       try {
-        req = requestSchema.parse(JSON.parse(String(data)));
+        req = requestSchema.parse(JSON.parse(data));
       } catch {
         return send({ type: "error", message: "Not a valid request", fatal: false });
       }
@@ -68,7 +74,7 @@ export function attachChannel(server: Server, session: Session, onRequest: Reque
       } catch (e) {
         send({ type: "error", message: (e as Error).message, fatal: false });
       }
-    });
+    }
   }
 
   return () => {
