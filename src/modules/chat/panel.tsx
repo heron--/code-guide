@@ -34,7 +34,9 @@ function useGuide(job?: string): Guide | undefined {
 function ContextLabel({ c }: { c: ChatContext }) {
   const guide = useGuide(c.kind === "code" ? undefined : c.job);
   if (c.kind === "code")
-    return <>{`${c.path.split("/").pop()} ${c.start === c.end ? c.start : `${c.start}–${c.end}`}`}</>;
+    return (
+      <>{`${c.path.split("/").pop()} ${c.start === c.end ? c.start : `${c.start}–${c.end}`}${c.side === "old" ? " (removed)" : ""}`}</>
+    );
   const title = guide?.chapters[c.chapter]?.title;
   return <>{`${c.kind === "prose" ? "From" : "About"} ${pad(c.chapter + 1)}${title ? ` · ${title}` : ""}`}</>;
 }
@@ -107,13 +109,23 @@ function CodeLines({ c }: { c: Extract<ChatContext, { kind: "code" }> }) {
       .then((r) => (r.ok ? r.json() : undefined))
       .then(setFile, () => {});
   }, [c.path]);
-  const lines = file?.lines.filter((l) => l.k !== "-" && (l.n ?? 0) >= c.start && (l.n ?? 0) <= c.end).slice(0, 12);
+  // Removed lines are numbered on the old side; everything else on the new.
+  const num = (l: ResolvedFile["lines"][number]) => (c.side === "old" ? l.k !== "+" && l.o : l.k !== "-" && l.n);
+  const lines = file?.lines
+    .filter((l) => {
+      const n = num(l);
+      return !!n && n >= c.start && n <= c.end;
+    })
+    .slice(0, 12);
   if (!lines?.length) return null;
   return (
     <div className="overflow-x-auto font-mono text-[11.5px]">
       {lines.map((l) => (
-        <div key={l.n} className={cn("flex h-5 min-w-max leading-5", l.k === "+" && "bg-add-bg")}>
-          <span className="w-9 flex-none pr-2 text-right text-[11px] text-fg-3">{l.n}</span>
+        <div
+          key={`${l.o}:${l.n}`}
+          className={cn("flex h-5 min-w-max leading-5", l.k === "+" && "bg-add-bg", l.k === "-" && "bg-del-bg")}
+        >
+          <span className="w-9 flex-none pr-2 text-right text-[11px] text-fg-3">{num(l)}</span>
           <span className="pr-3 whitespace-pre">
             {l.t.map(([t, lc, dc], i) =>
               lc ? (
@@ -183,7 +195,8 @@ export default function ChatPanel({ state, channel }: PanelProps) {
         <div className="flex min-h-full flex-col justify-end gap-[18px] px-4 pt-4 pb-2">
           {messages.length === 0 && (
             <p className="m-auto max-w-[280px] text-center text-[12.5px] leading-normal text-fg-3">
-              Ask anything about the code. Select lines or prose in the Guide, or use its Ask button, to attach them.
+              Ask anything about the code. Select lines in the Guide or Diff, or prose in the Guide, or use its Ask
+              button, to attach them.
             </p>
           )}
           {messages.map((m) => (
@@ -215,7 +228,7 @@ export default function ChatPanel({ state, channel }: PanelProps) {
           />
           <div className="flex items-center gap-2">
             <span className="font-mono text-[10.5px] text-fg-3">
-              {waiting ? "Answering…" : "Select code in the Guide to attach it"}
+              {waiting ? "Answering…" : "Select code in the Guide or Diff to attach it"}
             </span>
             <span className="flex-1" />
             <button
