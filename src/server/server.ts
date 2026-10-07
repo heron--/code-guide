@@ -5,7 +5,8 @@ import { attachChannel, type RequestHandler } from "./channel.js";
 import type { ModuleInfo } from "../shared/modules.js";
 import type { Session } from "./session.js";
 import { parseInput, suggestions } from "./subjects.js";
-import { checkGuide, parseGuide, resolveChangedFile } from "./resolve.js";
+import { changedFiles } from "./git.js";
+import { changeRefs, checkGuide, parseGuide, resolveChangedFile } from "./resolve.js";
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -64,6 +65,19 @@ export function startServer(opts: ServeOptions): Promise<{ url: string; close: (
     if (parts[1] === "subjects") {
       const input = url.searchParams.get("input");
       return send(res, 200, input ? await parseInput(repo, input) : await suggestions(repo));
+    }
+    // The session's change, for the Diff module: every changed file, then one file at a time.
+    if (parts[1] === "diff") {
+      const subject = session.state.subject?.subject;
+      if (subject?.type !== "change") return send(res, 404, { error: "the subject isn't a change" });
+      const refs = await changeRefs(repo, subject);
+      if (!refs) return send(res, 404, { error: "the change's refs don't resolve" });
+      if (parts[2] === "file") {
+        const path = url.searchParams.get("path") ?? "";
+        const f = await resolveChangedFile(repo, refs.base, refs.head, path);
+        return f ? send(res, 200, f) : send(res, 404, { error: `${path} is not changed` });
+      }
+      return send(res, 200, { changed: await changedFiles(repo, refs.base, refs.head) });
     }
     // A finished job's result, e.g. a quiz.
     if (parts[1] === "results" && parts[2]) {

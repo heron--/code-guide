@@ -270,3 +270,17 @@ export async function resolveChangedFile(
     lines: diff.map(({ text: _, ...l }, i) => ({ ...l, t: tokens[i] })),
   };
 }
+
+/**
+ * The commits a change compares: the merge-base of base and head, and head (undefined for the working tree).
+ * Undefined if either ref doesn't resolve.
+ */
+export async function changeRefs(
+  repo: string,
+  change: { base: string; head?: string },
+): Promise<{ base: string; head?: string } | undefined> {
+  const b = await revParse(repo, change.base);
+  const h = change.head ? await revParse(repo, change.head) : undefined;
+  if (!b || (change.head && !h)) return undefined;
+  return { base: await mergeBase(repo, b, h ?? "HEAD"), head: h };
+}
