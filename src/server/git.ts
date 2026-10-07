@@ -1,19 +1,16 @@
-import { execFile } from "node:child_process";
 import { readFile, realpath } from "node:fs/promises";
 import { resolve, sep } from "node:path";
-import { promisify } from "node:util";
 import type { FileStatus, Line } from "../shared/guide.js";
+import { run } from "./run.js";
 
-const exec = promisify(execFile);
-
-async function git(cwd: string, args: string[]): Promise<string> {
-  const { stdout } = await exec("git", args, { cwd, maxBuffer: 256 * 1024 * 1024 });
-  return stdout;
+function git(cwd: string, args: string[]): Promise<string> {
+  return run("git", args, { cwd });
 }
 
 export async function repoRoot(dir: string): Promise<string | undefined> {
   try {
-    return (await git(dir, ["rev-parse", "--show-toplevel"])).trim();
+    // git prints C:/x on Windows; path.resolve makes it C:\x, the form every other path here has.
+    return resolve((await git(dir, ["rev-parse", "--show-toplevel"])).trim());
   } catch {
     return undefined;
   }
@@ -43,8 +40,9 @@ export async function fileAt(root: string, ref: string | undefined, path: string
   }
 }
 
+/** Lines of a file, whatever its line endings. */
 export function splitLines(text: string): string[] {
-  const lines = text.split("\n");
+  const lines = text.split(/\r?\n/);
   if (lines.at(-1) === "") lines.pop();
   return lines;
 }

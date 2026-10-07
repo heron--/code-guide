@@ -294,7 +294,7 @@ export async function resolveSubjectFile(
   subject: { type: string; base?: string; head?: string },
   path: string,
 ): Promise<ResolvedFile | undefined> {
-  if (path.startsWith("/") || path.split("/").includes("..")) return undefined;
+  if (path.startsWith("/") || path.split(/[\\/]/).includes("..")) return undefined;
   let ref: string | undefined;
   if (subject.type === "change" && subject.base) {
     const refs = await changeRefs(repo, { base: subject.base, head: subject.head });

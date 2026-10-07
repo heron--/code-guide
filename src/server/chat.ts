@@ -91,7 +91,7 @@ export class Chat {
       const ref = subject.type === "change" && subject.head ? await revParse(repo, subject.head) : undefined;
       // Without it, fileAt would read the working tree instead of the change.
       if (subject.type === "change" && subject.head && !ref) throw new Error(`unknown ref "${subject.head}"`);
-      const text = c.path.split("/").includes("..") ? undefined : await fileAt(repo, ref, c.path);
+      const text = c.path.split(/[\\/]/).includes("..") ? undefined : await fileAt(repo, ref, c.path);
       const lines = text === undefined ? [] : splitLines(text).slice(c.start - 1, c.end);
       return `The reader selected ${c.path}#L${c.start}-L${c.end}:\n\`\`\`\n${lines.map((l, i) => `${c.start + i}  ${l}`).join("\n")}\n\`\`\``;
     }
