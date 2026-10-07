@@ -23,8 +23,9 @@ async function serve(s: Session) {
     port: 0,
     session: {
       session: s,
-      onRequest: (r) => {
+      onRequest: async (r) => {
         if (r.type === "job.cancel") throw new Error(`no job "${r.job}"`);
+        if (r.type === "job.start") await new Promise((ok) => setTimeout(ok, 50));
         requests.push(r);
       },
     },
@@ -98,6 +99,15 @@ test("a tab follows the server onto a new session", async () => {
   expect(server.url).not.toBe(old);
   await until(() => c.snapshot.state?.id === next.id);
   expect(c.snapshot.state).toEqual(next.state);
+});
+
+test("a tab's requests are handled one at a time, in order", async () => {
+  const c = tab();
+  await until(() => c.snapshot.status === "open");
+  c.send({ type: "job.start", module: "slow" });
+  c.send({ type: "chat.send", text: "after", context: [] });
+  await until(() => requests.length === 2);
+  expect(requests.map((r) => r.type)).toEqual(["job.start", "chat.send"]);
 });
 
 test("refused requests come back as errors", async () => {
