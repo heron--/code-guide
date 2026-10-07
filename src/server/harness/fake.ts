@@ -35,7 +35,7 @@ export class FakeHarness implements Harness {
     };
 
     const answer = async (text: string) => {
-      const call = text.match(/Call the `(\w+)` tool with (\{.*?\})\./s);
+      const call = text.match(/Call the `([^`]+)` tool with (\{.*?\})\./s);
       const reply = text.match(/Reply with exactly: (.+)$/s);
       const count = text.match(/Count from 1 to (\d+)/);
       if (call) {

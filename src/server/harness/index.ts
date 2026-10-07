@@ -12,7 +12,7 @@ export const harnesses: Record<string, (model?: string) => Harness> = {
 export const DEFAULT_HARNESS = "fake";
 
 export function createHarness(name = DEFAULT_HARNESS, model?: string): Harness {
-  const make = harnesses[name];
+  const make = Object.hasOwn(harnesses, name) ? harnesses[name] : undefined;
   if (!make) throw new Error(`Unknown harness "${name}". Choose one of: ${Object.keys(harnesses).join(", ")}`);
   return make(model);
 }
