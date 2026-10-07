@@ -99,6 +99,32 @@ export async function preparePullRequest(repo: string, subject: Subject & { type
   return { type: "change", base, head: pr.headRefOid, pr: subject.pr };
 }
 
+/** A pull request's description, as the Overview shows it. */
+export type PullRequest = { number: number; title: string; url: string; body: string };
+
+/**
+ * The branch name `gh pr view` looks up for a head: `HEAD` is the branch it's on, and a remote-tracking branch
+ * (`origin/feature`) drops its remote.
+ */
+async function branchName(repo: string, head: string): Promise<string | undefined> {
+  if (head === "HEAD") return quiet(sh(repo, "git", ["branch", "--show-current"]));
+  if (await revParse(repo, `refs/remotes/${head}`)) return head.slice(head.indexOf("/") + 1);
+  return head;
+}
+
+/**
+ * The pull request a change comes from: the one it names, else the open one for its head branch. Undefined when
+ * there's none, or `gh` isn't installed or signed in.
+ */
+export async function pullRequestFor(repo: string, subject: Subject): Promise<PullRequest | undefined> {
+  if (subject.type !== "change") return undefined;
+  const which = subject.pr ? String(subject.pr) : subject.head && (await branchName(repo, subject.head));
+  // A commit, or no head (the working tree), has no pull request of its own.
+  if (!which || (!subject.pr && /^[0-9a-f]{7,40}$/.test(which))) return undefined;
+  const out = await quiet(sh(repo, "gh", ["pr", "view", which, "--json", "number,title,url,body"]));
+  return out ? (JSON.parse(out) as PullRequest) : undefined;
+}
+
 /**
  * Bring a change's base up to date before comparing against it. A stale local copy of the base moves the
  * merge-base back, and the change then includes everyone's commits to the base since the last fetch.
