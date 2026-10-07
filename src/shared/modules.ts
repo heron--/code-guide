@@ -44,9 +44,18 @@ function done(state: SessionState, id: string): boolean {
     job.status === "finished" &&
     state.jobOrder.every((f) => {
       const next = state.jobs[f];
-      return next.module !== job.module || next.inputs[0] !== id || done(state, f);
+      return next.module !== job.module || next.inputs[0] !== id || retried(state, f) || done(state, f);
     })
   );
+}
+
+/** A failed or cancelled job that was run again: its retry, a later job of the same kind and inputs, counts instead. */
+function retried(state: SessionState, id: string): boolean {
+  const job = state.jobs[id];
+  if (job.status !== "failed" && job.status !== "cancelled") return false;
+  const same = (o: typeof job) =>
+    o.kind === job.kind && o.module === job.module && o.inputs.join() === job.inputs.join();
+  return state.jobOrder.slice(state.jobOrder.indexOf(id) + 1).some((o) => same(state.jobs[o]));
 }
 
 /** Whether any of a module's jobs (its own, or follow-ups like a review) is still queued or running. */
