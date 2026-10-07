@@ -37,6 +37,8 @@ export function useAskSelection(
     const rect = sel.getRangeAt(0).getBoundingClientRect();
     const at = { x: Math.max(8, rect.left - box.left), y: rect.bottom - box.top + 6 };
     const card = el(sel.anchorNode)?.closest("section[data-path]");
+    // Row indexes restart in every file card: a selection across two can't be one range.
+    if (card && card !== el(sel.focusNode)?.closest("section[data-path]")) return setSelection(undefined);
     if (card) {
       const path = card.getAttribute("data-path")!;
       const file = opts.file(path);
@@ -45,13 +47,15 @@ export function useAskSelection(
         .map((n) => el(n)?.closest("[data-idx]")?.getAttribute("data-idx"))
         .filter((i): i is string => i != null)
         .map(Number);
-      const nums = idx
-        .map((i) => (file.status === "deleted" ? file.lines[i]?.o : (file.lines[i]?.n ?? file.lines[i]?.o)))
-        .filter((n): n is number => n != null);
+      if (!idx.length) return setSelection(undefined);
+      // New-side numbers, unless only removed lines (or a deleted file) are selected: then the base side's.
+      const rows = file.lines.slice(Math.min(...idx), Math.max(...idx) + 1);
+      const old = file.status === "deleted" || !rows.some((l) => l.n != null);
+      const nums = rows.map((l) => (old ? l.o : l.n)).filter((n): n is number => n != null);
       if (!nums.length) return setSelection(undefined);
       const [start, end] = [Math.min(...nums), Math.max(...nums)];
       return setSelection({
-        context: { kind: "code", path, start, end },
+        context: { kind: "code", path, start, end, ...(old && { side: "old" as const }) },
         label: start === end ? `Ask about line ${start}` : `Ask about lines ${start}–${end}`,
         ...at,
       });

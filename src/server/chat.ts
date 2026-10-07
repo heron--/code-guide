@@ -1,6 +1,7 @@
 import type { Guide } from "../shared/guide.js";
 import type { ChatContext } from "../shared/protocol.js";
-import { fileAt, revParse, splitLines } from "./git.js";
+import { fileAt, splitLines } from "./git.js";
+import { changeRefs } from "./resolve.js";
 import type { Harness, HarnessSession } from "./harness/index.js";
 import type { Session } from "./session.js";
 
@@ -88,12 +89,15 @@ export class Chat {
     if (c.kind === "code") {
       const subject = this.session.state.subject!.subject;
       const repo = this.session.state.repo!;
-      const ref = subject.type === "change" && subject.head ? await revParse(repo, subject.head) : undefined;
+      const refs = subject.type === "change" ? await changeRefs(repo, subject) : undefined;
       // Without it, fileAt would read the working tree instead of the change.
-      if (subject.type === "change" && subject.head && !ref) throw new Error(`unknown ref "${subject.head}"`);
+      if (subject.type === "change" && !refs) throw new Error(`unknown ref "${subject.head ?? subject.base}"`);
+      // Removed lines are read where they still exist: the change's base.
+      const ref = c.side === "old" ? refs!.base : refs?.head;
       const text = c.path.split(/[\\/]/).includes("..") ? undefined : await fileAt(repo, ref, c.path);
       const lines = text === undefined ? [] : splitLines(text).slice(c.start - 1, c.end);
-      return `The reader selected ${c.path}#L${c.start}-L${c.end}:\n\`\`\`\n${lines.map((l, i) => `${c.start + i}  ${l}`).join("\n")}\n\`\`\``;
+      const where = c.side === "old" ? " (removed by the change; numbered as before it)" : "";
+      return `The reader selected ${c.path}#L${c.start}-L${c.end}${where}:\n\`\`\`\n${lines.map((l, i) => `${c.start + i}  ${l}`).join("\n")}\n\`\`\``;
     }
     const job = this.session.state.jobs[c.job];
     const guide = job?.result ? ((await this.session.readResult(job.result)) as Guide) : undefined;

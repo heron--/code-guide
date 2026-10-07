@@ -34,7 +34,9 @@ function useGuide(job?: string): Guide | undefined {
 function ContextLabel({ c }: { c: ChatContext }) {
   const guide = useGuide(c.kind === "code" ? undefined : c.job);
   if (c.kind === "code")
-    return <>{`${c.path.split("/").pop()} ${c.start === c.end ? c.start : `${c.start}–${c.end}`}`}</>;
+    return (
+      <>{`${c.path.split("/").pop()} ${c.start === c.end ? c.start : `${c.start}–${c.end}`}${c.side === "old" ? " (removed)" : ""}`}</>
+    );
   const title = guide?.chapters[c.chapter]?.title;
   return <>{`${c.kind === "prose" ? "From" : "About"} ${pad(c.chapter + 1)}${title ? ` · ${title}` : ""}`}</>;
 }
@@ -107,13 +109,23 @@ function CodeLines({ c }: { c: Extract<ChatContext, { kind: "code" }> }) {
       .then((r) => (r.ok ? r.json() : undefined))
       .then(setFile, () => {});
   }, [c.path]);
-  const lines = file?.lines.filter((l) => l.k !== "-" && (l.n ?? 0) >= c.start && (l.n ?? 0) <= c.end).slice(0, 12);
+  // Removed lines are numbered on the old side; everything else on the new.
+  const num = (l: ResolvedFile["lines"][number]) => (c.side === "old" ? l.k !== "+" && l.o : l.k !== "-" && l.n);
+  const lines = file?.lines
+    .filter((l) => {
+      const n = num(l);
+      return !!n && n >= c.start && n <= c.end;
+    })
+    .slice(0, 12);
   if (!lines?.length) return null;
   return (
     <div className="overflow-x-auto font-mono text-[11.5px]">
       {lines.map((l) => (
-        <div key={l.n} className={cn("flex h-5 min-w-max leading-5", l.k === "+" && "bg-add-bg")}>
-          <span className="w-9 flex-none pr-2 text-right text-[11px] text-fg-3">{l.n}</span>
+        <div
+          key={`${l.o}:${l.n}`}
+          className={cn("flex h-5 min-w-max leading-5", l.k === "+" && "bg-add-bg", l.k === "-" && "bg-del-bg")}
+        >
+          <span className="w-9 flex-none pr-2 text-right text-[11px] text-fg-3">{num(l)}</span>
           <span className="pr-3 whitespace-pre">
             {l.t.map(([t, lc, dc], i) =>
               lc ? (
