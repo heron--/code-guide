@@ -42,11 +42,19 @@ export class Chat {
     if (!this.session.state.subject) return Promise.reject(new Error("Choose a subject first"));
     const id = this.nextId();
     this.session.append("chat.sent", { message: id, text, context });
-    this.pending.push({ id });
-    const sent = this.queue.then(async () => {
-      const parts = [await this.catchUp(), ...(await Promise.all(context.map((c) => this.describe(c)))), text];
-      this.start().send(parts.filter(Boolean).join("\n\n"));
-    });
+    const entry = { id };
+    this.pending.push(entry);
+    const sent = this.queue
+      .then(async () => {
+        const parts = [await this.catchUp(), ...(await Promise.all(context.map((c) => this.describe(c)))), text];
+        this.start().send(parts.filter(Boolean).join("\n\n"));
+      })
+      .catch((e: Error) => {
+        // It never reached the harness, so no reply will come: fail it here, or the next reply would be its.
+        this.pending = this.pending.filter((p) => p !== entry);
+        this.session.append("chat.failed", { message: this.reply(entry), error: e.message });
+        throw e;
+      });
     this.queue = sent.catch(() => {});
     return sent;
   }

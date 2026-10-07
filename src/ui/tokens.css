@@ -23,7 +23,7 @@
   /* Text */
   --fg: #1d1c19;
   --fg-2: #54524c;
-  --fg-3: #706e67;
+  --fg-3: #706e67; /* on surfaces only: 4.1:1 on the canvas */
   --fg-4: #86837b; /* line numbers */
   /* Lines */
   --rule: #1d1c19; /* the one strong line: under the status bar, above the dock */

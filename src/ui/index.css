@@ -36,7 +36,8 @@
   --color-primary: var(--accent);
   --color-primary-foreground: var(--surface);
   --color-muted: var(--surface-3);
-  --color-muted-foreground: var(--fg-3);
+  /* fg-3 is under 4.5:1 on the canvas in light mode; quiet text on the canvas uses fg-2. */
+  --color-muted-foreground: var(--fg-2);
   --color-accent-foreground: var(--fg);
   --color-ring: var(--accent);
 
