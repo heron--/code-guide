@@ -86,7 +86,12 @@ export default function DiffPanel({ state }: PanelProps) {
       </nav>
       <div className="flex flex-col gap-3 p-3 pb-[40vh]">
         {changed.map((f) => (
-          <DiffFile key={f.path} path={f.path} target={target?.path === f.path ? target : undefined} />
+          <DiffFile
+            key={f.path}
+            path={f.path}
+            scroller={scroller}
+            target={target?.path === f.path ? target : undefined}
+          />
         ))}
       </div>
     </div>
@@ -94,7 +99,15 @@ export default function DiffPanel({ state }: PanelProps) {
 }
 
 /** One file's diff, loaded when it first comes near the screen. */
-function DiffFile({ path, target }: { path: string; target?: LinesTarget & { nonce: number } }) {
+function DiffFile({
+  path,
+  scroller,
+  target,
+}: {
+  path: string;
+  scroller: React.RefObject<HTMLDivElement | null>;
+  target?: LinesTarget & { nonce: number };
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [file, setFile] = useState<ResolvedFile>();
   const [visible, setVisible] = useState<boolean[]>();
@@ -117,10 +130,14 @@ function DiffFile({ path, target }: { path: string; target?: LinesTarget & { non
   const [failed, setFailed] = useState<string>();
 
   useEffect(() => {
-    const io = new IntersectionObserver(([e]) => e.isIntersecting && setNear(true), { rootMargin: "800px" });
+    // The panel's scroller is the root: margins don't reach past a clipping ancestor that isn't.
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && setNear(true), {
+      root: scroller.current,
+      rootMargin: "800px",
+    });
     if (ref.current) io.observe(ref.current);
     return () => io.disconnect();
-  }, []);
+  }, [scroller]);
   useEffect(() => {
     if (!near || file || failed) return;
     fetch(`/api/diff/file?path=${encodeURIComponent(path)}`)
