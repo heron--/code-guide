@@ -7,7 +7,14 @@ export function SessionHome() {
   const { status, state, modules, error } = useSession();
   if (!state) return <Message title={status === "closed" ? "Not connected" : "Connecting…"}>{error}</Message>;
   if (!state.subject) return <SubjectPicker />;
-  return <Workspace state={state} modules={modules} channel={sessionChannel()} />;
+  return (
+    <Workspace
+      state={state}
+      modules={modules}
+      channel={sessionChannel()}
+      problem={status !== "open" ? "Reconnecting to Code Guide…" : error}
+    />
+  );
 }
 
 function Message({ title, children }: { title: string; children?: React.ReactNode }) {

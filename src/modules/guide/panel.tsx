@@ -26,8 +26,17 @@ export default function GuidePanel({ state, job }: PanelProps) {
   const [error, setError] = useState<string>();
   useEffect(() => {
     if (!job) return;
+    // A revision replaces the guide while this panel stays open: drop answers for the old one.
+    let current = true;
     setData(undefined);
-    api.guide(job).then(setData, (e) => setError(e.message));
+    setError(undefined);
+    api.guide(job).then(
+      (d) => current && setData(d),
+      (e) => current && setError(e.message),
+    );
+    return () => {
+      current = false;
+    };
   }, [job]);
 
   const root = useRef<HTMLDivElement>(null);
