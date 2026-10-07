@@ -341,6 +341,7 @@ function PanelFrame(props: {
     <section
       aria-label={m.label}
       onPointerDownCapture={props.onFocus}
+      onFocusCapture={props.onFocus}
       className={cn(
         "relative flex min-w-0 flex-1 flex-col bg-surface",
         active ? "border border-rule shadow-active" : "border border-border-strong",
