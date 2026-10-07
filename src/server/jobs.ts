@@ -182,7 +182,8 @@ export class JobRunner {
       ],
       onEvent: (e) => {
         if (this.isOver(id)) {
-          if (e.type === "turn.end") void this.end(id);
+          // The job ended (accepted, failed or cancelled); release it once the harness is done or dead.
+          if (e.type === "turn.end" || (e.type === "error" && e.fatal)) void this.end(id);
           return;
         }
         if (e.type === "activity") this.session.append("job.progress", { job: id, activity: e.activity });
