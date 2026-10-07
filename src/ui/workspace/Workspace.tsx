@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ResolvedFile } from "../../shared/guide";
+import type { ChatContext } from "../../shared/protocol";
 import { unavailable, type ModuleInfo } from "../../shared/modules";
 import type { SessionState } from "../../shared/state";
 import { panelFor } from "@/lib/panels";
@@ -7,7 +8,14 @@ import type { SessionChannel } from "@/lib/session";
 import { usePersistent, usePersistentSet } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { Icon, icons } from "./Icon";
-import { ActionsContext, type LineShower, type LinesTarget, type WorkspaceActions } from "./actions";
+import {
+  ActionsContext,
+  DraftContext,
+  sameContext,
+  type LineShower,
+  type LinesTarget,
+  type WorkspaceActions,
+} from "./actions";
 import { Dock } from "./Dock";
 import { FileView } from "./FileView";
 import {
@@ -94,9 +102,13 @@ export function Workspace({ state, modules, channel, problem }: Props) {
         }
         setFileView({ target, file });
       },
-      ask: () => {},
+      ask(context) {
+        setDraft((d) => (d.some((c) => sameContext(c, context)) ? d : [...d, context]));
+        if (!inSlot("chat")) setLayout(open(live.current.layout, "chat", elsewhere()));
+      },
     };
   }, [setLayout]);
+  const [draft, setDraft] = useState<ChatContext[]>([]);
 
   const startModule = (m: ModuleInfo) => {
     if (m.needsJob) channel.send({ type: "job.start", module: m.name });
@@ -166,49 +178,51 @@ export function Workspace({ state, modules, channel, problem }: Props) {
 
   return (
     <ActionsContext.Provider value={actions}>
-      <div
-        className={cn(
-          "relative flex h-full flex-col overflow-hidden bg-canvas text-fg",
-          drag && dragged.current && "cursor-grabbing select-none",
-        )}
-      >
-        <StatusBar state={state} modules={modules} onStart={startModule} problem={problem} />
-        <main ref={mainRef} className="flex min-h-0 flex-1 p-2.5">
-          {over?.whole && dragged.current ? (
-            slot("left")
-          ) : shown.maximized ? (
-            slot(shown.maximized)
-          ) : (
-            <Slots
-              split={shown.split}
-              onSplit={(v) => setLayout(setSplit(layout, v))}
-              left={slot("left")}
-              right={slot("right")}
-            />
+      <DraftContext.Provider value={{ context: draft, setContext: setDraft }}>
+        <div
+          className={cn(
+            "relative flex h-full flex-col overflow-hidden bg-canvas text-fg",
+            drag && dragged.current && "cursor-grabbing select-none",
           )}
-        </main>
-        <Dock
-          state={state}
-          modules={modules}
-          layout={layout}
-          dragging={drag?.from === "dock" && dragged.current ? drag.panel : undefined}
-          onDragStart={(p, e) => startDrag(p, "dock", e)}
-          onOpen={(p) => !dragged.current && setLayout(open(layout, p))}
-          onDiscard={(p) => setLayout(discard(layout, p))}
-          onRetry={(module, job) => channel.send({ type: "job.start", module, retry: job })}
-        />
-        {drag && dragged.current && draggedModule && drag.from === "dock" && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none fixed z-50 flex h-[50px] w-[54px] flex-col items-center justify-center gap-[5px] border border-accent bg-surface shadow-active"
-            style={{ left: drag.x - 27, top: drag.y - 25 }}
-          >
-            <Icon paths={draggedModule.icon} className="text-fg-2" />
-            <span className="font-mono text-[10px]">{draggedModule.label}</span>
-          </div>
-        )}
-        {fileView && <FileView {...fileView} onClose={() => setFileView(undefined)} />}
-      </div>
+        >
+          <StatusBar state={state} modules={modules} onStart={startModule} problem={problem} />
+          <main ref={mainRef} className="flex min-h-0 flex-1 p-2.5">
+            {over?.whole && dragged.current ? (
+              slot("left")
+            ) : shown.maximized ? (
+              slot(shown.maximized)
+            ) : (
+              <Slots
+                split={shown.split}
+                onSplit={(v) => setLayout(setSplit(layout, v))}
+                left={slot("left")}
+                right={slot("right")}
+              />
+            )}
+          </main>
+          <Dock
+            state={state}
+            modules={modules}
+            layout={layout}
+            dragging={drag?.from === "dock" && dragged.current ? drag.panel : undefined}
+            onDragStart={(p, e) => startDrag(p, "dock", e)}
+            onOpen={(p) => !dragged.current && setLayout(open(layout, p))}
+            onDiscard={(p) => setLayout(discard(layout, p))}
+            onRetry={(module, job) => channel.send({ type: "job.start", module, retry: job })}
+          />
+          {drag && dragged.current && draggedModule && drag.from === "dock" && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none fixed z-50 flex h-[50px] w-[54px] flex-col items-center justify-center gap-[5px] border border-accent bg-surface shadow-active"
+              style={{ left: drag.x - 27, top: drag.y - 25 }}
+            >
+              <Icon paths={draggedModule.icon} className="text-fg-2" />
+              <span className="font-mono text-[10px]">{draggedModule.label}</span>
+            </div>
+          )}
+          {fileView && <FileView {...fileView} onClose={() => setFileView(undefined)} />}
+        </div>
+      </DraftContext.Provider>
     </ActionsContext.Provider>
   );
 }

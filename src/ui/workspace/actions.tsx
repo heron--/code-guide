@@ -38,3 +38,15 @@ export function useLineShower(module: string, shower: LineShower) {
     [module, register],
   );
 }
+
+/** What the next chat message will be about: context attached from other panels, until it's sent. */
+export type Draft = { context: ChatContext[]; setContext: (c: ChatContext[]) => void };
+export const DraftContext = createContext<Draft>({ context: [], setContext: () => {} });
+export function useDraft(): Draft {
+  return useContext(DraftContext);
+}
+
+/** The same context twice is one context. */
+export function sameContext(a: ChatContext, b: ChatContext): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}

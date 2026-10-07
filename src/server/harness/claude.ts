@@ -142,11 +142,17 @@ export class ClaudeHarness implements Harness {
       },
     });
 
+    let wroteText = false;
     const handle = (m: SDKMessage) => {
       if (m.type === "stream_event" && m.parent_tool_use_id === null) {
         const ev = m.event;
-        if (ev.type === "content_block_delta" && ev.delta.type === "text_delta")
+        // Text the agent writes between tool calls is its own paragraph, not run into what follows.
+        if (ev.type === "content_block_start" && ev.content_block.type === "text" && wroteText)
+          emit({ type: "text", delta: "\n\n" });
+        if (ev.type === "content_block_delta" && ev.delta.type === "text_delta" && ev.delta.text) {
+          wroteText = true;
           emit({ type: "text", delta: ev.delta.text });
+        }
       } else if (m.type === "assistant" && m.parent_tool_use_id === null) {
         for (const b of m.message.content)
           if (b.type === "tool_use")
@@ -155,6 +161,7 @@ export class ClaudeHarness implements Harness {
         if (m.subtype !== "success" && !cancelling)
           emit({ type: "error", message: m.errors.join("; ") || m.subtype, fatal: false });
         emit(cancelling ? { type: "turn.end", cancelled: true } : { type: "turn.end" });
+        wroteText = false;
         busy = false;
         poke();
       }
