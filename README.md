@@ -50,7 +50,7 @@ Sessions are kept in `.code-guide/sessions/` in the repository; add it to your `
 The browser shows a workspace: two slots side by side and a dock along the bottom. It opens with the Guide on the left, showing its progress while it's written, and Chat on the right. Other jobs wait in the dock with their progress; click a square to open it, or drag it up into a slot.
 
 - **Guide**: one chapter at a time, its prose and file list beside the code. Keys work while focus is in the panel: <kbd>J</kbd>/<kbd>K</kbd> (or <kbd>⌥</kbd><kbd>↓</kbd>/<kbd>↑</kbd>) for chapters, <kbd>[</kbd>/<kbd>]</kbd> for files, <kbd>R</kbd> to mark the chapter Reviewed.
-- **Diff** (for changes): every changed file. Open it from **New panel**.
+- **Diff** (for changes): every changed file. Open it from **New panel**. **Full diff** at its top shows every line of every file instead of just the changes.
 - **Quiz**: a few questions on the guide, answered by tapping an option. Each answer explains itself and cites the code.
 - **Citations** (`file:line` chips) show the lines in the Guide if the chapter has the file, else in the Diff, else in a file view.
 - **Chat**: ask about the code as you read. It knows the guides and quizzes so far. Select lines or prose in the Guide and choose **Ask about this** to bring them in.

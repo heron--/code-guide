@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { FileStatus, ResolvedFile } from "../../shared/guide";
-import { ChangeCount, FileCard, LangTag, splitPath } from "@/code/FileCard";
+import { ChangeCount, FileCard, LangTag, Reviewed, splitPath } from "@/code/FileCard";
 import { indexRange, initialVisible } from "@/code/excerpt";
 import type { PanelProps } from "@/lib/panels";
+import { usePersistent } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { useLineShower, type LinesTarget } from "@/workspace/actions";
 
@@ -15,6 +16,8 @@ export default function DiffPanel({ state }: PanelProps) {
   const [error, setError] = useState<string>();
   const scroller = useRef<HTMLDivElement>(null);
   const subject = state.subject?.subject;
+  // Every line of every changed file, instead of just the hunks.
+  const [full, setFull] = usePersistent(`cg:${state.id}:diff:full`, false);
   // A citation to a changed file: scroll to it, and the file marks its lines once loaded.
   const [target, setTarget] = useState<LinesTarget & { nonce: number }>();
   useLineShower("diff", {
@@ -54,6 +57,7 @@ export default function DiffPanel({ state }: PanelProps) {
         </span>
         <ChangeCount file={{ additions: add, deletions: del }} />
         <span className="flex-1" />
+        <Reviewed checked={full} onChange={setFull} label="Full diff" />
         {subject?.type === "change" && (
           <span className="truncate font-mono text-[11px] text-fg-3">
             {subject.pr ? `#${subject.pr}` : (subject.head ?? "working tree")} ← {subject.base}
@@ -89,6 +93,7 @@ export default function DiffPanel({ state }: PanelProps) {
           <DiffFile
             key={f.path}
             path={f.path}
+            full={full}
             scroller={scroller}
             target={target?.path === f.path ? target : undefined}
           />
@@ -101,10 +106,13 @@ export default function DiffPanel({ state }: PanelProps) {
 /** One file's diff, loaded when it first comes near the screen. */
 function DiffFile({
   path,
+  full,
   scroller,
   target,
 }: {
   path: string;
+  /** Show every line, loaded now rather than when the file nears the screen. */
+  full: boolean;
   scroller: React.RefObject<HTMLDivElement | null>;
   target?: LinesTarget & { nonce: number };
 }) {
@@ -115,8 +123,8 @@ function DiffFile({
   const [marked, setMarked] = useState<[number, number]>();
 
   useEffect(() => {
-    if (target) setNear(true);
-  }, [target]);
+    if (target || full) setNear(true);
+  }, [target, full]);
   useEffect(() => {
     // A citation in another file takes the mark with it.
     if (!target) return setMarked(undefined);
@@ -160,7 +168,7 @@ function DiffFile({
         <FileCard
           id={`${domId(path)}-card`}
           file={file}
-          visible={visible}
+          visible={full ? visible.map(() => true) : visible}
           marked={marked}
           onReveal={(from, to) => setVisible((v) => v && v.map((shown, i) => shown || (i >= from && i <= to)))}
         />
