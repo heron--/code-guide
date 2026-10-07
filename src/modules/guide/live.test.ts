@@ -7,7 +7,7 @@ import type { Subject } from "../../shared/protocol";
 import { ClaudeHarness } from "../../server/harness/claude";
 import { JobRunner } from "../../server/jobs";
 import { followUps } from "../../server/requests";
-import { latestFinished, moduleBusy } from "../../shared/modules";
+import { latestDone, moduleBusy } from "../../shared/modules";
 import { Session } from "../../server/session";
 import guide from "./module";
 
@@ -37,7 +37,7 @@ describe.runIf(process.env.CODE_GUIDE_LIVE)("guide job, live", () => {
         console.log(id, job.status, job.attempts, "attempts", job.error ?? "", JSON.stringify(job.warnings));
         if (job.result) console.log(JSON.stringify(await session.readResult(job.result), null, 2));
       }
-      const latest = latestFinished(session.state, "guide");
+      const latest = latestDone(session.state, "guide");
       expect(latest).toBeDefined();
       expect(session.state.jobOrder.some((id) => id.startsWith("review-"))).toBe(true);
     },
