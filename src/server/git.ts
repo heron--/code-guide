@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import type { FileStatus, Line } from "../shared/guide.js";
@@ -35,8 +35,9 @@ export async function mergeBase(root: string, a: string, b: string): Promise<str
 export async function fileAt(root: string, ref: string | undefined, path: string): Promise<string | undefined> {
   try {
     if (ref) return await git(root, ["show", `${ref}:${path}`]);
-    const abs = resolve(root, path);
-    return abs.startsWith(root + sep) ? await readFile(abs, "utf8") : undefined;
+    // Real paths, so a symlink in the repository can't lead outside it.
+    const abs = await realpath(resolve(root, path));
+    return abs.startsWith((await realpath(root)) + sep) ? await readFile(abs, "utf8") : undefined;
   } catch {
     return undefined;
   }
