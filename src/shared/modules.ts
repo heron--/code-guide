@@ -20,11 +20,47 @@ export function unavailable(m: ModuleInfo, state: SessionState): string | undefi
   const subject = state.subject?.subject;
   if (!subject) return "Choose a subject first";
   if (m.subjects && !m.subjects.includes(subject.type)) return `${m.label} needs a ${m.subjects.join(" or ")}`;
-  for (const kind of m.results ?? []) if (!latestFinished(state, kind)) return `${m.label} needs a finished ${kind}`;
+  for (const kind of m.results ?? []) {
+    // One still being written, reviewed or revised: wait, so the input is the final one.
+    const newest = state.jobOrder.findLast((id) => state.jobs[id].kind === kind);
+    if (newest && moduleBusy(state, state.jobs[newest].module)) return `${m.label} waits for the ${kind} to finish`;
+    if (!latestDone(state, kind)) return `${m.label} needs a finished ${kind}`;
+  }
   return undefined;
 }
 
-/** The newest finished job of a kind. */
-export function latestFinished(state: SessionState, kind: string): string | undefined {
-  return state.jobOrder.findLast((id) => state.jobs[id].kind === kind && state.jobs[id].status === "finished");
+/**
+ * The newest done job of a kind: finished, and so are the follow-ups its module ran on it (a guide's review,
+ * and any revision and its review). Readers never see a result that's still being reviewed, or whose review
+ * failed: that shows as the failed job, with its reason and a retry.
+ */
+export function latestDone(state: SessionState, kind: string): string | undefined {
+  return state.jobOrder.findLast((id) => state.jobs[id].kind === kind && done(state, id));
+}
+
+function done(state: SessionState, id: string): boolean {
+  const job = state.jobs[id];
+  return (
+    job.status === "finished" &&
+    state.jobOrder.every((f) => {
+      const next = state.jobs[f];
+      return next.module !== job.module || next.inputs[0] !== id || retried(state, f) || done(state, f);
+    })
+  );
+}
+
+/** A failed or cancelled job that was run again: its retry, a later job of the same kind and inputs, counts instead. */
+function retried(state: SessionState, id: string): boolean {
+  const job = state.jobs[id];
+  if (job.status !== "failed" && job.status !== "cancelled") return false;
+  const same = (o: typeof job) =>
+    o.kind === job.kind && o.module === job.module && o.inputs.join() === job.inputs.join();
+  return state.jobOrder.slice(state.jobOrder.indexOf(id) + 1).some((o) => same(state.jobs[o]));
+}
+
+/** Whether any of a module's jobs (its own, or follow-ups like a review) is still queued or running. */
+export function moduleBusy(state: SessionState, module: string): boolean {
+  return state.jobOrder.some(
+    (id) => state.jobs[id].module === module && ["queued", "running"].includes(state.jobs[id].status),
+  );
 }

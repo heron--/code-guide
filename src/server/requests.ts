@@ -1,4 +1,4 @@
-import { latestFinished, unavailable } from "../shared/modules.js";
+import { latestDone, unavailable } from "../shared/modules.js";
 import type { Subject } from "../shared/protocol.js";
 import { moduleInfo, type Module } from "../modules/types.js";
 import type { RequestHandler } from "./channel.js";
@@ -39,7 +39,7 @@ export function requestHandler(session: Session, runner: JobRunner, modules: Mod
         runner.start(
           m.job,
           m.name,
-          (m.results ?? []).map((kind) => latestFinished(session.state, kind)!),
+          (m.results ?? []).map((kind) => latestDone(session.state, kind)!),
         );
         return;
       }
@@ -49,4 +49,14 @@ export function requestHandler(session: Session, runner: JobRunner, modules: Mod
         throw new Error("Chat isn't available yet");
     }
   };
+}
+
+/** Starts each module's follow-up jobs as its jobs finish. Returns a function that stops. */
+export function followUps(session: Session, runner: JobRunner, modules: Module[]): () => void {
+  return runner.onFinished((id, result) => {
+    const job = session.state.jobs[id];
+    const m = modules.find((m) => m.name === job.module);
+    const next = m?.next?.({ job: id, kind: job.kind, result }, session.state);
+    if (next) runner.start(next.job, m!.name, next.inputs);
+  });
 }

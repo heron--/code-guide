@@ -54,13 +54,24 @@ export class JobRunner {
   private queue: string[] = [];
   private active = new Set<string>();
   private opts: Required<JobRunnerOptions>;
+  private finished: ((job: string, result: unknown) => void)[] = [];
 
   constructor(
     private session: Session,
-    private harness: Harness,
+    /** One harness for every job, or one per job kind (e.g. a different model for reviews). */
+    private harness: Harness | ((kind: string) => Harness),
     opts: JobRunnerOptions = {},
   ) {
     this.opts = { concurrency: 2, maxAttempts: 5, maxNudges: 2, ...opts };
+  }
+
+  /**
+   * Run `fn` as each job finishes, with its result, right after its `job.finished` event. A job it starts is
+   * queued in the same tick, so the module never looks idle in between.
+   */
+  onFinished(fn: (job: string, result: unknown) => void): () => void {
+    this.finished.push(fn);
+    return () => (this.finished = this.finished.filter((f) => f !== fn));
   }
 
   /** Queue a job. `inputs` are finished jobs whose results it reads. Returns the job's id. */
@@ -140,7 +151,7 @@ export class JobRunner {
     // It may have been cancelled while its inputs were read.
     if (this.isOver(id)) return;
     this.session.append("job.started", { job: id });
-    const harness = this.harness.start({
+    const harness = (typeof this.harness === "function" ? this.harness(job.kind.kind) : this.harness).start({
       cwd: ctx.repo,
       instructions: `${job.kind.instructions}\n\nWhen you're done, call the \`${submit.tool}\` tool with the result. Your job ends only when a submission is accepted. If it's rejected, fix every error it lists and submit again.`,
       tools: [
@@ -164,6 +175,7 @@ export class JobRunner {
                 const result = await this.session.writeResult(id, accepted);
                 if (this.isOver(id)) return over;
                 this.session.append("job.finished", { job: id, result, warnings: problems });
+                for (const fn of this.finished) fn(id, accepted);
                 return { text: "Accepted. You're done; don't reply." };
               }
               if (attempts >= this.opts.maxAttempts) {
