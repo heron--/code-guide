@@ -32,14 +32,19 @@ function Inline({ text }: { text: string }) {
   );
 }
 
-/** One line of prose: code citations (`[text](path#L1-L2)`) become file:line chips. */
+/** One line of prose: code citations (`[text](path#L1-L2)`) become file:line chips. Web pages stay links. */
 function Line({ src }: { src: string }) {
   return (
     <>
       {parseBody(src)
         .flat()
         .map((part, i) =>
-          part.kind === "anchor" ? (
+          part.kind === "anchor" && /^https?:\/\//.test(part.path) ? (
+            <Inline
+              key={i}
+              text={`[${part.text}](${part.path}#L${part.range.start}${part.range.end !== part.range.start ? `-L${part.range.end}` : ""})`}
+            />
+          ) : part.kind === "anchor" ? (
             <CiteChip key={i} path={part.path} start={part.range.start} end={part.range.end} />
           ) : part.kind === "code" ? (
             <Inline key={i} text={`\`${part.text}\``} />
