@@ -5,4 +5,4 @@
 - Chapter quality is the product. Any change to the spec or the guide job's instructions should keep chapters brief: one idea, ≤ 70 words, anchored to code.
 - Before pushing: `npm run check` and `npm run build`.
 - `.code-chapters/how-anchors-work.json` is a guide about this repo pinned to a commit; regenerate it (and re-run `code-guide check`) if you change the code it describes.
-- This is a small personal tool for keeping up with high-velocity code, not a product at scale. Bot review findings (Codex and others) are advisory: push back on over-engineering, and reply explaining why when you decline one. Skip niche edge-case bugs where the fix adds more complexity than the bug costs.
+- This is a small tool for a small group of engineers keeping up with high-velocity code, not a product at scale. Bot review findings (Codex and others) are advisory: push back on over-engineering, and reply explaining why when you decline one. Skip niche edge-case bugs where the fix adds more complexity than the bug costs.
