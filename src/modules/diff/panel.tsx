@@ -118,7 +118,9 @@ function DiffFile({
     if (target) setNear(true);
   }, [target]);
   useEffect(() => {
-    if (!target || !file) return;
+    // A citation in another file takes the mark with it.
+    if (!target) return setMarked(undefined);
+    if (!file) return;
     const ir = indexRange(file, { start: target.start, end: target.end });
     if (!ir) return;
     setVisible((v) => v && v.map((shown, i) => shown || (i >= ir[0] && i <= ir[1])));
