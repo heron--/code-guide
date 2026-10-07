@@ -121,3 +121,9 @@ test("a change ending at HEAD finds the pull request for the current branch", as
     title: "feature",
   });
 });
+
+test("a change ending at a remote-tracking branch finds that branch's pull request", async () => {
+  expect(await pullRequestFor(repo, { type: "change", base: "main", head: "origin/main" })).toMatchObject({
+    title: "main",
+  });
+});
