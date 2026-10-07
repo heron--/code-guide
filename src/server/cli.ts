@@ -36,7 +36,7 @@ Options
   --model <model>       Model for jobs and chat
   --review-model <m>    Model for reviews (default: --model)
   --port <n>            Port to serve on (default 4646, next free port if taken)
-  --no-open             Don't open the browser
+  --open, --no-open     Open the browser, or don't (default: open)
   -h, --help            Show this help
 
 Settings
@@ -166,6 +166,7 @@ async function main(argv: string[]) {
     const a = argv[i];
     if (a === "-h" || a === "--help") return (console.log(HELP), 0);
     else if (a === "--no-open") flags.open = false;
+    else if (a === "--open") flags.open = true;
     else if (a === "--port") flags.port = Number(argv[++i]);
     else if (a === "--harness") flags.harness = argv[++i];
     else if (a === "--model") flags.model = argv[++i];
