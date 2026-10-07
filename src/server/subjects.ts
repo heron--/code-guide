@@ -1,0 +1,95 @@
+import { execFile } from "node:child_process";
+import { stat } from "node:fs/promises";
+import { resolve, sep } from "node:path";
+import { promisify } from "node:util";
+import type { Subject } from "../shared/protocol.js";
+import { revParse } from "./git.js";
+
+const exec = promisify(execFile);
+const run = async (cwd: string, cmd: string, args: string[]) =>
+  (await exec(cmd, args, { cwd, maxBuffer: 16 * 1024 * 1024 })).stdout.trim();
+const quiet = <T>(p: Promise<T>) => p.catch(() => undefined);
+
+/** A subject the picker offers, with how to show it. */
+export type Suggestion = { subject: Subject; title: string; detail: string };
+
+/** The branch changes are compared against: origin's default, else main or master. */
+export async function defaultBranch(repo: string): Promise<string | undefined> {
+  const head = await quiet(run(repo, "git", ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]));
+  if (head) return head;
+  for (const b of ["origin/main", "origin/master", "main", "master"]) if (await revParse(repo, b)) return b;
+  return undefined;
+}
+
+/**
+ * Subjects worth one click, each only when it applies: uncommitted work, the current branch when it's ahead
+ * of the default branch, and open pull requests when the `gh` CLI is installed and signed in.
+ */
+export async function suggestions(repo: string): Promise<Suggestion[]> {
+  const out: Suggestion[] = [];
+  const base = await defaultBranch(repo);
+
+  const dirty = await quiet(run(repo, "git", ["status", "--porcelain", "--", ".", ":!.code-guide"]));
+  if (dirty) {
+    const files = dirty.split("\n").length;
+    out.push({
+      subject: { type: "change", base: "HEAD" },
+      title: "Uncommitted changes",
+      detail: `${files} file${files === 1 ? "" : "s"} changed in the working tree`,
+    });
+  }
+
+  const branch = await quiet(run(repo, "git", ["branch", "--show-current"]));
+  if (base && branch && !base.endsWith(`/${branch}`) && base !== branch) {
+    const ahead = Number(await quiet(run(repo, "git", ["rev-list", "--count", `${base}..HEAD`])));
+    if (ahead > 0)
+      out.push({
+        subject: { type: "change", base, head: branch },
+        title: `${branch} vs ${base}`,
+        detail: `${ahead} commit${ahead === 1 ? "" : "s"} ahead`,
+      });
+  }
+
+  // Skipped silently when gh isn't installed, isn't signed in, or the repo isn't on GitHub.
+  const prs = await quiet(
+    run(repo, "gh", ["pr", "list", "--state", "open", "--limit", "10", "--json", "number,title,author,baseRefName"]),
+  );
+  for (const pr of prs
+    ? (JSON.parse(prs) as { number: number; title: string; author?: { login: string }; baseRefName: string }[])
+    : [])
+    out.push({
+      subject: { type: "change", base: pr.baseRefName, pr: pr.number },
+      title: `#${pr.number} ${pr.title}`,
+      detail: `Pull request${pr.author ? ` by ${pr.author.login}` : ""} into ${pr.baseRefName}`,
+    });
+  return out;
+}
+
+/**
+ * Turn what the reader typed into a subject: a commit range ("a..b" or "a...b"), a path that exists in the
+ * repository, or else a question.
+ */
+export async function parseInput(repo: string, input: string): Promise<Subject> {
+  const text = input.trim();
+  const range = text.match(/^(\S+?)\.\.\.?(\S+)$/);
+  if (range && (await revParse(repo, range[1])) && (await revParse(repo, range[2])))
+    return { type: "change", base: range[1], head: range[2] };
+  const abs = resolve(repo, text);
+  if (!/\s/.test(text) && (abs === repo || abs.startsWith(repo + sep)) && (await quiet(stat(abs))))
+    return { type: "path", path: text.replace(/\/+$/, "") || "." };
+  return { type: "question", question: text };
+}
+
+/**
+ * Make a pull request's commits available locally, without creating branches: fetch its head commit and pin
+ * the subject to it, comparing against the base as it is on origin.
+ */
+export async function preparePullRequest(repo: string, subject: Subject & { type: "change" }): Promise<Subject> {
+  if (!subject.pr) return subject;
+  const pr = JSON.parse(
+    await run(repo, "gh", ["pr", "view", String(subject.pr), "--json", "headRefOid,baseRefName"]),
+  ) as { headRefOid: string; baseRefName: string };
+  await run(repo, "git", ["fetch", "--quiet", "origin", pr.headRefOid, pr.baseRefName]);
+  const base = (await revParse(repo, `origin/${pr.baseRefName}`)) ? `origin/${pr.baseRefName}` : pr.baseRefName;
+  return { type: "change", base, head: pr.headRefOid, pr: subject.pr };
+}

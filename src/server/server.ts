@@ -4,6 +4,7 @@ import { extname, join, normalize } from "node:path";
 import { attachChannel, type RequestHandler } from "./channel.js";
 import type { ModuleInfo } from "../shared/modules.js";
 import type { Session } from "./session.js";
+import { parseInput, suggestions } from "./subjects.js";
 import { checkGuide, parseGuide, resolveChangedFile } from "./resolve.js";
 
 const MIME: Record<string, string> = {
@@ -59,6 +60,11 @@ export function startServer(opts: ServeOptions): Promise<{ url: string; close: (
 
     const { session } = opts;
     const repo = session.state.repo!;
+    // Subjects worth one click, and what typed input would mean.
+    if (parts[1] === "subjects") {
+      const input = url.searchParams.get("input");
+      return send(res, 200, input ? await parseInput(repo, input) : await suggestions(repo));
+    }
     // A finished job's result, e.g. a quiz.
     if (parts[1] === "results" && parts[2]) {
       const job = session.state.jobs[parts[2]];
