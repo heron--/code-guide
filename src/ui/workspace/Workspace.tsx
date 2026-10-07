@@ -6,8 +6,20 @@ import type { SessionChannel } from "@/lib/session";
 import { usePersistent, usePersistentSet } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { Icon, icons } from "./Icon";
-import { emptyLayout, open, setSplit, toDock, toggleMaximized, type Layout, type Slot } from "./layout";
-import { panelState, sessionActivity } from "./status";
+import { Dock } from "./Dock";
+import {
+  discard,
+  emptyLayout,
+  jobStarted,
+  markSeen,
+  open,
+  setSplit,
+  toDock,
+  toggleMaximized,
+  type Layout,
+  type Slot,
+} from "./layout";
+import { jobLabel, panelState, sessionActivity } from "./status";
 
 type Props = {
   state: SessionState;
@@ -19,8 +31,24 @@ type Props = {
 
 /** The frame every module lives in: a status bar, two slots, and (below) the dock. No navigation rail. */
 export function Workspace({ state, modules, channel, problem }: Props) {
-  const [layout, setLayout] = usePersistent<Layout>(`cg:${state.id}:layout`, emptyLayout);
+  const [stored, setLayout] = usePersistent<Layout>(`cg:${state.id}:layout`, emptyLayout);
+  const layout = { ...emptyLayout, ...stored };
   const byName = (name?: string) => modules.find((m) => m.name === name);
+
+  // Every new job puts its module in the dock (never in a slot), and a panel in a slot has seen its result.
+  useEffect(() => {
+    let next = layout;
+    for (const id of state.jobOrder) {
+      const m = byName(state.jobs[id].module);
+      if (m?.needsJob) next = jobStarted(next, id, m.name);
+    }
+    for (const s of ["left", "right"] as const) {
+      const m = byName(next[s]);
+      const job = m && panelState(m, state).job;
+      if (m && job) next = markSeen(next, m.name, job);
+    }
+    if (next !== layout) setLayout(next);
+  });
 
   const startModule = (m: ModuleInfo) => {
     if (m.needsJob) channel.send({ type: "job.start", module: m.name });
@@ -59,6 +87,14 @@ export function Workspace({ state, modules, channel, problem }: Props) {
           />
         )}
       </main>
+      <Dock
+        state={state}
+        modules={modules}
+        layout={layout}
+        onOpen={(p) => setLayout(open(layout, p))}
+        onDiscard={(p) => setLayout(discard(layout, p))}
+        onRetry={(module, job) => channel.send({ type: "job.start", module, retry: job })}
+      />
     </div>
   );
 }
@@ -181,18 +217,56 @@ function PanelBody({
   channel: SessionChannel;
 }) {
   const Panel = panelFor(m.name);
-  const { job, busy, activity } = panelState(m, state);
+  const { job, busy, activity, stage, failed } = panelState(m, state);
+  const retry = () => failed && channel.send({ type: "job.start", module: m.name, retry: failed.id });
+  // A failed job shows here as well as in the dock, with its retry, when the panel is in a slot.
+  if (m.needsJob && failed && !job)
+    return (
+      <Centered title={`Couldn't finish the ${m.label.toLowerCase()}`}>
+        <span className="block">{jobLabel(failed)} failed:</span>
+        <span className="block text-del">{failed.error}</span>
+        <span className="mt-1 block">It shows here once all its jobs are done. Retry picks up from this one.</span>
+        <span className="mt-3 block">
+          <RetryButton onClick={retry} />
+        </span>
+      </Centered>
+    );
   if (m.needsJob && !job)
     return (
-      <Centered title={busy ? `Writing ${m.label.toLowerCase()}…` : `No ${m.label.toLowerCase()} yet`}>
+      <Centered title={busy ? `${stage ?? `Writing ${m.label.toLowerCase()}`}…` : `No ${m.label.toLowerCase()} yet`}>
         {activity}
       </Centered>
     );
   if (!Panel) return <Centered title={`${m.label} panel`}>This module's panel isn't built yet.</Centered>;
-  return (
+  const panel = (
     <Suspense fallback={<Centered title="Loading…" />}>
       <Panel module={m} state={state} channel={channel} job={job} />
     </Suspense>
+  );
+  if (!failed) return panel;
+  // A later run failed: keep showing the earlier result, under the failure.
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex flex-none items-center gap-2 border-b border-rule bg-del-bg px-3 py-1.5 text-[12.5px]">
+        <span className="min-w-0 flex-1 truncate text-del" title={failed.error}>
+          {jobLabel(failed)} failed: {failed.error}
+        </span>
+        <RetryButton onClick={retry} />
+      </div>
+      {panel}
+    </div>
+  );
+}
+
+function RetryButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="inline-flex h-7 flex-none items-center gap-1.5 border border-border bg-surface px-3 text-[12.5px] text-fg hover:border-fg-3"
+    >
+      <Icon paths={icons.retry} size={12} />
+      Retry
+    </button>
   );
 }
 

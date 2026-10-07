@@ -51,6 +51,7 @@ function inputReview(ctx: JobContext): Review {
 
 export const reviewJob: JobKind = {
   kind: "review",
+  label: "Reviewing the guide",
   instructions: `You review a guide: brief chapters that explain code, each one idea next to the code that proves it. You didn't write it and don't know how it was written. Judge it only against the code and this quality bar:
 
 ${bar}
@@ -94,6 +95,7 @@ Findings are specific and actionable: which chapter, which rule, what's wrong, a
 /** A guide job that revises a reviewed guide. It reads the guide and the review, never the earlier transcripts. */
 export const revisionJob: JobKind = {
   kind: "guide",
+  label: "Revising the guide",
   instructions: `${guideInstructions}
 
 # Revising
