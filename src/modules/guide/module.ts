@@ -18,8 +18,14 @@ export default defineModule({
   label: "Guide",
   icon: ["M3 3h7l3 3v7H3z", "M5.5 7h5M5.5 9.5h5M5.5 12h3"],
   startsWithSession: true,
-  steps: 2 * (1 + MAX_REVISIONS),
-  job: { kind: "guide", instructions, prompt: (ctx) => prompt(ctx.subject), submit: submitGuide },
+  maxJobs: 2 * (1 + MAX_REVISIONS),
+  job: {
+    kind: "guide",
+    label: "Writing the guide",
+    instructions,
+    prompt: (ctx) => prompt(ctx.subject),
+    submit: submitGuide,
+  },
   // Every guide is reviewed by a separate job before the reader sees it; "revise" starts a revision.
   next(done, state) {
     if (done.kind === "guide") return { job: reviewJob, inputs: [done.job] };
