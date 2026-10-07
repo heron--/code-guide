@@ -9,10 +9,16 @@ import { Icon, icons } from "./Icon";
 import { emptyLayout, open, setSplit, toDock, toggleMaximized, type Layout, type Slot } from "./layout";
 import { panelState, sessionActivity } from "./status";
 
-type Props = { state: SessionState; modules: ModuleInfo[]; channel: SessionChannel };
+type Props = {
+  state: SessionState;
+  modules: ModuleInfo[];
+  channel: SessionChannel;
+  /** A lost connection or a refused request, shown in the status bar. */
+  problem?: string;
+};
 
 /** The frame every module lives in: a status bar, two slots, and (below) the dock. No navigation rail. */
-export function Workspace({ state, modules, channel }: Props) {
+export function Workspace({ state, modules, channel, problem }: Props) {
   const [layout, setLayout] = usePersistent<Layout>(`cg:${state.id}:layout`, emptyLayout);
   const byName = (name?: string) => modules.find((m) => m.name === name);
 
@@ -40,7 +46,7 @@ export function Workspace({ state, modules, channel }: Props) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-canvas text-fg">
-      <StatusBar state={state} modules={modules} onStart={startModule} />
+      <StatusBar state={state} modules={modules} onStart={startModule} problem={problem} />
       <main className="flex min-h-0 flex-1 p-2.5">
         {layout.maximized ? (
           slot(layout.maximized)
@@ -219,10 +225,12 @@ function StatusBar({
   state,
   modules,
   onStart,
+  problem,
 }: {
   state: SessionState;
   modules: ModuleInfo[];
   onStart: (m: ModuleInfo) => void;
+  problem?: string;
 }) {
   const subject = state.subject?.subject;
   const activity = sessionActivity(state);
@@ -259,6 +267,11 @@ function StatusBar({
         )}
         <span className="flex-1" />
       </div>
+      {problem && (
+        <span role="status" className="max-w-[40%] truncate text-[11.5px] text-del" title={problem}>
+          {problem}
+        </span>
+      )}
       {guideJob ? (
         <ReviewedCount session={state.id} job={guideJob} />
       ) : (
