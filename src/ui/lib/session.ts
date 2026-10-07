@@ -80,6 +80,8 @@ export class SessionChannel {
   /** Returns false when the channel isn't open; the request isn't queued. */
   send(req: Request): boolean {
     if (this.ws?.readyState !== this.WS.OPEN) return false;
+    // A new request starts clean, so a refusal that repeats the last one still shows up as new.
+    if (this.snapshot.error) this.set({ error: undefined });
     this.ws.send(JSON.stringify(req));
     return true;
   }
