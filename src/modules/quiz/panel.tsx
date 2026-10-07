@@ -26,7 +26,12 @@ function Inline({ text }: { text: string }) {
 }
 
 /** The Quiz module: one question at a time, tap to answer, then why. Answers last only for the session. */
-export default function QuizPanel({ state, job }: PanelProps) {
+export default function QuizPanel(props: PanelProps) {
+  // A new quiz starts fresh: its answers are stored under its own job.
+  return <QuizView key={props.job} {...props} />;
+}
+
+function QuizView({ state, job }: PanelProps) {
   const [quiz, setQuiz] = useState<Quiz>();
   useEffect(() => {
     if (!job) return;
