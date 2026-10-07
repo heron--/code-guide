@@ -59,3 +59,9 @@ test("cited lines must exist", async () => {
 test("3-5 questions", async () => {
   expect((await validate({ questions: [question()] })).problems[0]).toMatchObject({ where: "questions" });
 });
+
+test("a change whose head is gone isn't read from the working tree instead", async () => {
+  const gone = { ...ctx(), subject: { type: "change" as const, base: "HEAD", head: "deleted-branch" } };
+  const { problems } = await quiz.job!.submit.validate({ questions: [question(), question(), question()] }, gone);
+  expect(problems).toEqual([{ level: "error", where: "quiz", message: 'unknown ref "deleted-branch"' }]);
+});

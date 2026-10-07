@@ -124,3 +124,30 @@ test("a review can only cite chapters the guide has", async () => {
   expect((await reviewJob.submit.validate({ verdict: "revise", findings: [] }, ctx)).problems).toHaveLength(1);
   expect((await reviewJob.submit.validate({ verdict: "nope", findings: [] }, ctx)).problems[0].where).toBe("verdict");
 });
+
+test("the revision cap counts each guide's own chain, not every guide in the session", async () => {
+  const { session } = await run(["revise", "accept"]);
+  // A second guide started later in the same session still gets its revision.
+  const harness = new Scripted(["revise", "accept"]);
+  const runner = new JobRunner(session, harness);
+  followUps(session, runner, [guide]);
+  runner.start(guide.job!, "guide");
+  for (let i = 0; i < 300 && (moduleBusy(session.state, "guide") || session.state.jobOrder.length < 8); i++)
+    await new Promise((r) => setTimeout(r, 10));
+  expect(session.state.jobOrder.slice(4)).toEqual(["guide-3", "review-3", "guide-4", "review-4"]);
+  expect(session.state.jobs["guide-4"].inputs).toEqual(["guide-3", "review-3"]);
+});
+
+test("a module needing a guide waits for its review to settle", async () => {
+  const { unavailable } = await import("../../shared/modules");
+  const session = await Session.create(repo);
+  session.append("session.subject", { subject: { type: "question", question: "Q?" }, label: "" });
+  const quizLike = { name: "q", label: "Quiz", icon: [], needsJob: true, results: ["guide"] };
+  expect(unavailable(quizLike, session.state)).toBe("Quiz needs a finished guide");
+  session.append("job.queued", { job: "guide-1", kind: "guide", module: "guide", inputs: [] });
+  session.append("job.finished", { job: "guide-1", result: "results/guide-1.json", warnings: [] });
+  session.append("job.queued", { job: "review-1", kind: "review", module: "guide", inputs: ["guide-1"] });
+  expect(unavailable(quizLike, session.state)).toBe("Quiz waits for the guide to be reviewed");
+  session.append("job.finished", { job: "review-1", result: "results/review-1.json", warnings: [] });
+  expect(unavailable(quizLike, session.state)).toBeUndefined();
+});

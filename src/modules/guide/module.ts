@@ -7,8 +7,11 @@ import { submitGuide } from "./submit.js";
 /** Revisions after the first guide. When they run out, the reader gets the latest valid guide. */
 export const MAX_REVISIONS = 1;
 
-const guides = (state: SessionState) =>
-  state.jobOrder.filter((id) => state.jobs[id].kind === "guide" && state.jobs[id].status === "finished");
+/** How many revisions led to a guide: 0 for one written from scratch. A revision's first input is its guide. */
+function revisions(state: SessionState, guide: string): number {
+  const prev = state.jobs[guide]?.inputs[0];
+  return prev && state.jobs[prev]?.kind === "guide" ? 1 + revisions(state, prev) : 0;
+}
 
 export default defineModule({
   name: "guide",
@@ -19,8 +22,13 @@ export default defineModule({
   // Every guide is reviewed by a separate job before the reader sees it; "revise" starts a revision.
   next(done, state) {
     if (done.kind === "guide") return { job: reviewJob, inputs: [done.job] };
-    if (done.kind === "review" && (done.result as Review).verdict === "revise" && guides(state).length <= MAX_REVISIONS)
-      return { job: revisionJob, inputs: [state.jobs[done.job].inputs[0], done.job] };
+    const reviewed = state.jobs[done.job].inputs[0];
+    if (
+      done.kind === "review" &&
+      (done.result as Review).verdict === "revise" &&
+      revisions(state, reviewed) < MAX_REVISIONS
+    )
+      return { job: revisionJob, inputs: [reviewed, done.job] };
     return undefined;
   },
 });
