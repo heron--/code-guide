@@ -40,7 +40,7 @@ code-guide [dir]                   Start a session (default: the repo containing
 code-guide check <guide.json>…     Validate guides; exits 1 on errors
   --change <base>[...<head>]   --path <path>   --question <text>   pick the subject up front
   --harness <name>   --model <m>   --review-model <m>
-  --port <n>   default 4646      --no-open   don't open a browser
+  --port <n>   default 4646      --no-open / --open   don't (or do) open a browser
 ```
 
 Sessions are kept in `.code-guide/sessions/` in the repository; add it to your `.gitignore` if you like.
