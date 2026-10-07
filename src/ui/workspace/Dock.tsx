@@ -9,6 +9,9 @@ type Props = {
   state: SessionState;
   modules: ModuleInfo[];
   layout: Layout;
+  /** The square being dragged out, shown as an empty outline. */
+  dragging?: string;
+  onDragStart: (panel: string, e: React.PointerEvent) => void;
   onOpen: (panel: string) => void;
   onDiscard: (panel: string) => void;
   onRetry: (module: string, job: string) => void;
@@ -24,12 +27,20 @@ function progress(state: SessionState, module: string): number {
 }
 
 /** The strip along the bottom: panels that aren't in a slot, including modules whose job is still running. */
-export function Dock({ state, modules, layout, onOpen, onDiscard, onRetry }: Props) {
+export function Dock({ state, modules, layout, dragging, onDragStart, onOpen, onDiscard, onRetry }: Props) {
   return (
     <div aria-label="Dock" className="flex h-[66px] flex-none items-center gap-2 border-t border-rule bg-chrome px-3.5">
       {layout.dock.map((panel) => {
         const m = modules.find((x) => x.name === panel);
         if (!m) return null;
+        if (panel === dragging)
+          return (
+            <span
+              key={panel}
+              aria-hidden="true"
+              className="h-[50px] w-[54px] flex-none border border-dashed border-border"
+            />
+          );
         const s = panelState(m, state);
         const ready = !s.busy && !!s.job && layout.seen[panel] !== s.job;
         const status = s.failed
@@ -45,6 +56,7 @@ export function Dock({ state, modules, layout, onOpen, onDiscard, onRetry }: Pro
               aria-label={`${m.label}${status ? `, ${status}` : ""}`}
               title={status ? `${m.label}: ${status}` : m.label}
               onClick={() => onOpen(panel)}
+              onPointerDown={(e) => onDragStart(panel, e)}
               className={cn(
                 "relative flex h-[50px] w-[54px] flex-col items-center justify-center gap-[5px] border bg-surface",
                 s.busy && "pb-1.5",
