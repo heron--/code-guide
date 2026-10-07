@@ -63,7 +63,7 @@
   --shadow-lg: 0 0 #0000;
   --shadow-xl: 0 0 #0000;
   --shadow-2xl: 0 0 #0000;
-  --shadow-active: var(--shadow-active);
+  --shadow-active: var(--active-shadow);
 }
 
 html,
