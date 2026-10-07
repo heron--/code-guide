@@ -24,6 +24,7 @@
   },
   "homepage": "https://github.com/heron--/code-chapters#readme",
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.292",
     "open": "^11.0.4",
     "shiki": "^4.5.0",
     "ws": "^8.22.0",
