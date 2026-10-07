@@ -53,6 +53,7 @@ The browser shows a workspace: two slots side by side and a dock along the botto
 - **Diff** (for changes): every changed file. Open it from **New panel**.
 - **Quiz**: a few questions on the guide, answered by tapping an option. Each answer explains itself and cites the code.
 - **Citations** (`file:line` chips) show the lines in the Guide if the chapter has the file, else in the Diff, else in a file view.
+- **Chat**: ask about the code as you read. It knows the guides and quizzes so far. Select lines or prose in the Guide and choose **Ask about this** to bring them in.
 - **Anchors** (accent-coloured links in the prose) scroll the code to their lines and highlight them. **Go back** (or <kbd>Esc</kbd>) jumps back instantly.
 - "Reviewed" marks and the layout are saved in your browser.
 
