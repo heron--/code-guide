@@ -17,35 +17,31 @@ There are three parts:
 
 | Part | What it is |
 | --- | --- |
-| [Spec](skill/code-guide/SPEC.md) | The guide file format (`.code-chapters/*.json`) and its rules. |
-| [Skill](skill/code-guide/SKILL.md) | Instructions you give a coding agent so it writes good guides. The skill plus your question is all it needs. |
+| [Spec](docs/spec.md) | The guide format and its rules. `code-guide check` enforces them. |
+| Guide job | Code Guide drives your coding agent (Claude Code by default, through the Claude Agent SDK) to write a guide, read-only, with [these instructions](src/modules/guide/instructions.ts). A guide is accepted only once it passes the spec. |
 | Viewer | `code-guide`, a local web app for reading guides chapter by chapter. |
 
-Terms are defined in the [glossary](GLOSSARY.md). Code Guide calls no AI services; your own agent writes the guides.
+Terms are defined in the [glossary](GLOSSARY.md). Code Guide sends nothing anywhere itself; the agent it drives talks to its own model.
 
 ## Install
 
-Requires Node 22.12+ and git.
+Requires Node 22.12+, git, and Claude Code signed in (`claude`).
 
 ```sh
 npm install -g github:heron--/code-chapters   # or: git clone … && npm install && npm link
-code-guide install-skill                       # copies the skill to ~/.claude/skills/code-guide
 ```
-
-`install-skill` takes a directory if your agent keeps skills somewhere else. For agents without skill support, paste `SKILL.md` into the prompt and attach `SPEC.md`.
 
 ## Use
 
-1. In any repo, ask your agent: `/code-guide how does request retrying work?` or `/code-guide explain this branch`.
-2. The agent writes `.code-chapters/<slug>.json` and validates it with `code-guide check`.
-3. Run `code-guide` anywhere inside the repo. It starts a local server and opens your browser.
+Run `code-guide` anywhere inside a repo. It starts a local server and opens your browser.
 
 ```
 code-guide [dir | guide.json]      Open the viewer (default: the repo containing .)
 code-guide check <guide.json>…     Validate guides; exits 1 on errors
-code-guide install-skill [dir]     Install the authoring skill
   --port <n>   default 4646      --no-open   don't open a browser
 ```
+
+Starting a session on a subject (a change, a path or a question) and watching its guide get written arrives with the workspace (M8). Until then the viewer opens guides in `.code-chapters/*.json`.
 
 ### Reading a guide
 

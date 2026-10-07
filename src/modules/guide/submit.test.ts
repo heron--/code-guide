@@ -3,10 +3,10 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { submitGuide, type GuideSubmission } from "./guide-submission";
-import type { Harness, HarnessSessionOptions } from "./harness/types";
-import { JobRunner, type JobKind } from "./jobs";
-import { Session } from "./session";
+import { submitGuide, type GuideSubmission } from "./submit";
+import type { Harness, HarnessSessionOptions } from "../../server/harness/types";
+import { JobRunner, type JobKind } from "../../server/jobs";
+import { Session } from "../../server/session";
 
 let repo: string;
 

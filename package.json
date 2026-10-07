@@ -60,7 +60,7 @@
   },
   "files": [
     "dist",
-    "skill",
+    "docs",
     "GLOSSARY.md"
   ],
   "engines": {

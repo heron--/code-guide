@@ -1,5 +1,4 @@
-import { cp, mkdir, stat } from "node:fs/promises";
-import { homedir } from "node:os";
+import { stat } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import open from "open";
@@ -16,14 +15,13 @@ Usage
   code-guide [dir | guide.json]   Open the viewer for the repo containing dir (default: .)
                                   or for a single guide file.
   code-guide check <guide.json>…  Validate guides against the spec. Exits 1 on errors.
-  code-guide install-skill [dir]  Copy the authoring skill to dir (default: ~/.claude/skills).
 
 Options
   --port <n>    Port to serve on (default 4646, next free port if taken)
   --no-open     Don't open the browser
   -h, --help    Show this help
 
-Guides live in <repo>/.code-chapters/*.json. Spec: ${join(pkgRoot, "skill/code-guide/SPEC.md")}`;
+Guides live in <repo>/.code-chapters/*.json. Spec: ${join(pkgRoot, "docs/spec.md")}`;
 
 async function check(files: string[]) {
   if (files.length === 0) {
@@ -41,14 +39,6 @@ async function check(files: string[]) {
       console.log(`  ${p.level === "error" ? "error  " : "warning"} ${p.where}: ${p.message}`);
   }
   return errors ? 1 : 0;
-}
-
-async function installSkill(dir?: string) {
-  const target = join(resolve(dir ?? join(homedir(), ".claude", "skills")), "code-guide");
-  await mkdir(dirname(target), { recursive: true });
-  await cp(join(pkgRoot, "skill", "code-guide"), target, { recursive: true });
-  console.log(`Installed the code-guide skill to ${target}`);
-  return 0;
 }
 
 async function serve(args: string[], port: number, openBrowser: boolean) {
@@ -87,7 +77,6 @@ async function main(argv: string[]) {
     else args.push(a);
   }
   if (args[0] === "check") return check(args.slice(1));
-  if (args[0] === "install-skill") return installSkill(args[1]);
   return serve(args, port, openBrowser);
 }
 

@@ -33,6 +33,7 @@ const echo = (name: string, results?: string[]) =>
 let repo: string;
 let session: Session;
 let handle: ReturnType<typeof requestHandler>;
+let runner: JobRunner;
 
 async function until(cond: () => boolean) {
   for (let i = 0; i < 300 && !cond(); i++) await new Promise((r) => setTimeout(r, 10));
@@ -42,13 +43,14 @@ async function until(cond: () => boolean) {
 beforeEach(async () => {
   repo = mkdtempSync(join(tmpdir(), "cg-requests-"));
   session = await Session.create(repo);
-  handle = requestHandler(session, new JobRunner(session, new FakeHarness()), [
-    ...modules,
-    echo("echo"),
-    echo("recap", ["echo"]),
-  ]);
+  runner = new JobRunner(session, new FakeHarness());
+  handle = requestHandler(session, runner, [...modules, echo("echo"), echo("recap", ["echo"])]);
 });
-afterEach(() => rmSync(repo, { recursive: true, force: true }));
+afterEach(async () => {
+  for (const id of session.state.jobOrder)
+    if (["queued", "running"].includes(session.state.jobs[id].status)) await runner.cancel(id);
+  rmSync(repo, { recursive: true, force: true });
+});
 
 test("labels subjects for the status bar", () => {
   expect(subjectLabel({ type: "change", base: "main", head: "feat/retry-policy" })).toBe("feat/retry-policy vs main");
@@ -62,6 +64,11 @@ test("a session takes one subject", async () => {
   await handle({ type: "subject.choose", subject: { type: "path", path: "src" } });
   expect(session.state.subject).toEqual({ subject: { type: "path", path: "src" }, label: "src" });
   await expect(handle({ type: "subject.choose", subject: { type: "path", path: "lib" } })).rejects.toThrow(/already/);
+});
+
+test("choosing a subject starts the guide job", async () => {
+  await handle({ type: "subject.choose", subject: { type: "path", path: "src" } });
+  expect(session.state.jobs["guide-1"]).toMatchObject({ module: "guide", kind: "guide" });
 });
 
 test("starts a module's job, and refuses modules that can't start", async () => {

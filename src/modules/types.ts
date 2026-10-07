@@ -12,12 +12,14 @@ import type { JobKind } from "../server/jobs.js";
 export type Module = Omit<ModuleInfo, "needsJob"> & {
   /** Modules that need a job supply its kind. Its inputs are the latest finished result of each of `results`. */
   job?: JobKind;
+  /** Start its job as soon as the session has a subject. */
+  startsWithSession?: boolean;
 };
 
 export function defineModule(m: Module): Module {
   return m;
 }
 
-export function moduleInfo({ job, ...m }: Module): ModuleInfo {
+export function moduleInfo({ job, startsWithSession: _, ...m }: Module): ModuleInfo {
   return { ...m, needsJob: !!job };
 }
