@@ -18,6 +18,7 @@ import {
   type WorkspaceActions,
 } from "./actions";
 import { Dock } from "./Dock";
+import { ProgressBar } from "./ProgressBar";
 import { FileView } from "./FileView";
 import {
   discard,
@@ -400,6 +401,7 @@ function PanelBody({
 }) {
   const Panel = panelFor(m.name);
   const { job, busy, activity, stage, failed } = panelState(m, state);
+  const progress = runProgress(m, state);
   const retry = () => failed && channel.send({ type: "job.start", module: m.name, retry: failed.id });
   // A failed job shows here as well as in the dock, with its retry, when the panel is in a slot.
   if (m.needsJob && failed && !job)
@@ -417,12 +419,12 @@ function PanelBody({
     return (
       <Centered title={busy ? `${stage ?? `Writing ${m.label.toLowerCase()}`}…` : `No ${m.label.toLowerCase()} yet`}>
         {busy && (
-          <span className="relative mx-auto mb-2 block h-[5px] w-40 border border-border">
-            <span
-              className="absolute inset-y-0 left-0 bg-accent transition-[width] duration-700"
-              style={{ width: `${Math.max(0.04, runProgress(m, state).fraction) * 100}%` }}
-            />
-          </span>
+          <ProgressBar
+            fraction={progress.fraction}
+            jobs={progress.of}
+            label={stage ?? m.label}
+            className="mx-auto mt-1 mb-2.5"
+          />
         )}
         {activity}
       </Centered>
@@ -433,6 +435,19 @@ function PanelBody({
       <Panel module={m} state={state} channel={channel} job={job} />
     </Suspense>
   );
+  if (busy)
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex flex-none items-center gap-2.5 border-b border-border-subtle bg-surface-3 px-3 py-1.5 font-mono text-[11.5px] text-fg-2">
+          <ProgressBar fraction={progress.fraction} jobs={progress.of} label={stage ?? m.label} className="w-32" />
+          <span className="min-w-0 flex-1 truncate">
+            {stage}
+            {activity && ` · ${activity}`}
+          </span>
+        </div>
+        {panel}
+      </div>
+    );
   if (!failed) return panel;
   // A later run failed: keep showing the earlier result, under the failure.
   return (
