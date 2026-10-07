@@ -3,7 +3,7 @@ import type { SessionState } from "../../shared/state";
 import { cn } from "@/lib/utils";
 import { Icon, icons } from "./Icon";
 import type { Layout } from "./layout";
-import { panelState } from "./status";
+import { panelState, runProgress } from "./status";
 
 type Props = {
   state: SessionState;
@@ -16,15 +16,6 @@ type Props = {
   onDiscard: (panel: string) => void;
   onRetry: (module: string, job: string) => void;
 };
-
-/** How far along a running job looks, from the work it has reported: never quite full until it's done. */
-function progress(state: SessionState, module: string): number {
-  const running = state.jobOrder
-    .map((id) => state.jobs[id])
-    .filter((j) => j.module === module && j.status === "running");
-  const steps = running.reduce((n, j) => n + j.steps, 0);
-  return running.length ? 0.08 + 0.84 * (1 - Math.exp(-steps / 12)) : 0.04;
-}
 
 /** The strip along the bottom: panels that aren't in a slot, including modules whose job is still running. */
 export function Dock({ state, modules, layout, dragging, onDragStart, onOpen, onDiscard, onRetry }: Props) {
@@ -46,7 +37,7 @@ export function Dock({ state, modules, layout, dragging, onDragStart, onOpen, on
         const status = s.failed
           ? `failed: ${s.failed.error}`
           : s.busy
-            ? (s.activity ?? "working…")
+            ? [s.stage, s.activity].filter(Boolean).join(": ") || "working…"
             : ready
               ? "ready"
               : undefined;
@@ -71,7 +62,7 @@ export function Dock({ state, modules, layout, dragging, onDragStart, onOpen, on
                 <span className="absolute right-1 bottom-1 left-1 h-[3px] border border-border">
                   <span
                     className="absolute inset-y-0 left-0 bg-accent transition-[width] duration-700"
-                    style={{ width: `${progress(state, panel) * 100}%` }}
+                    style={{ width: `${Math.max(0.04, runProgress(m, state).fraction) * 100}%` }}
                   />
                 </span>
               )}
