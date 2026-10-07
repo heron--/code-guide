@@ -5,6 +5,7 @@ import {
   dropFromDock,
   dropTarget,
   emptyLayout,
+  initialLayout,
   jobStarted,
   markSeen,
   open,
@@ -105,4 +106,12 @@ test("dropping from the dock", () => {
   // None: the whole workspace.
   expect(dropTarget(emptyLayout, "right")).toBe("left");
   expect(dropFromDock(addToDock(emptyLayout, "quiz"), "quiz", "left")).toMatchObject({ left: "quiz", dock: [] });
+});
+
+test("a new session opens its default panels left to right", () => {
+  expect(initialLayout(["guide", "chat"])).toMatchObject({ left: "guide", right: "chat", dock: [], recent: "right" });
+  expect(initialLayout(["guide", "chat", "diff"])).toMatchObject({ left: "guide", right: "chat", dock: ["diff"] });
+  expect(initialLayout([])).toEqual(emptyLayout);
+  // The guide's first job finds its panel already open, and leaves it there.
+  expect(jobStarted(initialLayout(["guide"]), "guide-1", "guide")).toMatchObject({ left: "guide", dock: [] });
 });

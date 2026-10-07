@@ -24,7 +24,12 @@ export type Layout = {
 
 export const emptyLayout: Layout = { dock: [], recent: "left", split: 0.5, known: [], seen: {} };
 
-/** A job started: its module's panel waits in the dock (once per job; it never opens itself). */
+/** A new session's layout: these panels in the slots, left to right (a third and later go to the dock). */
+export function initialLayout(panels: string[]): Layout {
+  return panels.reduce((l, p) => (has(l, p) ? l : !l.left || !l.right ? open(l, p) : addToDock(l, p)), emptyLayout);
+}
+
+/** A job started: its module's panel waits in the dock unless it's already open (once per job). */
 export function jobStarted(l: Layout, job: string, panel: string): Layout {
   if (l.known.includes(job)) return l;
   return { ...addToDock(l, panel), known: [...l.known, job] };

@@ -53,14 +53,15 @@ export function usePersistentSet(key: string): [Set<string>, (item: string, on: 
   return [set, toggle];
 }
 
-/** A JSON value persisted in localStorage. */
-export function usePersistent<T>(key: string, initial: T): [T, (v: T) => void] {
+/** A JSON value persisted in localStorage. `initial` may be a function, called only when nothing is stored. */
+export function usePersistent<T>(key: string, initial: T | (() => T)): [T, (v: T) => void] {
+  const fallback = () => (typeof initial === "function" ? (initial as () => T)() : initial);
   const read = () => {
     try {
       const raw = load(key);
-      return raw ? (JSON.parse(raw) as T) : initial;
+      return raw ? (JSON.parse(raw) as T) : fallback();
     } catch {
-      return initial;
+      return fallback();
     }
   };
   const [state, setValue] = useState<{ key: string; value: T }>(() => ({ key, value: read() }));
