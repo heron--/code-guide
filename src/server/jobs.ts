@@ -57,7 +57,8 @@ export class JobRunner {
 
   constructor(
     private session: Session,
-    private harness: Harness,
+    /** One harness for every job, or one per job kind (e.g. a different model for reviews). */
+    private harness: Harness | ((kind: string) => Harness),
     opts: JobRunnerOptions = {},
   ) {
     this.opts = { concurrency: 2, maxAttempts: 5, maxNudges: 2, ...opts };
@@ -140,7 +141,7 @@ export class JobRunner {
     // It may have been cancelled while its inputs were read.
     if (this.isOver(id)) return;
     this.session.append("job.started", { job: id });
-    const harness = this.harness.start({
+    const harness = (typeof this.harness === "function" ? this.harness(job.kind.kind) : this.harness).start({
       cwd: ctx.repo,
       instructions: `${job.kind.instructions}\n\nWhen you're done, call the \`${submit.tool}\` tool with the result. Your job ends only when a submission is accepted. If it's rejected, fix every error it lists and submit again.`,
       tools: [

@@ -1,4 +1,5 @@
 import type { ModuleInfo } from "../shared/modules.js";
+import type { SessionState } from "../shared/state.js";
 import type { JobKind } from "../server/jobs.js";
 
 /**
@@ -14,12 +15,19 @@ export type Module = Omit<ModuleInfo, "needsJob"> & {
   job?: JobKind;
   /** Start its job as soon as the session has a subject. */
   startsWithSession?: boolean;
+  /**
+   * Called when one of this module's jobs finishes. Returns a follow-up job to run in the same module, e.g. a
+   * review after a guide. Its inputs are finished jobs.
+   */
+  next?: (done: { job: string; kind: string; result: unknown }, state: SessionState) => FollowUp | undefined;
 };
+
+export type FollowUp = { job: JobKind; inputs: string[] };
 
 export function defineModule(m: Module): Module {
   return m;
 }
 
-export function moduleInfo({ job, startsWithSession: _, ...m }: Module): ModuleInfo {
+export function moduleInfo({ job, startsWithSession: _, next: __, ...m }: Module): ModuleInfo {
   return { ...m, needsJob: !!job };
 }

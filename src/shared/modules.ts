@@ -28,3 +28,10 @@ export function unavailable(m: ModuleInfo, state: SessionState): string | undefi
 export function latestFinished(state: SessionState, kind: string): string | undefined {
   return state.jobOrder.findLast((id) => state.jobs[id].kind === kind && state.jobs[id].status === "finished");
 }
+
+/** Whether any of a module's jobs (its own, or follow-ups like a review) is still queued or running. */
+export function moduleBusy(state: SessionState, module: string): boolean {
+  return state.jobOrder.some(
+    (id) => state.jobs[id].module === module && ["queued", "running"].includes(state.jobs[id].status),
+  );
+}

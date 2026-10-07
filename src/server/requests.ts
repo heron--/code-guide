@@ -50,3 +50,17 @@ export function requestHandler(session: Session, runner: JobRunner, modules: Mod
     }
   };
 }
+
+/** Starts each module's follow-up jobs as its jobs finish. Returns a function that stops. */
+export function followUps(session: Session, runner: JobRunner, modules: Module[]): () => void {
+  return session.subscribe((e) => {
+    if (e.type !== "job.finished") return;
+    const job = session.state.jobs[e.payload.job];
+    const m = modules.find((m) => m.name === job.module);
+    if (!m?.next) return;
+    void session.readResult(e.payload.result).then((result) => {
+      const next = m.next!({ job: job.id, kind: job.kind, result }, session.state);
+      if (next) runner.start(next.job, m.name, next.inputs);
+    });
+  });
+}
