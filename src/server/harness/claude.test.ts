@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { ClaudeHarness, describeActivity, isReadOnlyGit } from "./claude";
+import { ClaudeHarness, describeActivity, isReadOnlyGit, staysInside } from "./claude";
 import { harnessContract } from "./contract";
 
 describe("read-only Bash", () => {
@@ -17,7 +17,26 @@ describe("read-only Bash", () => {
     "git log `touch x`",
     "cat a.ts",
     "rm a.ts",
+    "git branch created",
+    "git diff --output=out.patch HEAD",
+    "git log --output out.txt",
+    "git grep -Ovim x",
+    "git grep --open-files-in-pager=sh x",
+    "git diff --no-index /etc/passwd a.ts",
+    "git -c core.pager=sh log",
   ])("refuses %s", (c) => expect(isReadOnlyGit(c)).toBe(false));
+});
+
+test("file tools stay inside the repository", () => {
+  expect(staysInside("/repo", { file_path: "/repo/src/a.ts" })).toBe(true);
+  expect(staysInside("/repo", { file_path: "src/a.ts" })).toBe(true);
+  expect(staysInside("/repo", { pattern: "**/*.ts" })).toBe(true);
+  expect(staysInside("/repo", { pattern: "x", path: "/repo" })).toBe(true);
+  expect(staysInside("/repo", { file_path: "/etc/passwd" })).toBe(false);
+  expect(staysInside("/repo", { file_path: "../other/a.ts" })).toBe(false);
+  expect(staysInside("/repo", { pattern: "x", path: "/home" })).toBe(false);
+  expect(staysInside("/repo", { pattern: "/etc/*" })).toBe(false);
+  expect(staysInside("/repo", { file_path: "/repo-other/a.ts" })).toBe(false);
 });
 
 test("describes tool calls as activity", () => {
