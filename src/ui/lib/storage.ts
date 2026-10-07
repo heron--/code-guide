@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 
 const CHANGED = "cg-storage";
-/** Where values live when localStorage can't be used (e.g. blocked by the browser): this page only. */
+/**
+ * Every value this page writes, read first: it stays right when localStorage can't be used, or refuses a write
+ * (e.g. it's full) while still returning the old value.
+ */
 const memory = new Map<string, string>();
 const load = (key: string): string | null => {
+  if (memory.has(key)) return memory.get(key)!;
   try {
-    return localStorage.getItem(key) ?? memory.get(key) ?? null;
+    return localStorage.getItem(key);
   } catch {
-    return memory.get(key) ?? null;
+    return null;
   }
 };
 const save = (key: string, value: string) => {
