@@ -13,6 +13,8 @@ export type ChannelSnapshot = {
   modules: ModuleInfo[];
   /** The last refusal or failure the server sent. */
   error?: string;
+  /** The server ended the connection for good (e.g. a different protocol version): no reconnect is coming. */
+  fatal?: boolean;
 };
 
 /**
@@ -68,7 +70,7 @@ export class SessionChannel {
       });
     } else if (f.type === "error") {
       if (f.fatal) this.stopped = true;
-      this.set({ error: f.message });
+      this.set({ error: f.message, ...(f.fatal && { fatal: true }) });
       // A refusal is news, not a state: let it fade.
       if (!f.fatal) setTimeout(() => this.snapshot.error === f.message && this.set({ error: undefined }), 8000);
     } else {

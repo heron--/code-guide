@@ -3,6 +3,7 @@ import type { Subject } from "../shared/protocol.js";
 import { moduleInfo, type Module } from "../modules/types.js";
 import type { RequestHandler } from "./channel.js";
 import type { Chat } from "./chat.js";
+import { revParse } from "./git.js";
 import type { JobRunner } from "./jobs.js";
 import type { Session } from "./session.js";
 import { preparePullRequest } from "./subjects.js";
@@ -29,6 +30,10 @@ export function requestHandler(session: Session, runner: JobRunner, modules: Mod
           req.subject.type === "change" && req.subject.pr
             ? await preparePullRequest(session.state.repo!, req.subject)
             : req.subject;
+        // A ref that doesn't resolve (a typo, or HEAD in a repository with no commits) would fail every job.
+        if (subject.type === "change")
+          for (const ref of [subject.base, subject.head])
+            if (ref && !(await revParse(session.state.repo!, ref))) throw new Error(`unknown ref "${ref}"`);
         if (session.state.subject) throw new Error("This session already has a subject");
         session.append("session.subject", { subject, label: subjectLabel(subject) });
         for (const m of modules) if (m.job && m.startsWithSession) runner.start(m.job, m.name);
