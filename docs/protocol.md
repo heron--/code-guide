@@ -14,7 +14,7 @@ Every event carries `v`, the protocol version. The browser sends its version in 
 
 ## Events
 
-Every event has the same envelope. `seq` counts up from 1 within a session. A browser that reconnects sends the last `seq` it saw, and the server replays everything after it.
+Every event has the same envelope. `seq` counts up from 1 within a session. A tab that reconnects sends the last `seq` it saw, and the server replays everything after it, then streams live. See [the channel](#channel).
 
 ```json
 {
@@ -108,10 +108,10 @@ Replies stream as text deltas, appended in order.
 ## Requests
 
 ```json
-{ "type": "hello", "v": 1, "after": 41 }
+{ "type": "hello", "v": 1, "session": "2026-10-07-091203-k3f9", "after": 41 }
 ```
 
-The first message on every connection. Omit `after` on a fresh tab to receive the whole session.
+The first message on every connection. A tab that reconnects sends its session and the last `seq` it saw, and gets only what came after. A fresh tab omits both, and so does a tab whose session isn't the server's any more: either gets the whole session.
 
 ```json
 { "type": "subject.choose", "subject": { "type": "question", "question": "How are retries scheduled?" } }
@@ -144,3 +144,7 @@ A chat message's context can be a `chapter`, a selected range of chapter `prose`
 ```json
 { "type": "error", "message": "This tab speaks protocol v2; the server speaks v1. Reload the page.", "fatal": true }
 ```
+
+## Channel
+
+Each browser tab opens one WebSocket to `/api/session` on the local server, which binds to 127.0.0.1 and accepts connections only from pages served on this machine. The tab sends `hello`; the server answers `welcome`, replays the events the tab missed, and then sends every new event as it happens. Every tab gets every event, so tabs on the same session stay in sync. When the connection drops, the tab reconnects and says hello again with the last `seq` it saw, so nothing is lost or shown twice.
