@@ -16,14 +16,16 @@ export function ProgressBar({
   label: string;
   className?: string;
 }) {
-  const shown = Math.min(1, Math.max(0.04, fraction));
+  const actual = Math.min(1, Math.max(0, fraction));
+  // A sliver shows even at the start, so the bar reads as started; assistive technology gets the real value.
+  const shown = Math.max(0.04, actual);
   return (
     <span
       role="progressbar"
       aria-label={label}
       aria-valuemin={0}
       aria-valuemax={100}
-      aria-valuenow={Math.round(shown * 100)}
+      aria-valuenow={Math.round(actual * 100)}
       className={cn("relative block h-2 w-[200px] max-w-full border border-border bg-surface-3", className)}
     >
       <span
