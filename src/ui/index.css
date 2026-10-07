@@ -1,66 +1,69 @@
 @import "tailwindcss";
+@import "./tokens.css";
 
+/* Tailwind names for the tokens. Old names (background, card, muted…) point at their new equivalents. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--foreground);
+  --color-canvas: var(--canvas);
+  --color-chrome: var(--chrome);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-fg-4: var(--fg-4);
+  --color-rule: var(--rule);
   --color-border: var(--border);
-  --color-ring: var(--ring);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-bg: var(--accent-bg);
+  --color-accent-bg-strong: var(--accent-bg-strong);
   --color-add: var(--add);
   --color-add-bg: var(--add-bg);
+  --color-add-bg-strong: var(--add-bg-strong);
   --color-del: var(--del);
   --color-del-bg: var(--del-bg);
+  --color-del-bg-strong: var(--del-bg-strong);
   --color-mark: var(--mark);
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
-}
 
-:root {
-  --background: #f7f7f8;
-  --foreground: #18181b;
-  --card: #ffffff;
-  --popover: #ffffff;
-  --primary: #18181b;
-  --primary-foreground: #fafafa;
-  --muted: #f1f1f3;
-  --muted-foreground: #6b6b76;
-  --accent: #ececef;
-  --border: #e4e4e8;
-  --ring: #a1a1aa;
-  --add: #1a7f37;
-  --add-bg: #eaf7ee;
-  --del: #cf222e;
-  --del-bg: #fdecee;
-  --mark: #fff3c4;
-}
+  --color-background: var(--canvas);
+  --color-foreground: var(--fg);
+  --color-card: var(--surface);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--fg);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--surface);
+  --color-muted: var(--surface-3);
+  /* fg-3 is under 4.5:1 on the canvas in light mode; quiet text on the canvas uses fg-2. */
+  --color-muted-foreground: var(--fg-2);
+  --color-accent-foreground: var(--fg);
+  --color-ring: var(--accent);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #111113;
-    --foreground: #ececef;
-    --card: #18181b;
-    --popover: #1f1f23;
-    --primary: #ececef;
-    --primary-foreground: #18181b;
-    --muted: #222226;
-    --muted-foreground: #9a9aa5;
-    --accent: #2a2a2f;
-    --border: #2c2c31;
-    --ring: #52525b;
-    --add: #3fb950;
-    --add-bg: rgb(46 160 67 / 0.14);
-    --del: #f85149;
-    --del-bg: rgb(248 81 73 / 0.14);
-    --mark: rgb(234 179 8 / 0.22);
-  }
+  --font-sans: "IBM Plex Sans", "Helvetica Neue", Helvetica, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+
+  /* Square corners everywhere. */
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+  --radius-4xl: 0px;
+  --radius: 0px;
+
+  /* No soft shadows; the active panel's hard shadow is the only one. */
+  --shadow-2xs: 0 0 #0000;
+  --shadow-xs: 0 0 #0000;
+  --shadow-sm: 0 0 #0000;
+  --shadow-md: 0 0 #0000;
+  --shadow-lg: 0 0 #0000;
+  --shadow-xl: 0 0 #0000;
+  --shadow-2xl: 0 0 #0000;
+  --shadow-active: var(--active-shadow);
 }
 
 html,
@@ -70,8 +73,8 @@ body,
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--canvas);
+  color: var(--fg);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
@@ -81,20 +84,23 @@ body {
   color: var(--l, inherit);
 }
 @media (prefers-color-scheme: dark) {
-  .tok {
+  :root:not([data-theme="light"]) .tok {
     color: var(--d, inherit);
   }
+}
+:root[data-theme="dark"] .tok {
+  color: var(--d, inherit);
 }
 
 .anchor-link {
   text-decoration-line: underline;
   text-decoration-style: dotted;
-  text-decoration-color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
+  text-decoration-color: var(--accent-underline);
   text-decoration-thickness: 1.5px;
   text-underline-offset: 5px;
 }
 .anchor-link:hover {
-  text-decoration-color: var(--foreground);
+  text-decoration-color: var(--accent);
 }
 
 @keyframes mark-in {

@@ -83,7 +83,8 @@ function Gap({
   // Like a diff hunk header: what the next shown lines sit inside, unless it's already on screen.
   const enclosing = atBottom ? undefined : enclosingLine(lines, to + 1);
   const scope = enclosing && !visible[enclosing.idx] ? enclosing.text : undefined;
-  const btn = "flex h-6 w-full items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground";
+  const btn =
+    "flex h-6 w-full items-center justify-center text-muted-foreground hover:bg-surface-3 hover:text-foreground";
   return (
     <div className="grid grid-cols-[3px_4rem_1fr] items-stretch bg-muted/60 font-mono text-[13px] text-muted-foreground">
       <span />
