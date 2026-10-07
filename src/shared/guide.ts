@@ -128,16 +128,6 @@ export type Problem = {
   message: string;
 };
 
-export type GuideSummary = {
-  id: string;
-  file: string;
-  title: string;
-  question: string;
-  subjectType: Subject["type"] | "invalid";
-  chapters: number;
-  errors: number;
-};
-
 export type ResolvedGuide = {
   id: string;
   file: string;

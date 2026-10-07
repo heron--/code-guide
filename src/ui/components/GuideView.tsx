@@ -41,7 +41,7 @@ export function GuideView({ id, tab, chapter }: { id: string; tab: Tab; chapter:
     <div className="flex h-full flex-col">
       <header className="shrink-0 px-8 pt-6">
         <a href="#/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="size-4" /> Guides
+          <ChevronLeft className="size-4" /> Session
         </a>
         <h1 className="mt-2 text-[32px] font-semibold leading-tight tracking-tight">{g.title}</h1>
         <p className="mt-1.5 flex min-w-0 items-center gap-2 text-[15px] text-muted-foreground">

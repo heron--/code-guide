@@ -33,15 +33,17 @@ npm install -g github:heron--/code-chapters   # or: git clone … && npm install
 
 ## Use
 
-Run `code-guide` anywhere inside a repo. It starts a local server and opens your browser.
+Run `code-guide` anywhere inside a git repository. It starts a session and a local server and opens your browser, where you pick a subject: a change, a path, or a question. Code Guide writes a guide about it (and has another job review it), and you can ask questions as you read.
 
 ```
-code-guide [dir | guide.json]      Open the viewer (default: the repo containing .)
+code-guide [dir]                   Start a session (default: the repo containing .)
 code-guide check <guide.json>…     Validate guides; exits 1 on errors
+  --change <base>[...<head>]   --path <path>   --question <text>   pick the subject up front
+  --harness <name>   --model <m>   --review-model <m>
   --port <n>   default 4646      --no-open   don't open a browser
 ```
 
-Starting a session on a subject (a change, a path or a question) and watching its guide get written arrives with the workspace (M8). Until then the viewer opens guides in `.code-chapters/*.json`.
+Sessions are kept in `.code-guide/sessions/` in the repository; add it to your `.gitignore` if you like.
 
 ### Reading a guide
 
@@ -51,7 +53,7 @@ Starting a session on a subject (a change, a path or a question) and watching it
 - **Diff** (for changes): every changed file.
 - "Reviewed" marks on chapters and files are saved in your browser.
 
-This repo has a guide about itself: run `code-guide` here and open *How anchors reach their lines*.
+This repo has a guide about itself in `.code-chapters/how-anchors-work.json`; `code-guide check` validates it.
 
 ## Develop
 

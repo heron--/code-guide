@@ -19,18 +19,14 @@ const channels: SessionChannel[] = [];
 async function serve(s: Session) {
   server?.close();
   server = await startServer({
-    roots: [],
-    files: [],
     uiDir: repo,
     port: 0,
-    session: {
-      session: s,
-      modules: modules.map(moduleInfo),
-      onRequest: async (r) => {
-        if (r.type === "job.cancel") throw new Error(`no job "${r.job}"`);
-        if (r.type === "job.start") await new Promise((ok) => setTimeout(ok, 50));
-        requests.push(r);
-      },
+    session: s,
+    modules: modules.map(moduleInfo),
+    onRequest: async (r) => {
+      if (r.type === "job.cancel") throw new Error(`no job "${r.job}"`);
+      if (r.type === "job.start") await new Promise((ok) => setTimeout(ok, 50));
+      requests.push(r);
     },
   });
 }
