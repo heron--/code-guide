@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { ClaudeHarness, describeActivity, isReadOnlyGit, staysInside } from "./claude";
 import { harnessContract } from "./contract";
@@ -27,6 +30,8 @@ describe("read-only Bash", () => {
     "git grep --open-files-in-pager=sh x",
     "git diff --no-index /etc/passwd a.ts",
     "git -c core.pager=sh log",
+    "git diff '--no-index' /etc/passwd a.ts",
+    'git log "--output=out.txt"',
   ])("refuses %s", (c) => expect(isReadOnlyGit(c)).toBe(false));
 });
 
@@ -40,6 +45,23 @@ test("file tools stay inside the repository", () => {
   expect(staysInside("/repo", { pattern: "x", path: "/home" })).toBe(false);
   expect(staysInside("/repo", { pattern: "/etc/*" })).toBe(false);
   expect(staysInside("/repo", { file_path: "/repo-other/a.ts" })).toBe(false);
+});
+
+test("a symlink out of the repository doesn't count as inside it", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cg-link-"));
+  const repo = join(dir, "repo");
+  mkdirSync(join(dir, "outside"), { recursive: true });
+  mkdirSync(repo);
+  writeFileSync(join(dir, "outside", "secret.txt"), "x\n");
+  writeFileSync(join(repo, "a.ts"), "x\n");
+  // A junction, so Windows allows it without admin rights; elsewhere it's an ordinary directory symlink.
+  symlinkSync(join(dir, "outside"), join(repo, "linked"), "junction");
+  try {
+    expect(staysInside(repo, { file_path: "a.ts" })).toBe(true);
+    expect(staysInside(repo, { file_path: "linked/secret.txt" })).toBe(false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("describes tool calls as activity", () => {
