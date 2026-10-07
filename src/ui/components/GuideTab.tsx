@@ -269,7 +269,7 @@ function ChapterRail({
 function MissingFile({ path }: { path: string }) {
   return (
     <div className="rounded-xl border border-dashed border-del/50 bg-card px-4 py-3 text-sm text-del">
-      {path} could not be found. Run <code className="font-mono">code-chapters check</code> on this guide.
+      {path} could not be found. Run <code className="font-mono">code-guide check</code> on this guide.
     </div>
   );
 }

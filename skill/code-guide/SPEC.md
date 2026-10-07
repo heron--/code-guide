@@ -6,7 +6,7 @@ Guides never contain code. They point at files in the repository; the viewer rea
 
 ## Where guides live
 
-`<repo root>/.code-chapters/<slug>.json`, where `<slug>` is kebab-case, e.g. `.code-chapters/how-retries-work.json`. Running `code-chapters` anywhere inside the repo lists them.
+`<repo root>/.code-chapters/<slug>.json`, where `<slug>` is kebab-case, e.g. `.code-chapters/how-retries-work.json`. Running `code-guide` anywhere inside the repo lists them.
 
 ## Shape
 
@@ -83,7 +83,7 @@ An anchor is a Markdown link in `body`:
 
 ## Validation
 
-`code-chapters check <guide.json>` reports:
+`code-guide check <guide.json>` reports:
 
 - **Errors** (the guide will not render correctly): schema violations, unknown refs, missing files, line numbers out of bounds, anchors to files the chapter doesn't show.
 - **Warnings** (the guide breaks the quality bar): length limits, too many chapters or excerpts, chapters with no anchors, anchors outside the excerpt's lines, oversized excerpts.

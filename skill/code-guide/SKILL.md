@@ -1,11 +1,11 @@
 ---
-name: code-chapters
-description: Write a guide that answers a question about a codebase ("how does X work?", "why do we use Y here?") or explains a change (a branch, PR, or uncommitted diff) as a few brief chapters, each paired with the exact code it is about. Use when the user asks to explain, walk through, guide, or teach some code or a change, or invokes /code-chapters.
+name: code-guide
+description: Write a guide that answers a question about a codebase ("how does X work?", "why do we use Y here?") or explains a change (a branch, PR, or uncommitted diff) as a few brief chapters, each paired with the exact code it is about. Use when the user asks to explain, walk through, guide, or teach some code or a change, or invokes /code-guide.
 ---
 
-# Code Chapters: write a guide
+# Code Guide: write a guide
 
-You will produce one **guide**: a JSON file that answers the user's question in a few short **chapters**. Each chapter states one idea in a few sentences, shown next to **excerpts** of the real code, with **anchors** linking phrases to exact lines. The reader steps through chapters one at a time in the Code Chapters viewer.
+You will produce one **guide**: a JSON file that answers the user's question in a few short **chapters**. Each chapter states one idea in a few sentences, shown next to **excerpts** of the real code, with **anchors** linking phrases to exact lines. The reader steps through chapters one at a time in the Code Guide viewer.
 
 The file format is in [SPEC.md](SPEC.md), next to this file. Read it before writing.
 
@@ -70,9 +70,9 @@ Good (one idea each, anchored, ~30 words each):
 ## 5. Check, then cut
 
 1. Save to `<repo root>/.code-chapters/<slug>.json` (create the directory if needed).
-2. Run `code-chapters check .code-chapters/<slug>.json`. Fix every error and every warning, then run it again. If the `code-chapters` command isn't installed, check each rule in SPEC.md by hand: paths exist at the ref, line numbers are in bounds, every anchor path matches one of its chapter's excerpts exactly.
+2. Run `code-guide check .code-chapters/<slug>.json`. Fix every error and every warning, then run it again. If the `code-guide` command isn't installed, check each rule in SPEC.md by hand: paths exist at the ref, line numbers are in bounds, every anchor path matches one of its chapter's excerpts exactly.
 3. Brevity pass. Reread each chapter and delete every word, clause and sentence the reader doesn't need. Then do it once more. Then reread the guide start to finish: does each chapter follow from the last, and does the last one land on the answer?
 
 ## 6. Hand off
 
-Tell the user, in two or three lines: the guide's path, how many chapters, and to open it by running `code-chapters` from inside the repo. Don't repeat the guide's content in chat.
+Tell the user, in two or three lines: the guide's path, how many chapters, and to open it by running `code-guide` from inside the repo. Don't repeat the guide's content in chat.

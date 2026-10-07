@@ -1,5 +1,5 @@
 {
-  "name": "code-chapters",
+  "name": "code-guide",
   "version": "0.1.0",
   "description": "Read code and code changes as a few brief, guided chapters.",
   "scripts": {
@@ -53,7 +53,7 @@
   },
   "type": "module",
   "bin": {
-    "code-chapters": "dist/cli.js"
+    "code-guide": "dist/cli.js"
   },
   "files": [
     "dist",

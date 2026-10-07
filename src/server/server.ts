@@ -57,7 +57,7 @@ async function serveStatic(uiDir: string, urlPath: string, res: ServerResponse) 
     res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream" });
     res.end(body);
   } catch {
-    res.writeHead(404).end("Viewer not built. Run `npm run build` in the code-chapters package.");
+    res.writeHead(404).end("Viewer not built. Run `npm run build` in the code-guide package.");
   }
 }
 
