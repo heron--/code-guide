@@ -2,6 +2,7 @@ import { latestFinished, unavailable } from "../shared/modules.js";
 import type { Subject } from "../shared/protocol.js";
 import { moduleInfo, type Module } from "../modules/types.js";
 import type { RequestHandler } from "./channel.js";
+import type { Chat } from "./chat.js";
 import type { JobRunner } from "./jobs.js";
 import type { Session } from "./session.js";
 
@@ -18,7 +19,7 @@ export function subjectLabel(s: Subject): string {
 }
 
 /** Turns the browser's requests into jobs and events. Modules are looked up by name; none is special. */
-export function requestHandler(session: Session, runner: JobRunner, modules: Module[]): RequestHandler {
+export function requestHandler(session: Session, runner: JobRunner, modules: Module[], chat?: Chat): RequestHandler {
   return async (req) => {
     switch (req.type) {
       case "subject.choose":
@@ -46,7 +47,8 @@ export function requestHandler(session: Session, runner: JobRunner, modules: Mod
       case "job.cancel":
         return runner.cancel(req.job);
       case "chat.send":
-        throw new Error("Chat isn't available yet");
+        if (!chat) throw new Error("Chat isn't available");
+        return chat.send(req.text, req.context ?? []);
     }
   };
 }
