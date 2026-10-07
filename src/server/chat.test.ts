@@ -184,3 +184,14 @@ test("code context from a change whose head no longer resolves is refused", asyn
   );
   await c.stop();
 });
+
+test("reports what the agent is doing, and how full its context is", async () => {
+  const states: string[] = [];
+  chat.onStatus((s) => states.push(s.state));
+  await chat.send("Call the `nothing` tool with {}.", []);
+  await until(() => replies()[0]?.status === "done");
+  expect(states).toEqual(["working", "writing", "idle"]);
+  harness.opts!.onEvent({ type: "usage", context: 1200, window: 200_000 });
+  harness.opts!.onEvent({ type: "thinking" });
+  expect(chat.status).toEqual({ state: "thinking", context: 1200, window: 200_000 });
+});

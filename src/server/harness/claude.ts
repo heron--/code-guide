@@ -162,9 +162,11 @@ export class ClaudeHarness implements Harness {
     });
 
     let wroteText = false;
+    let window: number | undefined;
     const handle = (m: SDKMessage) => {
       if (m.type === "stream_event" && m.parent_tool_use_id === null) {
         const ev = m.event;
+        if (ev.type === "content_block_start" && ev.content_block.type === "thinking") emit({ type: "thinking" });
         // Text the agent writes between tool calls is its own paragraph, not run into what follows.
         if (ev.type === "content_block_start" && ev.content_block.type === "text" && wroteText)
           emit({ type: "text", delta: "\n\n" });
@@ -173,10 +175,23 @@ export class ClaudeHarness implements Harness {
           emit({ type: "text", delta: ev.delta.text });
         }
       } else if (m.type === "assistant" && m.parent_tool_use_id === null) {
+        const u = m.message.usage;
+        if (u)
+          emit({
+            type: "usage",
+            context:
+              u.input_tokens +
+              (u.cache_read_input_tokens ?? 0) +
+              (u.cache_creation_input_tokens ?? 0) +
+              u.output_tokens,
+            window,
+          });
         for (const b of m.message.content)
           if (b.type === "tool_use")
             emit({ type: "activity", activity: describeActivity(b.name, (b.input ?? {}) as Record<string, unknown>) });
       } else if (m.type === "result") {
+        // The window is only reported here; later usage events carry it.
+        window = Object.values(m.modelUsage ?? {})[0]?.contextWindow ?? window;
         if (m.subtype !== "success" && !cancelling)
           emit({ type: "error", message: m.errors.join("; ") || m.subtype, fatal: false });
         emit(cancelling ? { type: "turn.end", cancelled: true } : { type: "turn.end" });

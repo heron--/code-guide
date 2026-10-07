@@ -1,5 +1,5 @@
-import { latestDone, moduleBusy, type ModuleInfo } from "../../shared/modules";
-import type { JobState, SessionState } from "../../shared/state";
+import { latestDone, moduleBusy, type ModuleInfo } from "./modules.js";
+import type { JobState, SessionState } from "./state.js";
 
 export type PanelState = {
   /** A job of this module (its own, or a follow-up it started) is queued or running. */

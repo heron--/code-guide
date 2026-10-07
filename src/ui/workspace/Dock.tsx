@@ -3,7 +3,7 @@ import type { SessionState } from "../../shared/state";
 import { cn } from "@/lib/utils";
 import { Icon, icons } from "./Icon";
 import type { Layout } from "./layout";
-import { panelState, runProgress } from "./status";
+import { panelState, runProgress } from "../../shared/progress";
 
 type Props = {
   state: SessionState;

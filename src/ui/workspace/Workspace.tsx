@@ -36,7 +36,7 @@ import {
   type Layout,
   type Slot,
 } from "./layout";
-import { jobLabel, panelState, runProgress, sessionActivity } from "./status";
+import { jobLabel, panelState, runProgress, sessionActivity } from "../../shared/progress";
 
 type Props = {
   state: SessionState;
