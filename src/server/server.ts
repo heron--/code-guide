@@ -4,6 +4,7 @@ import { extname, join, normalize } from "node:path";
 import { attachChannel, type RequestHandler } from "./channel.js";
 import { parseGlossary, type Term } from "../shared/glossary.js";
 import type { ModuleInfo } from "../shared/modules.js";
+import type { ViewSettings } from "../shared/settings.js";
 import type { Session } from "./session.js";
 import { parseInput, suggestions } from "./subjects.js";
 import { changedFiles } from "./git.js";
@@ -27,6 +28,8 @@ export type ServeOptions = {
   session: Session;
   onRequest: RequestHandler;
   modules?: ModuleInfo[];
+  /** Settings the browser applies: theme, and the modules a new session opens. */
+  view?: ViewSettings;
 };
 
 function send(res: ServerResponse, status: number, body: unknown) {
@@ -133,7 +136,7 @@ export function startServer(opts: ServeOptions): Promise<{ url: string; close: (
     handle(req, res).catch((e) => send(res, 500, { error: String(e?.message ?? e) }));
   });
 
-  const detach = attachChannel(server, opts.session, opts.onRequest, opts.modules);
+  const detach = attachChannel(server, opts.session, opts.onRequest, opts.modules, opts.view);
 
   // Localhost only: the server reads the repository and drives an agent.
   const host = "127.0.0.1";

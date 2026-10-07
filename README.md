@@ -45,6 +45,24 @@ code-guide check <guide.json>…     Validate guides; exits 1 on errors
 
 Sessions are kept in `.code-guide/sessions/` in the repository; add it to your `.gitignore` if you like.
 
+### Settings
+
+`~/.code-guide/settings.json` holds your defaults. A repository's `.code-guide/settings.json` overrides them key by key, and flags override both. Every key is optional:
+
+```json
+{
+  "harness": "claude",
+  "model": "claude-opus-5-5",
+  "reviewModel": "claude-sonnet-5-5",
+  "modules": ["guide", "chat"],
+  "theme": "system",
+  "port": 4646,
+  "open": true
+}
+```
+
+`modules` are the panels a new session opens, left slot first. `theme` is `light`, `dark` or `system`.
+
 ### Reading a guide
 
 The browser shows a workspace: two slots side by side and a dock along the bottom. It opens with the Guide on the left, showing its progress while it's written, and Chat on the right. Other jobs wait in the dock with their progress; click a square to open it, or drag it up into a slot.
