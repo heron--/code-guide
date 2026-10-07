@@ -59,7 +59,8 @@ function Line({ src }: { src: string }) {
 const LIST_ITEM = /^\s*([-*]|\d+\.)\s/;
 const HEADING = /^#{1,6}\s+/;
 
-type Block = { kind: "heading" | "para"; text: string } | { kind: "list"; items: string[] };
+/** A list keeps its first number when ordered (`3. …`), so numbered steps render as numbered. */
+type Block = { kind: "heading" | "para"; text: string } | { kind: "list"; start?: number; items: string[] };
 
 /** A paragraph's lines, grouped: each heading on its own, runs of list items, and the prose between. */
 function blocks(para: string): Block[] {
@@ -68,8 +69,11 @@ function blocks(para: string): Block[] {
     const last = out.at(-1);
     if (HEADING.test(line)) out.push({ kind: "heading", text: line.replace(HEADING, "") });
     else if (LIST_ITEM.test(line)) {
-      if (last?.kind === "list") last.items.push(line.replace(LIST_ITEM, ""));
-      else out.push({ kind: "list", items: [line.replace(LIST_ITEM, "")] });
+      const marker = line.match(LIST_ITEM)![1];
+      const start = /\d/.test(marker) ? Number.parseInt(marker) : undefined;
+      if (last?.kind === "list" && (last.start === undefined) === (start === undefined))
+        last.items.push(line.replace(LIST_ITEM, ""));
+      else out.push({ kind: "list", start, items: [line.replace(LIST_ITEM, "")] });
     } else if (last?.kind === "para") last.text += " " + line.trim();
     else if (last?.kind === "list") last.items[last.items.length - 1] += " " + line.trim();
     else out.push({ kind: "para", text: line.trim() });
@@ -78,16 +82,20 @@ function blocks(para: string): Block[] {
 }
 
 function Block({ block: b }: { block: Block }) {
-  if (b.kind === "list")
-    return (
-      <ul className="flex list-disc flex-col gap-1 pl-5">
-        {b.items.map((item, j) => (
-          <li key={j}>
-            <Line src={item} />
-          </li>
-        ))}
-      </ul>
+  if (b.kind === "list") {
+    const items = b.items.map((item, j) => (
+      <li key={j}>
+        <Line src={item} />
+      </li>
+    ));
+    return b.start === undefined ? (
+      <ul className="flex list-disc flex-col gap-1 pl-5">{items}</ul>
+    ) : (
+      <ol start={b.start} className="flex list-decimal flex-col gap-1 pl-5">
+        {items}
+      </ol>
     );
+  }
   return (
     <p className={cn(b.kind === "heading" && "pt-1 font-semibold")}>
       <Line src={b.text} />
