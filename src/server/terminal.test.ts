@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import type { ModuleInfo } from "../shared/modules";
 import type { SessionEvent } from "../shared/protocol";
 import { emptyState, reduce, type SessionState } from "../shared/state";
-import { logLine, showStatus, statusLines } from "./terminal";
+import { logLine, printable, showStatus, statusLines } from "./terminal";
 
 const guide: ModuleInfo = { name: "guide", label: "Guide", icon: [], needsJob: true, kind: "guide", maxJobs: 4 };
 const quiz: ModuleInfo = { name: "quiz", label: "Quiz", icon: [], needsJob: true, kind: "quiz" };
@@ -107,4 +107,40 @@ test("on a terminal, each live line takes one row", () => {
     { write: (s: string) => (written += s), isTTY: true, columns: 200 },
   )();
   expect(written.split("\n")).toEqual(["Agent  h · m · context empty · idle", "Quiz  failed: first second", ""]);
+});
+
+test("text from the repository can't send the terminal escape sequences", () => {
+  expect(printable("a\x1b[2Jb\x1b]0;title\x07c\rd")).toBe("a b c d");
+});
+
+test("lines are clipped by display width, and a resize redraws for the reflowed rows", () => {
+  const wide = session(
+    ["job.queued", { job: "quiz-1", kind: "quiz", module: "quiz", inputs: [] }],
+    ["job.started", { job: "quiz-1" }],
+    ["job.failed", { job: "quiz-1", error: "错误".repeat(20), problems: [] }],
+  );
+  const fake = { state: wide, subscribe: () => () => {}, eventsAfter: () => [] } as unknown as Parameters<
+    typeof showStatus
+  >[0];
+  let written = "";
+  let onResize = () => {};
+  const out = {
+    write: (s: string) => (written += s),
+    isTTY: true,
+    columns: 40,
+    on: (_: "resize", fn: () => void) => (onResize = fn),
+  };
+  showStatus(
+    fake,
+    [quiz],
+    { harness: "h", model: "m", status: () => ({ state: "idle" }), onStatus: () => () => {} },
+    out,
+  );
+  const [, failed] = written.split("\n");
+  expect([...failed].reduce((n, ch) => n + (ch.codePointAt(0)! >= 0x1100 ? 2 : 1), 0)).toBeLessThanOrEqual(39);
+  // Both lines were drawn under 40 columns; at 20, each now takes two rows.
+  written = "";
+  out.columns = 20;
+  onResize();
+  expect(written.startsWith("\x1b[4A\x1b[0J")).toBe(true);
 });

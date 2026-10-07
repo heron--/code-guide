@@ -56,7 +56,22 @@ export function logLine(e: SessionEvent, state: SessionState): string | undefine
   return undefined;
 }
 
-type Out = { write(s: string): unknown; isTTY?: boolean; columns?: number };
+type Out = {
+  write(s: string): unknown;
+  isTTY?: boolean;
+  columns?: number;
+  on?(event: "resize", fn: () => void): unknown;
+  off?(event: "resize", fn: () => void): unknown;
+};
+
+/** Text from the repository or a model, made safe to print: no escape sequences or other control characters. */
+export function printable(s: string): string {
+  return s.replace(/\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(\x07|\x1b\\)?|[\x00-\x1f\x7f-\x9f]+/g, " ");
+}
+
+/** Columns a character takes: two for wide ones (CJK, most emoji), else one. A close-enough rule, erring wide. */
+const cells = (ch: string) => (ch.codePointAt(0)! >= 0x1100 ? 2 : 1);
+const widthOf = (s: string) => [...s].reduce((n, ch) => n + cells(ch), 0);
 
 /**
  * Shows the session in the terminal while it runs: a log of finished and failed jobs, and on a terminal, a live
@@ -68,16 +83,26 @@ export function showStatus(
   agent: { harness: string; model: string; status: () => AgentStatus; onStatus: (fn: () => void) => () => void },
   out: Out = process.stdout,
 ): () => void {
-  let drawn = 0;
+  /** Display widths of the lines last drawn, to know how many rows they take now (a resize reflows them). */
+  let drawn: number[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
-  // One row per line, or the redraw would move up too few rows: no newlines (e.g. in an error), no wrapping.
+  // One row per line when drawn, or the redraw would move up too few rows: printable, and clipped by display width.
   const clip = (line: string) => {
-    const l = line.replace(/\s*\n\s*/g, " ");
-    return out.columns && l.length > out.columns - 1 ? l.slice(0, out.columns - 2) + "…" : l;
+    const l = printable(line);
+    const max = (out.columns ?? Infinity) - 1;
+    if (widthOf(l) <= max) return l;
+    let cut = "";
+    for (const ch of l) {
+      if (widthOf(cut) + cells(ch) > max - widthOf("…")) break;
+      cut += ch;
+    }
+    return cut + "…";
   };
   const clear = () => {
-    if (drawn) out.write(`\x1b[${drawn}A\x1b[0J`);
-    drawn = 0;
+    const cols = out.columns ?? Infinity;
+    const rows = drawn.reduce((n, w) => n + Math.max(1, Math.ceil(w / cols)), 0);
+    if (rows) out.write(`\x1b[${rows}A\x1b[0J`);
+    drawn = [];
   };
   const draw = () => {
     timer = undefined;
@@ -89,7 +114,7 @@ export function showStatus(
     }).map(clip);
     clear();
     out.write(lines.join("\n") + "\n");
-    drawn = lines.length;
+    drawn = lines.map(widthOf);
   };
   // Redraws are batched: progress can come many times a second.
   const later = () => (timer ??= setTimeout(draw, 100));
@@ -98,7 +123,7 @@ export function showStatus(
     const line = logLine(e, session.state);
     if (line) {
       if (out.isTTY) clear();
-      out.write(line + "\n");
+      out.write(printable(line) + "\n");
       if (out.isTTY) draw();
     } else later();
   });
@@ -106,10 +131,14 @@ export function showStatus(
   // What happened before this started (a subject chosen with --change, jobs already done) is logged now.
   for (const e of session.eventsAfter(0)) {
     const line = logLine(e, session.state);
-    if (line) out.write(line + "\n");
+    if (line) out.write(printable(line) + "\n");
   }
+  // A narrower terminal reflows what's drawn; redraw at the new width.
+  const resized = () => draw();
+  out.on?.("resize", resized);
   draw();
   return () => {
+    out.off?.("resize", resized);
     stopSession();
     stopAgent();
     clearTimeout(timer);
