@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { z } from "zod";
 import { FakeHarness } from "./harness/fake";
+import type { Harness } from "./harness/types";
 import { JobRunner, type JobKind } from "./jobs";
 import { Session } from "./session";
 
@@ -166,4 +167,24 @@ test("a job cancelled while its submission is checked stays cancelled", async ()
   await new Promise((r) => setTimeout(r, 100));
   expect(status(id)).toBe("cancelled");
   expect(session.eventsAfter(0).some((e) => e.type === "job.submitted" || e.type === "job.finished")).toBe(false);
+});
+
+test("a harness that dies after an accepted submission still frees its slot", async () => {
+  // Turns end with a fatal error instead of turn.end, as the Claude adapter does when its process exits.
+  const fake = new FakeHarness();
+  const dying: Harness = {
+    name: "dying",
+    model: "scripted",
+    check: () => fake.check(),
+    start: (opts) =>
+      fake.start({
+        ...opts,
+        onEvent: (e) => opts.onEvent(e.type === "turn.end" ? { type: "error", message: "exited", fatal: true } : e),
+      }),
+  };
+  const runner = new JobRunner(session, dying, { concurrency: 1 });
+  const a = runner.start(says("guide", "a"), "guide");
+  await until(() => status(a) === "finished");
+  const b = runner.start(says("guide", "b"), "guide");
+  await until(() => status(b) === "finished");
 });
