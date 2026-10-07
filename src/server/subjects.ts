@@ -108,7 +108,12 @@ export type PullRequest = { number: number; title: string; url: string; body: st
  */
 export async function pullRequestFor(repo: string, subject: Subject): Promise<PullRequest | undefined> {
   if (subject.type !== "change") return undefined;
-  const which = subject.pr ? String(subject.pr) : subject.head;
+  // `gh pr view` takes a branch, not a revision, so `HEAD` becomes the branch it's on.
+  const which = subject.pr
+    ? String(subject.pr)
+    : subject.head === "HEAD"
+      ? await quiet(sh(repo, "git", ["branch", "--show-current"]))
+      : subject.head;
   // A commit, or no head (the working tree), has no pull request of its own.
   if (!which || (!subject.pr && /^[0-9a-f]{7,40}$/.test(which))) return undefined;
   const out = await quiet(sh(repo, "gh", ["pr", "view", which, "--json", "number,title,url,body"]));

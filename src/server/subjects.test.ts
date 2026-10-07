@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { parseInput, preparePullRequest, suggestions } from "./subjects";
+import { parseInput, preparePullRequest, pullRequestFor, suggestions } from "./subjects";
 
 let dir: string;
 let repo: string;
@@ -50,7 +50,9 @@ beforeAll(() => {
     join(bin, "gh.js"),
     `const [, , , cmd] = process.argv;
 if (cmd === "list") console.log('[{"number":7,"title":"Fix retries","author":{"login":"sam"},"baseRefName":"main"}]');
-if (cmd === "view") console.log('{"headRefOid":"${prCommit}","baseRefName":"main"}');
+if (cmd === "view" && process.argv.includes("headRefOid,baseRefName"))
+  console.log('{"headRefOid":"${prCommit}","baseRefName":"main"}');
+else if (cmd === "view") console.log(JSON.stringify({ number: 8, title: process.argv[4], url: "u", body: "" }));
 `,
   );
   writeFileSync(join(bin, "gh"), `#!/bin/sh\nexec node "$(dirname "$0")/gh.js" "$@"\n`);
@@ -111,4 +113,11 @@ test("suggests unpushed commits on the default branch itself", async () => {
   commit(own, "d.ts", "local");
   const s = await suggestions(own);
   expect(s.find((x) => x.title === "main vs origin/main")?.detail).toBe("1 commit ahead");
+});
+
+test("a change ending at HEAD finds the pull request for the current branch", async () => {
+  expect(await pullRequestFor(repo, { type: "change", base: "main", head: "HEAD" })).toMatchObject({
+    number: 8,
+    title: "feature",
+  });
 });
