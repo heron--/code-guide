@@ -155,6 +155,7 @@ export class Chat {
         if (!head && e.type === "error" && e.fatal) {
           this.harness = undefined;
           this.seen.clear();
+          this.setStatus({ state: "idle", context: undefined });
         }
         if (!head) return;
         if (e.type === "text") this.session.append("chat.delta", { message: this.reply(head), text: e.delta });

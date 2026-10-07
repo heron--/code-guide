@@ -68,3 +68,18 @@ test("off a terminal, only the log is written", () => {
   stop();
   expect(written).toBe("✓ Writing the guide (guide-1)\n");
 });
+
+test("a subject chosen before the status started is logged first", () => {
+  const fake = {
+    state: { ...running, subject: { subject: { type: "path", path: "src" }, label: "src" } },
+    subscribe: () => () => {},
+  } as unknown as Parameters<typeof showStatus>[0];
+  let written = "";
+  showStatus(
+    fake,
+    [guide],
+    { harness: "h", model: "m", status: () => ({ state: "idle" }), onStatus: () => () => {} },
+    { write: (s: string) => (written += s), isTTY: false },
+  )();
+  expect(written).toBe("Subject: src\n");
+});

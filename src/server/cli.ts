@@ -148,13 +148,14 @@ async function serve(dir: string | undefined, flags: Flags) {
   });
   console.log(`Code Guide for ${relative(process.cwd(), root) || "."} at ${url}`);
   console.log(`Session ${session.id}. Press Ctrl+C to stop.\n`);
+  if (opts.open) await open(url).catch(() => console.log("(Couldn't open a browser; visit the URL above.)"));
+  // After the browser opens, so a failure to open prints above the live block, not into it.
   showStatus(session, modules.map(moduleInfo), {
     harness: harness.name,
     model: harness.model,
     status: () => chat.status,
     onStatus: (fn) => chat.onStatus(fn),
   });
-  if (opts.open) await open(url).catch(() => console.log("(Couldn't open a browser; visit the URL above.)"));
   return new Promise<number>(() => {});
 }
 
