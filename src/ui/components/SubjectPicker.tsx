@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Subject } from "../../shared/protocol";
-import { sessionChannel } from "@/lib/session";
+import { sessionChannel, useSession } from "@/lib/session";
 
 type Suggestion = { subject: Subject; title: string; detail: string };
 
@@ -24,18 +24,32 @@ export function SubjectPicker() {
       .then(setSuggestions, () => setSuggestions([]));
   }, []);
   useEffect(() => {
-    if (!input.trim()) return setParsed(undefined);
+    // Whatever was read before belongs to other text: never submit it, and drop answers that arrive late.
+    setParsed(undefined);
+    if (!input.trim()) return;
+    let current = true;
     const t = setTimeout(() => {
       fetch(`/api/subjects?input=${encodeURIComponent(input)}`)
         .then((r) => r.json())
-        .then(setParsed, () => {});
+        .then(
+          (s: Subject) => current && setParsed(s),
+          () => {},
+        );
     }, 150);
-    return () => clearTimeout(t);
+    return () => {
+      current = false;
+      clearTimeout(t);
+    };
   }, [input]);
 
+  // A refused choice (e.g. a pull request that couldn't be fetched) comes back as an error: let them try again.
+  const { error } = useSession();
+  useEffect(() => {
+    if (error) setBusy(false);
+  }, [error]);
+
   const choose = (subject: Subject) => {
-    setBusy(true);
-    sessionChannel().send({ type: "subject.choose", subject });
+    setBusy(sessionChannel().send({ type: "subject.choose", subject }));
   };
 
   return (
@@ -44,6 +58,7 @@ export function SubjectPicker() {
         <header className="border-b border-rule bg-surface-3 px-3 py-1.5 text-xs font-semibold">New session</header>
         <div className="flex flex-col gap-5 p-5">
           <h1 className="text-xl font-semibold tracking-tight">What do you want to understand?</h1>
+          {error && <p className="text-[12.5px] text-del">{error}</p>}
           {suggestions === undefined ? (
             <p className="font-mono text-xs text-fg-3">Looking for changes…</p>
           ) : (
