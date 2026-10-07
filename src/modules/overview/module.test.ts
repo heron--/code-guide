@@ -8,7 +8,16 @@ import overview, { SUMMARY_WORDS } from "./module";
 let repo: string;
 beforeAll(() => {
   repo = mkdtempSync(join(tmpdir(), "cg-overview-"));
-  execFileSync("git", ["init", "-q"], { cwd: repo });
+  const git = (...args: string[]) => execFileSync("git", args, { cwd: repo });
+  git("init", "-q", "-b", "main");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  writeFileSync(join(repo, "gone.ts"), "one\ntwo\nthree\n");
+  git("add", "-A");
+  git("commit", "-qm", "base");
+  git("checkout", "-qb", "remove");
+  git("rm", "-q", "gone.ts");
+  git("commit", "-qm", "remove");
   writeFileSync(join(repo, "a.ts"), Array.from({ length: 20 }, (_, i) => `line ${i + 1}`).join("\n") + "\n");
 });
 afterAll(() => rmSync(repo, { recursive: true, force: true }));
@@ -43,4 +52,12 @@ test("a change whose head no longer resolves is rejected, not read from the work
     { repo, subject: { type: "change", base: "main", head: "gone" }, label: "", inputs: {} },
   );
   expect(result.problems.map((p) => p.message)).toEqual(['unknown ref "gone"']);
+});
+
+test("a change that deletes a file can cite the lines it removes", async () => {
+  const result = await overview.job!.submit.validate(
+    { summary: "It removes [the old code](gone.ts#L1-L3)." },
+    { repo, subject: { type: "change", base: "main", head: "remove" }, label: "", inputs: {} },
+  );
+  expect(result.problems).toEqual([]);
 });

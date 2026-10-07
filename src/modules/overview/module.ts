@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { malformedLinks, parseBody, wordCount, type Problem } from "../../shared/guide.js";
-import { fileAt, revParse, splitLines } from "../../server/git.js";
+import { revParse } from "../../server/git.js";
+import { lastLine, resolveSubjectFile } from "../../server/resolve.js";
 import { pullRequestFor, type PullRequest } from "../../server/subjects.js";
 import { prompt as guidePrompt } from "../guide/instructions.js";
 import { defineModule } from "../types.js";
@@ -54,16 +55,16 @@ export default defineModule({
           problems.push({ level: "error", where: "summary", message: `${words} words; at most ${SUMMARY_WORDS}` });
         for (const link of malformedLinks(summary))
           problems.push({ level: "error", where: "summary", message: `${link} isn't a link to lines (path#L1-L2)` });
-        // Cited lines are read where the reader will see them: the change's head, or the working tree.
+        // Cited lines are read as the reader will see them: in the change's diff (old side for a deleted file),
+        // else at its head, or in the working tree.
         const head = ctx.subject.type === "change" ? ctx.subject.head : undefined;
-        const ref = head ? await revParse(ctx.repo, head) : undefined;
-        if (head && !ref) return { problems: [{ level: "error", where: "summary", message: `unknown ref "${head}"` }] };
+        if (head && !(await revParse(ctx.repo, head)))
+          return { problems: [{ level: "error", where: "summary", message: `unknown ref "${head}"` }] };
         for (const a of parseBody(summary).flat()) {
           if (a.kind !== "anchor") continue;
-          const text = a.path.split(/[\\/]/).includes("..") ? undefined : await fileAt(ctx.repo, ref, a.path);
-          const last = text === undefined ? 0 : splitLines(text).length;
-          if (text === undefined)
-            problems.push({ level: "error", where: "summary", message: `${a.path} doesn't exist` });
+          const file = await resolveSubjectFile(ctx.repo, ctx.subject, a.path);
+          const last = file ? lastLine(file) : 0;
+          if (!file) problems.push({ level: "error", where: "summary", message: `${a.path} doesn't exist` });
           else if (a.range.start < 1 || a.range.end < a.range.start || a.range.end > last)
             problems.push({
               level: "error",
