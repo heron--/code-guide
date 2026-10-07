@@ -65,7 +65,7 @@ test("a fresh tab gets the whole session, then live events", async () => {
   const c = tab();
   await until(() => c.snapshot.state?.seq === 3);
   expect(c.snapshot.state).toEqual(session.state);
-  expect(c.snapshot.modules.map((m) => m.name)).toEqual(["guide", "diff", "chat"]);
+  expect(c.snapshot.modules.map((m) => m.name)).toEqual(["guide", "quiz", "diff", "chat"]);
   session.append("job.progress", { job: "guide-1", activity: "Reading a.ts" });
   await until(() => c.snapshot.state?.seq === 4);
   expect(c.snapshot.state?.jobs["guide-1"].activity).toBe("Reading a.ts");
