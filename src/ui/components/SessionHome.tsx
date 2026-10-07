@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { BookOpen } from "lucide-react";
+import { latestDone } from "../../shared/modules";
 import type { Subject } from "../../shared/protocol";
 import { href } from "@/lib/router";
 import { sessionChannel, useSession } from "@/lib/session";
@@ -29,7 +30,7 @@ export function SessionHome() {
               <span className="text-muted-foreground">{job.status}</span>
               {job.activity && <span className="ml-2 text-sm text-muted-foreground">· {job.activity}</span>}
               {job.error && <span className="ml-2 text-sm text-del">· {job.error}</span>}
-              {job.status === "finished" && job.kind === "guide" && (
+              {id === latestDone(state, "guide") && (
                 <a className="ml-2 underline" href={href({ page: "guide", id, tab: "guide", chapter: 0 })}>
                   Read
                 </a>

@@ -66,6 +66,15 @@ test("a session takes one subject", async () => {
   await expect(handle({ type: "subject.choose", subject: { type: "path", path: "lib" } })).rejects.toThrow(/already/);
 });
 
+test("a change whose ref doesn't resolve is refused before anything starts", async () => {
+  // The temp directory isn't a repository, so not even HEAD resolves (as in one with no commits yet).
+  await expect(handle({ type: "subject.choose", subject: { type: "change", base: "HEAD" } })).rejects.toThrow(
+    'unknown ref "HEAD"',
+  );
+  expect(session.state.subject).toBeUndefined();
+  expect(session.state.jobOrder).toEqual([]);
+});
+
 test("choosing a subject starts the guide job", async () => {
   await handle({ type: "subject.choose", subject: { type: "path", path: "src" } });
   expect(session.state.jobs["guide-1"]).toMatchObject({ module: "guide", kind: "guide" });

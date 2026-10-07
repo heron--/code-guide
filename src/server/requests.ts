@@ -3,6 +3,7 @@ import type { Subject } from "../shared/protocol.js";
 import { moduleInfo, type Module } from "../modules/types.js";
 import type { RequestHandler } from "./channel.js";
 import type { Chat } from "./chat.js";
+import { revParse } from "./git.js";
 import type { JobRunner } from "./jobs.js";
 import type { Session } from "./session.js";
 
@@ -24,6 +25,10 @@ export function requestHandler(session: Session, runner: JobRunner, modules: Mod
     switch (req.type) {
       case "subject.choose":
         if (session.state.subject) throw new Error("This session already has a subject");
+        // A ref that doesn't resolve (a typo, or HEAD in a repository with no commits) would fail every job.
+        if (req.subject.type === "change")
+          for (const ref of [req.subject.base, req.subject.head])
+            if (ref && !(await revParse(session.state.repo!, ref))) throw new Error(`unknown ref "${ref}"`);
         session.append("session.subject", { subject: req.subject, label: subjectLabel(req.subject) });
         for (const m of modules) if (m.job && m.startsWithSession) runner.start(m.job, m.name);
         return;
