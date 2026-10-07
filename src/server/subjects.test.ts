@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import { parseInput, preparePullRequest, suggestions } from "./subjects";
 
@@ -43,20 +43,20 @@ beforeAll(() => {
   mkdirSync(join(repo, ".code-guide/sessions/s"), { recursive: true });
   writeFileSync(join(repo, ".code-guide/sessions/s/events.jsonl"), "{}\n");
 
-  // A stand-in for the gh CLI that knows one open pull request.
+  // A stand-in for the gh CLI that knows one open pull request: a Node script, with a shell and a Windows shim.
   const bin = join(dir, "bin");
   mkdirSync(bin);
   writeFileSync(
-    join(bin, "gh"),
-    `#!/bin/sh
-case "$2" in
-  list) echo '[{"number":7,"title":"Fix retries","author":{"login":"sam"},"baseRefName":"main"}]' ;;
-  view) echo '{"headRefOid":"${prCommit}","baseRefName":"main"}' ;;
-esac
+    join(bin, "gh.js"),
+    `const [, , , cmd] = process.argv;
+if (cmd === "list") console.log('[{"number":7,"title":"Fix retries","author":{"login":"sam"},"baseRefName":"main"}]');
+if (cmd === "view") console.log('{"headRefOid":"${prCommit}","baseRefName":"main"}');
 `,
   );
+  writeFileSync(join(bin, "gh"), `#!/bin/sh\nexec node "$(dirname "$0")/gh.js" "$@"\n`);
   chmodSync(join(bin, "gh"), 0o755);
-  process.env.PATH = `${bin}:${process.env.PATH}`;
+  writeFileSync(join(bin, "gh.cmd"), `@node "%~dp0gh.js" %*\r\n`);
+  process.env.PATH = `${bin}${delimiter}${process.env.PATH}`;
 });
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 

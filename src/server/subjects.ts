@@ -1,13 +1,10 @@
-import { execFile } from "node:child_process";
 import { stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
-import { promisify } from "node:util";
 import type { Subject } from "../shared/protocol.js";
 import { revParse } from "./git.js";
+import { run } from "./run.js";
 
-const exec = promisify(execFile);
-const run = async (cwd: string, cmd: string, args: string[]) =>
-  (await exec(cmd, args, { cwd, maxBuffer: 16 * 1024 * 1024 })).stdout.trim();
+const sh = async (cwd: string, cmd: string, args: string[]) => (await run(cmd, args, { cwd })).trim();
 const quiet = <T>(p: Promise<T>) => p.catch(() => undefined);
 
 /** A subject the picker offers, with how to show it. */
@@ -15,7 +12,7 @@ export type Suggestion = { subject: Subject; title: string; detail: string };
 
 /** The branch changes are compared against: origin's default, else main or master. */
 export async function defaultBranch(repo: string): Promise<string | undefined> {
-  const head = await quiet(run(repo, "git", ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]));
+  const head = await quiet(sh(repo, "git", ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]));
   if (head) return head;
   for (const b of ["origin/main", "origin/master", "main", "master"]) if (await revParse(repo, b)) return b;
   return undefined;
@@ -29,7 +26,7 @@ export async function suggestions(repo: string): Promise<Suggestion[]> {
   const out: Suggestion[] = [];
   const base = await defaultBranch(repo);
 
-  const dirty = await quiet(run(repo, "git", ["status", "--porcelain", "--", ".", ":!.code-guide"]));
+  const dirty = await quiet(sh(repo, "git", ["status", "--porcelain", "--", ".", ":!.code-guide"]));
   if (dirty) {
     const files = dirty.split("\n").length;
     out.push({
@@ -39,9 +36,9 @@ export async function suggestions(repo: string): Promise<Suggestion[]> {
     });
   }
 
-  const branch = await quiet(run(repo, "git", ["branch", "--show-current"]));
+  const branch = await quiet(sh(repo, "git", ["branch", "--show-current"]));
   if (base && branch && !base.endsWith(`/${branch}`) && base !== branch) {
-    const ahead = Number(await quiet(run(repo, "git", ["rev-list", "--count", `${base}..HEAD`])));
+    const ahead = Number(await quiet(sh(repo, "git", ["rev-list", "--count", `${base}..HEAD`])));
     if (ahead > 0)
       out.push({
         subject: { type: "change", base, head: branch },
@@ -52,7 +49,7 @@ export async function suggestions(repo: string): Promise<Suggestion[]> {
 
   // Skipped silently when gh isn't installed, isn't signed in, or the repo isn't on GitHub.
   const prs = await quiet(
-    run(repo, "gh", ["pr", "list", "--state", "open", "--limit", "10", "--json", "number,title,author,baseRefName"]),
+    sh(repo, "gh", ["pr", "list", "--state", "open", "--limit", "10", "--json", "number,title,author,baseRefName"]),
   );
   for (const pr of prs
     ? (JSON.parse(prs) as { number: number; title: string; author?: { login: string }; baseRefName: string }[])
@@ -87,9 +84,9 @@ export async function parseInput(repo: string, input: string): Promise<Subject> 
 export async function preparePullRequest(repo: string, subject: Subject & { type: "change" }): Promise<Subject> {
   if (!subject.pr) return subject;
   const pr = JSON.parse(
-    await run(repo, "gh", ["pr", "view", String(subject.pr), "--json", "headRefOid,baseRefName"]),
+    await sh(repo, "gh", ["pr", "view", String(subject.pr), "--json", "headRefOid,baseRefName"]),
   ) as { headRefOid: string; baseRefName: string };
-  await run(repo, "git", ["fetch", "--quiet", "origin", pr.headRefOid, pr.baseRefName]);
+  await sh(repo, "git", ["fetch", "--quiet", "origin", pr.headRefOid, pr.baseRefName]);
   const base = (await revParse(repo, `origin/${pr.baseRefName}`)) ? `origin/${pr.baseRefName}` : pr.baseRefName;
   return { type: "change", base, head: pr.headRefOid, pr: subject.pr };
 }

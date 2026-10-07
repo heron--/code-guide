@@ -79,7 +79,7 @@ export class Chat {
       const subject = this.session.state.subject!.subject;
       const repo = this.session.state.repo!;
       const ref = subject.type === "change" && subject.head ? await revParse(repo, subject.head) : undefined;
-      const text = c.path.split("/").includes("..") ? undefined : await fileAt(repo, ref, c.path);
+      const text = c.path.split(/[\\/]/).includes("..") ? undefined : await fileAt(repo, ref, c.path);
       const lines = text === undefined ? [] : splitLines(text).slice(c.start - 1, c.end);
       return `The reader selected ${c.path}#L${c.start}-L${c.end}:\n\`\`\`\n${lines.map((l, i) => `${c.start + i}  ${l}`).join("\n")}\n\`\`\``;
     }
