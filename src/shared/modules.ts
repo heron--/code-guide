@@ -20,7 +20,12 @@ export function unavailable(m: ModuleInfo, state: SessionState): string | undefi
   const subject = state.subject?.subject;
   if (!subject) return "Choose a subject first";
   if (m.subjects && !m.subjects.includes(subject.type)) return `${m.label} needs a ${m.subjects.join(" or ")}`;
-  for (const kind of m.results ?? []) if (!latestFinished(state, kind)) return `${m.label} needs a finished ${kind}`;
+  for (const kind of m.results ?? []) {
+    const done = latestFinished(state, kind);
+    if (!done) return `${m.label} needs a finished ${kind}`;
+    // Wait until its module settles (e.g. a guide's review and revision), so the input is the final one.
+    if (moduleBusy(state, state.jobs[done].module)) return `${m.label} waits for the ${kind} to be reviewed`;
+  }
   return undefined;
 }
 
