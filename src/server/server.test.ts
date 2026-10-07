@@ -62,3 +62,11 @@ test("serves any file as the subject shows it, for citations", async () => {
   expect([f.body.status, f.body.lines.length]).toEqual(["unchanged", 2]);
   expect((await question("/api/file?path=../etc/passwd")).status).toBe(404);
 });
+
+test("serves the repository's glossary terms, or none", async () => {
+  const get = await serve({ subject: { type: "question", question: "Q?" }, label: "" });
+  expect((await get("/api/glossary")).body).toEqual([]);
+  writeFileSync(join(repo, "Glossary.md"), "| Term | Definition |\n| --- | --- |\n| **Widget** | A thing. |\n");
+  const again = await serve({ subject: { type: "question", question: "Q?" }, label: "" });
+  expect((await again("/api/glossary")).body).toEqual([{ term: "Widget", definition: "A thing." }]);
+});
