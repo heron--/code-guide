@@ -3,6 +3,7 @@ import { ChevronLeft, GitBranch, MessageCircleQuestion } from "lucide-react";
 import type { Problem, ResolvedGuide } from "../../shared/guide";
 import { api } from "@/lib/api";
 import { navigate, type Tab } from "@/lib/router";
+import { useSession } from "@/lib/session";
 import { usePersistentSet } from "@/lib/storage";
 import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
 import { DiffTab } from "./DiffTab";
@@ -19,8 +20,10 @@ export function GuideView({ id, tab, chapter }: { id: string; tab: Tab; chapter:
     api.guide(id).then(setData, (e) => setError(e.message));
   }, [id]);
 
-  const [reviewedChapters, toggleChapter] = usePersistentSet(`cc:${id}:chapters`);
-  const [reviewedFiles, toggleFile] = usePersistentSet(`cc:${id}:files`);
+  // Job ids repeat across sessions (every session has a guide-1), so marks are kept per session.
+  const sessionId = useSession().state?.id ?? "";
+  const [reviewedChapters, toggleChapter] = usePersistentSet(`cc:${sessionId}:${id}:chapters`);
+  const [reviewedFiles, toggleFile] = usePersistentSet(`cc:${sessionId}:${id}:files`);
 
   if (error) return <Message title="Couldn't load this guide">{error}</Message>;
   if (!data) return <Message title="Loading…" />;
@@ -41,7 +44,7 @@ export function GuideView({ id, tab, chapter }: { id: string; tab: Tab; chapter:
     <div className="flex h-full flex-col">
       <header className="shrink-0 px-8 pt-6">
         <a href="#/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="size-4" /> Guides
+          <ChevronLeft className="size-4" /> Session
         </a>
         <h1 className="mt-2 text-[32px] font-semibold leading-tight tracking-tight">{g.title}</h1>
         <p className="mt-1.5 flex min-w-0 items-center gap-2 text-[15px] text-muted-foreground">

@@ -1,11 +1,10 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readdir, readFile, stat } from "node:fs/promises";
-import { dirname, extname, join, normalize, resolve } from "node:path";
+import { readFile, stat } from "node:fs/promises";
+import { extname, join, normalize } from "node:path";
 import { attachChannel, type RequestHandler } from "./channel.js";
-import { repoRoot } from "./git.js";
 import type { ModuleInfo } from "../shared/modules.js";
 import type { Session } from "./session.js";
-import { resolveChangedFile, resolveGuide, summarize, guideId } from "./resolve.js";
+import { checkGuide, parseGuide, resolveChangedFile } from "./resolve.js";
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -19,26 +18,13 @@ const MIME: Record<string, string> = {
 };
 
 export type ServeOptions = {
-  /** Directories whose `.code-chapters/*.json` are listed. */
-  roots: string[];
-  /** Guide files opened explicitly. */
-  files: string[];
   uiDir: string;
   port: number;
-  /** The session to serve over the WebSocket channel, and what to do with its requests. */
-  session?: { session: Session; onRequest: RequestHandler; modules?: ModuleInfo[] };
+  /** The session this server serves, and what to do with its requests. */
+  session: Session;
+  onRequest: RequestHandler;
+  modules?: ModuleInfo[];
 };
-
-async function discover(opts: ServeOptions): Promise<Map<string, string>> {
-  const found = new Map<string, string>();
-  for (const root of opts.roots) {
-    const dir = join(root, ".code-chapters");
-    const names = await readdir(dir).catch(() => [] as string[]);
-    for (const n of names.filter((n) => n.endsWith(".json")).sort()) found.set(guideId(n), join(dir, n));
-  }
-  for (const f of opts.files) found.set(guideId(f), resolve(f));
-  return found;
-}
 
 function send(res: ServerResponse, status: number, body: unknown) {
   res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
@@ -71,30 +57,34 @@ export function startServer(opts: ServeOptions): Promise<{ url: string; close: (
     const parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
     if (parts[0] !== "api") return serveStatic(opts.uiDir, url.pathname, res);
 
-    const guides = await discover(opts);
-    if (parts[1] === "guides" && parts.length === 2) {
-      return send(res, 200, {
-        roots: opts.roots,
-        guides: await Promise.all([...guides.values()].map(summarize)),
-      });
+    const { session } = opts;
+    const repo = session.state.repo!;
+    // A finished job's result, e.g. a quiz.
+    if (parts[1] === "results" && parts[2]) {
+      const job = session.state.jobs[parts[2]];
+      if (job?.status !== "finished") return send(res, 404, { error: `no finished job "${parts[2]}"` });
+      return send(res, 200, await session.readResult(job.result!));
     }
+    // A finished guide, resolved against the repository for the viewer.
     if (parts[1] === "guides" && parts[2]) {
-      const file = guides.get(parts[2]);
-      if (!file) return send(res, 404, { error: `no guide "${parts[2]}"` });
+      const job = session.state.jobs[parts[2]];
+      if (job?.status !== "finished" || job.kind !== "guide")
+        return send(res, 404, { error: `no guide "${parts[2]}"` });
       if (parts[3] === "file") {
         // One file of the Diff tab. The client passes the commits the guide resolved to,
         // so this doesn't re-resolve the whole guide per file.
         const q = url.searchParams;
         const sha = /^[0-9a-f]{40}$/;
         const [path, base, head] = [q.get("path") ?? "", q.get("base") ?? "", q.get("head") ?? ""];
-        const repo = await repoRoot(dirname(file));
-        if (!repo || !sha.test(base) || !(sha.test(head) || head === "working tree"))
+        if (!sha.test(base) || !(sha.test(head) || head === "working tree"))
           return send(res, 400, { error: "bad file request" });
         const f = await resolveChangedFile(repo, base, head === "working tree" ? undefined : head, path);
         return f ? send(res, 200, f) : send(res, 404, { error: `${path} is not changed` });
       }
-      const { resolved, problems } = await resolveGuide(file);
-      if (!resolved) return send(res, 422, { id: parts[2], file, problems });
+      const { guide, problems } = parseGuide(await session.readResult(job.result!));
+      if (!guide) return send(res, 422, { id: parts[2], file: job.result, problems });
+      const { resolved, problems: all } = await checkGuide(guide, repo, { id: parts[2], file: job.result! });
+      if (!resolved) return send(res, 422, { id: parts[2], file: job.result, problems: all });
       return send(res, 200, resolved);
     }
     send(res, 404, { error: "not found" });
@@ -104,9 +94,7 @@ export function startServer(opts: ServeOptions): Promise<{ url: string; close: (
     handle(req, res).catch((e) => send(res, 500, { error: String(e?.message ?? e) }));
   });
 
-  const detach = opts.session
-    ? attachChannel(server, opts.session.session, opts.session.onRequest, opts.session.modules)
-    : undefined;
+  const detach = attachChannel(server, opts.session, opts.onRequest, opts.modules);
 
   // Localhost only: the server reads the repository and drives an agent.
   const host = "127.0.0.1";
@@ -125,7 +113,7 @@ export function startServer(opts: ServeOptions): Promise<{ url: string; close: (
       ok({
         url: `http://localhost:${p}`,
         close: () => {
-          detach?.();
+          detach();
           server.close();
         },
       });

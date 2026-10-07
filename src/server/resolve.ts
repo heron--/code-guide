@@ -74,19 +74,6 @@ async function load(file: string): Promise<Load> {
   return parseGuide(json);
 }
 
-export async function summarize(file: string) {
-  const { guide, problems } = await load(file);
-  return {
-    id: guideId(file),
-    file,
-    title: guide?.title ?? guideId(file),
-    question: guide?.question ?? "",
-    subjectType: guide?.subject.type ?? ("invalid" as const),
-    chapters: guide?.chapters.length ?? 0,
-    errors: problems.length,
-  };
-}
-
 function toResolved(path: string, raw: RawLine[], status: ResolvedFile["status"]): Omit<ResolvedFile, "lines"> {
   return {
     path,

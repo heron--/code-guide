@@ -2,26 +2,41 @@ import { stat } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import open from "open";
-import { repoRoot } from "./git.js";
-import { guideId, resolveGuide } from "./resolve.js";
+import { modules } from "../modules/index.js";
+import { moduleInfo } from "../modules/types.js";
+import type { Subject } from "../shared/protocol.js";
+import { Chat } from "./chat.js";
+import { repoRoot, revParse } from "./git.js";
+import { createHarness, DEFAULT_HARNESS, harnesses } from "./harness/index.js";
+import { JobRunner } from "./jobs.js";
+import { followUps, requestHandler } from "./requests.js";
+import { resolveGuide } from "./resolve.js";
 import { startServer } from "./server.js";
+import { Session } from "./session.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(here, "..");
 
-const HELP = `code-guide: read code as a few brief chapters
+const HELP = `code-guide: understand code through a guide, a quiz, and questions
 
 Usage
-  code-guide [dir | guide.json]   Open the viewer for the repo containing dir (default: .)
-                                  or for a single guide file.
-  code-guide check <guide.json>…  Validate guides against the spec. Exits 1 on errors.
+  code-guide [dir]                   Start a session in the repo containing dir (default: .)
+  code-guide check <guide.json>…     Validate guides against the spec. Exits 1 on errors.
+
+Subject (optional; otherwise pick one in the browser)
+  --change <base>[...<head>]   A change: from the merge-base of base to head (default: the working tree)
+  --path <path>                A directory, package or service
+  --question <text>            A question about the code
 
 Options
-  --port <n>    Port to serve on (default 4646, next free port if taken)
-  --no-open     Don't open the browser
-  -h, --help    Show this help
+  --harness <name>      Agent harness: ${Object.keys(harnesses).join(", ")} (default ${DEFAULT_HARNESS})
+  --model <model>       Model for jobs and chat
+  --review-model <m>    Model for reviews (default: --model)
+  --port <n>            Port to serve on (default 4646, next free port if taken)
+  --no-open             Don't open the browser
+  -h, --help            Show this help
 
-Guides live in <repo>/.code-chapters/*.json. Spec: ${join(pkgRoot, "docs/spec.md")}`;
+Sessions are kept in <repo>/.code-guide/sessions/. Guide spec: ${join(pkgRoot, "docs/spec.md")}`;
 
 async function check(files: string[]) {
   if (files.length === 0) {
@@ -41,43 +56,78 @@ async function check(files: string[]) {
   return errors ? 1 : 0;
 }
 
-async function serve(args: string[], port: number, openBrowser: boolean) {
-  const target = resolve(args[0] ?? ".");
-  const isFile = await stat(target)
-    .then((s) => s.isFile())
-    .catch(() => false);
-  if (!isFile && !(await stat(target).catch(() => undefined))) {
-    console.error(`No such file or directory: ${target}`);
+type Flags = { port: number; open: boolean; harness?: string; model?: string; reviewModel?: string; subject?: Subject };
+
+function parseSubject(flag: string, value: string | undefined): Subject {
+  if (!value) throw new Error(`${flag} needs a value`);
+  if (flag === "--path") return { type: "path", path: value };
+  if (flag === "--question") return { type: "question", question: value };
+  const [base, head] = value.split("...");
+  return { type: "change", base, ...(head && { head }) };
+}
+
+async function serve(dir: string | undefined, flags: Flags) {
+  const target = resolve(dir ?? ".");
+  if (!(await stat(target).catch(() => undefined))) {
+    console.error(`No such directory: ${target}`);
     return 1;
   }
-  const dir = isFile ? dirname(target) : target;
-  const root = (await repoRoot(dir)) ?? dir;
+  const root = await repoRoot(target);
+  if (!root) {
+    console.error(`${target} isn't inside a git repository. Run code-guide from inside one.`);
+    return 1;
+  }
+  // A ref that doesn't resolve would fail every submission; say so now instead.
+  if (flags.subject?.type === "change")
+    for (const ref of [flags.subject.base, flags.subject.head])
+      if (ref && !(await revParse(root, ref))) {
+        console.error(`--change: unknown ref "${ref}"`);
+        return 1;
+      }
+  const harness = createHarness(flags.harness, flags.model);
+  const ok = await harness.check();
+  if (!ok.ok) {
+    console.error(`Can't use ${harness.name}: ${ok.reason}`);
+    return 1;
+  }
+  const reviewer = flags.reviewModel ? createHarness(flags.harness, flags.reviewModel) : harness;
+
+  const session = await Session.create(root);
+  session.append("harness.status", { harness: harness.name, model: harness.model, state: "ready" });
+  const runner = new JobRunner(session, (kind) => (kind === "review" ? reviewer : harness));
+  followUps(session, runner, modules);
+  const onRequest = requestHandler(session, runner, modules, new Chat(session, harness));
+  if (flags.subject) await onRequest({ type: "subject.choose", subject: flags.subject });
+
   const { url } = await startServer({
-    roots: [root],
-    files: isFile ? [target] : [],
+    session,
+    onRequest,
+    modules: modules.map(moduleInfo),
     uiDir: join(here, "ui"),
-    port,
+    port: flags.port,
   });
-  const page = isFile ? `${url}/#/g/${encodeURIComponent(guideId(target))}/guide/1` : url;
-  console.log(`Code Guide for ${relative(process.cwd(), root) || "."} at ${page}`);
-  console.log("Press Ctrl+C to stop.");
-  if (openBrowser) await open(page).catch(() => console.log("(Couldn't open a browser; visit the URL above.)"));
+  console.log(`Code Guide for ${relative(process.cwd(), root) || "."} at ${url}`);
+  console.log(`Session ${session.id}. Press Ctrl+C to stop.`);
+  if (flags.open) await open(url).catch(() => console.log("(Couldn't open a browser; visit the URL above.)"));
   return new Promise<number>(() => {});
 }
 
 async function main(argv: string[]) {
   const args: string[] = [];
-  let port = 4646;
-  let openBrowser = true;
+  const flags: Flags = { port: 4646, open: true };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "-h" || a === "--help") return (console.log(HELP), 0);
-    else if (a === "--no-open") openBrowser = false;
-    else if (a === "--port") port = Number(argv[++i]);
+    else if (a === "--no-open") flags.open = false;
+    else if (a === "--port") flags.port = Number(argv[++i]);
+    else if (a === "--harness") flags.harness = argv[++i];
+    else if (a === "--model") flags.model = argv[++i];
+    else if (a === "--review-model") flags.reviewModel = argv[++i];
+    else if (a === "--change" || a === "--path" || a === "--question") flags.subject = parseSubject(a, argv[++i]);
     else args.push(a);
   }
   if (args[0] === "check") return check(args.slice(1));
-  return serve(args, port, openBrowser);
+  return serve(args[0], flags);
 }
 
 main(process.argv.slice(2)).then(

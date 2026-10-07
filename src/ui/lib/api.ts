@@ -1,4 +1,4 @@
-import type { GuideSummary, Problem, ResolvedFile, ResolvedGuide } from "../../shared/guide";
+import type { Problem, ResolvedFile, ResolvedGuide } from "../../shared/guide";
 
 async function get<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -8,7 +8,6 @@ async function get<T>(url: string): Promise<T> {
 }
 
 export const api = {
-  guides: () => get<{ roots: string[]; guides: GuideSummary[] }>("/api/guides"),
   guide: (id: string) =>
     get<ResolvedGuide | { id: string; file: string; problems: Problem[]; guide?: undefined }>(
       `/api/guides/${encodeURIComponent(id)}`,
