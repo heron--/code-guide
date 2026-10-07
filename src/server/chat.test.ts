@@ -136,3 +136,25 @@ test("a message that can't be prepared fails on its own and doesn't take the nex
   await until(() => replies()[1]?.status === "done");
   expect(replies()[1]).toMatchObject({ replyTo: "m-3", text: "next" });
 });
+
+test("a message that fails doesn't count its results as told", async () => {
+  await finish("guide-1", "guide", { title: "Retries", chapters: [] });
+  // Context that can't be read: a finished job whose result is missing.
+  session.append("job.queued", { job: "review-1", kind: "review", module: "guide", inputs: [] });
+  session.append("job.finished", { job: "review-1", result: "results/missing.json", warnings: [] });
+  await expect(
+    chat.send("Reply with exactly: lost", [{ kind: "chapter", job: "review-1", chapter: 0 }]),
+  ).rejects.toThrow();
+  await chat.send("Reply with exactly: ok", []);
+  expect(harness.sent.at(-1)).toContain("A guide finished (guide-1)");
+});
+
+test("code context from a change whose head no longer resolves is refused", async () => {
+  const other = await Session.create(repo);
+  other.append("session.subject", { subject: { type: "change", base: "HEAD", head: "gone" }, label: "gone" });
+  const c = new Chat(other, harness);
+  await expect(c.send("Reply with exactly: x", [{ kind: "code", path: "a.ts", start: 1, end: 2 }])).rejects.toThrow(
+    'unknown ref "gone"',
+  );
+  await c.stop();
+});
