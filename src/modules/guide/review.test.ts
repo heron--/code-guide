@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { latestFinished, moduleBusy } from "../../shared/modules";
+import { latestDone, moduleBusy } from "../../shared/modules";
 import type { Harness, HarnessSessionOptions } from "../../server/harness/types";
 import { JobRunner } from "../../server/jobs";
 import { followUps, requestHandler } from "../../server/requests";
@@ -39,6 +39,8 @@ class Scripted implements Harness {
     return {
       send: async (text: string) => {
         (this.prompts[tool.name] ??= []).push(text);
+        if (tool.name === "submit_review" && this.verdicts[0] === undefined)
+          return opts.onEvent({ type: "error", message: "the reviewer crashed", fatal: true });
         const revising = text.startsWith("Revise");
         const input =
           tool.name === "submit_review"
@@ -80,14 +82,15 @@ async function run(verdicts: Review["verdict"][]) {
     await new Promise((r) => setTimeout(r, 10));
     if (session.state.jobOrder.length && !moduleBusy(session.state, "guide")) break;
   }
-  expect(idle).toEqual([session.state.jobOrder.at(-1)]);
+  const last = session.state.jobOrder.at(-1)!;
+  expect(idle).toEqual(session.state.jobs[last].status === "finished" ? [last] : []);
   return { session, harness, kinds: session.state.jobOrder.map((id) => `${id}:${session.state.jobs[id].status}`) };
 }
 
 test("a guide the review accepts goes to the reader as is", async () => {
   const { session, kinds } = await run(["accept"]);
   expect(kinds).toEqual(["guide-1:finished", "review-1:finished"]);
-  expect(latestFinished(session.state, "guide")).toBe("guide-1");
+  expect(latestDone(session.state, "guide")).toBe("guide-1");
 });
 
 test('"revise" starts a revision that reads the guide and the findings, then is reviewed again', async () => {
@@ -106,7 +109,17 @@ test('"revise" starts a revision that reads the guide and the findings, then is 
 test("revisions stop at the cap, and the reader gets the latest valid guide", async () => {
   const { session, kinds } = await run(["revise", "revise", "revise"]);
   expect(kinds).toEqual(["guide-1:finished", "review-1:finished", "guide-2:finished", "review-2:finished"]);
-  expect(latestFinished(session.state, "guide")).toBe("guide-2");
+  expect(latestDone(session.state, "guide")).toBe("guide-2");
+});
+
+test("a guide whose review fails isn't shown; the failure is", async () => {
+  const { session, kinds } = await run([]);
+  expect(kinds).toEqual(["guide-1:finished", "review-1:failed"]);
+  expect(latestDone(session.state, "guide")).toBeUndefined();
+  expect(session.state.jobs["review-1"].error).toBe("the reviewer crashed");
+  const { unavailable } = await import("../../shared/modules");
+  const quizLike = { name: "q", label: "Quiz", icon: [], needsJob: true, results: ["guide"] };
+  expect(unavailable(quizLike, session.state)).toBe("Quiz needs a finished guide");
 });
 
 test("a review can only cite chapters the guide has", async () => {
@@ -147,7 +160,7 @@ test("a module needing a guide waits for its review to settle", async () => {
   session.append("job.queued", { job: "guide-1", kind: "guide", module: "guide", inputs: [] });
   session.append("job.finished", { job: "guide-1", result: "results/guide-1.json", warnings: [] });
   session.append("job.queued", { job: "review-1", kind: "review", module: "guide", inputs: ["guide-1"] });
-  expect(unavailable(quizLike, session.state)).toBe("Quiz waits for the guide to be reviewed");
+  expect(unavailable(quizLike, session.state)).toBe("Quiz waits for the guide to finish");
   session.append("job.finished", { job: "review-1", result: "results/review-1.json", warnings: [] });
   expect(unavailable(quizLike, session.state)).toBeUndefined();
 });
