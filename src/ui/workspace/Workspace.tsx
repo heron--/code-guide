@@ -69,6 +69,7 @@ export function Workspace({ state, modules, channel, problem }: Props) {
   // else in a plain file view over the workspace.
   const showers = useRef(new Map<string, LineShower>());
   const pending = useRef<{ module: string; target: LinesTarget }>(undefined);
+  const latestCite = useRef(0);
   const [fileView, setFileView] = useState<{ target: LinesTarget; file: ResolvedFile }>();
   const live = useRef({ layout, state, modules });
   live.current = { layout, state, modules };
@@ -87,15 +88,22 @@ export function Workspace({ state, modules, channel, problem }: Props) {
         };
       },
       async showLines(target) {
+        // Only the latest citation clicked may move the workspace.
+        const ticket = ++latestCite.current;
         const guide = showers.current.get("guide");
         if (guide && inSlot("guide") && guide.canShow(target.path)) return guide.show(target);
         const res = await fetch(`/api/file?path=${encodeURIComponent(target.path)}`);
-        if (!res.ok) return;
+        if (!res.ok || ticket !== latestCite.current) return;
         const file = (await res.json()) as ResolvedFile;
+        if (ticket !== latestCite.current) return;
         const diff = live.current.modules.find((m) => m.name === "diff");
         if (file.status !== "unchanged" && diff && !unavailable(diff, live.current.state)) {
           const shower = showers.current.get("diff");
-          if (shower && inSlot("diff")) return shower.show(target);
+          if (shower && inSlot("diff")) {
+            // A Diff loaded before the file changed doesn't have it; the file view does.
+            if (shower.canShow(target.path)) return shower.show(target);
+            return setFileView({ target, file });
+          }
           pending.current = { module: "diff", target };
           setLayout(open(live.current.layout, "diff", elsewhere()));
           return;
@@ -385,6 +393,7 @@ function PanelBody({
 }) {
   const Panel = panelFor(m.name);
   const { job, busy, activity, stage, failed } = panelState(m, state);
+  const retry = () => failed && channel.send({ type: "job.start", module: m.name, retry: failed.id });
   // A failed job shows here as well as in the dock, with its retry, when the panel is in a slot.
   if (m.needsJob && failed && !job)
     return (
@@ -392,13 +401,9 @@ function PanelBody({
         <span className="block">{jobLabel(failed)} failed:</span>
         <span className="block text-del">{failed.error}</span>
         <span className="mt-1 block">It shows here once all its jobs are done. Retry picks up from this one.</span>
-        <button
-          onClick={() => channel.send({ type: "job.start", module: m.name, retry: failed.id })}
-          className="mt-3 inline-flex h-7 items-center gap-1.5 border border-border bg-surface px-3 text-[12.5px] text-fg hover:border-fg-3"
-        >
-          <Icon paths={icons.retry} size={12} />
-          Retry
-        </button>
+        <span className="mt-3 block">
+          <RetryButton onClick={retry} />
+        </span>
       </Centered>
     );
   if (m.needsJob && !job)
@@ -408,10 +413,35 @@ function PanelBody({
       </Centered>
     );
   if (!Panel) return <Centered title={`${m.label} panel`}>This module's panel isn't built yet.</Centered>;
-  return (
+  const panel = (
     <Suspense fallback={<Centered title="Loading…" />}>
       <Panel module={m} state={state} channel={channel} job={job} />
     </Suspense>
+  );
+  if (!failed) return panel;
+  // A later run failed: keep showing the earlier result, under the failure.
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex flex-none items-center gap-2 border-b border-rule bg-del-bg px-3 py-1.5 text-[12.5px]">
+        <span className="min-w-0 flex-1 truncate text-del" title={failed.error}>
+          {jobLabel(failed)} failed: {failed.error}
+        </span>
+        <RetryButton onClick={retry} />
+      </div>
+      {panel}
+    </div>
+  );
+}
+
+function RetryButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="inline-flex h-7 flex-none items-center gap-1.5 border border-border bg-surface px-3 text-[12.5px] text-fg hover:border-fg-3"
+    >
+      <Icon paths={icons.retry} size={12} />
+      Retry
+    </button>
   );
 }
 
