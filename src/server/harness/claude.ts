@@ -7,29 +7,47 @@ import {
   type SDKMessage,
   type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
+import { isAbsolute, relative, resolve } from "node:path";
 import type { Harness, HarnessSession, HarnessSessionOptions } from "./types.js";
 
 const SERVER = "code-guide";
 /** Built-in tools the agent gets. Nothing that writes; Bash is limited to read-only git by `canUseTool`. */
 const READ_TOOLS = ["Read", "Grep", "Glob", "Bash"];
-const GIT_READ = /^git (log|show|diff|blame|status|ls-files|rev-parse|merge-base|grep|branch|cat-file)\b/;
+const GIT_READ = /^git (log|show|diff|blame|status|ls-files|rev-parse|merge-base|grep|cat-file)( |$)/;
+/** Options that write a file, run a program, or read outside the repository. */
+const GIT_UNSAFE = /^(--output|-O|--open-files-in-pager|--no-index|--ext-diff)/;
 
 /** Allow a Bash command only if it's one read-only git command, with nothing chained or redirected. */
 export function isReadOnlyGit(command: string): boolean {
-  return GIT_READ.test(command.trim()) && !/[;&|`$<>\n]|\$\(/.test(command);
+  const c = command.trim();
+  return GIT_READ.test(c) && !/[;&|`$<>\n\\]/.test(c) && !c.split(/\s+/).some((arg) => GIT_UNSAFE.test(arg));
 }
 
-const canUseTool: CanUseTool = async (name, input) => {
-  if (name === "Bash") {
-    const command = String(input.command ?? "");
-    return isReadOnlyGit(command)
-      ? { behavior: "allow", updatedInput: input }
-      : { behavior: "deny", message: "Only single read-only git commands are allowed. Use Read, Grep or Glob." };
-  }
-  if (name.startsWith(`mcp__${SERVER}__`) || READ_TOOLS.includes(name))
-    return { behavior: "allow", updatedInput: input };
-  return { behavior: "deny", message: "This session is read-only." };
-};
+/** Whether every path a Read, Grep or Glob call names is inside the repository. */
+export function staysInside(root: string, input: Record<string, unknown>): boolean {
+  return ["file_path", "path", "pattern"].every((k) => {
+    const v = input[k];
+    if (typeof v !== "string" || (k === "pattern" && !isAbsolute(v))) return true;
+    const rel = relative(root, resolve(root, v));
+    return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+  });
+}
+
+function canUseTool(root: string): CanUseTool {
+  return async (name, input) => {
+    if (name === "Bash") {
+      return isReadOnlyGit(String(input.command ?? ""))
+        ? { behavior: "allow", updatedInput: input }
+        : { behavior: "deny", message: "Only single read-only git commands are allowed. Use Read, Grep or Glob." };
+    }
+    if (name.startsWith(`mcp__${SERVER}__`)) return { behavior: "allow", updatedInput: input };
+    if (READ_TOOLS.includes(name))
+      return staysInside(root, input)
+        ? { behavior: "allow", updatedInput: input }
+        : { behavior: "deny", message: "Only files inside the repository can be read." };
+    return { behavior: "deny", message: "This session is read-only." };
+  };
+}
 
 /** A short description of a tool call, for job progress. */
 export function describeActivity(name: string, input: Record<string, unknown>): string {
@@ -115,7 +133,7 @@ export class ClaudeHarness implements Harness {
         systemPrompt: opts.instructions,
         tools: READ_TOOLS,
         mcpServers: { [SERVER]: server },
-        canUseTool,
+        canUseTool: canUseTool(resolve(opts.cwd)),
         permissionMode: "default",
         // Don't load the user's or project's settings: their permission rules could allow edits.
         settingSources: [],
