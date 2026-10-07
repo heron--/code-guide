@@ -55,6 +55,7 @@ The browser shows a workspace: two slots side by side and a dock along the botto
 - **Citations** (`file:line` chips) show the lines in the Guide if the chapter has the file, else in the Diff, else in a file view.
 - **Chat**: ask about the code as you read. It knows the guides and quizzes so far. Select lines or prose in the Guide and choose **Ask about this** to bring them in.
 - **Anchors** (accent-coloured links in the prose) scroll the code to their lines and highlight them. **Go back** (or <kbd>Esc</kbd>) jumps back instantly.
+- **Maximize** a panel to send its neighbor to the dock; restoring it brings the neighbor back.
 - "Reviewed" marks and the layout are saved in your browser.
 
 This repo has a guide about itself in `.code-chapters/how-anchors-work.json`; `code-guide check` validates it.
