@@ -120,6 +120,11 @@ export class Chat {
       cwd: this.session.state.repo!,
       onEvent: (e) => {
         const head = this.pending[0];
+        // A harness that dies between messages is replaced by the next one, which is told everything again.
+        if (!head && e.type === "error" && e.fatal) {
+          this.harness = undefined;
+          this.seen.clear();
+        }
         if (!head) return;
         if (e.type === "text") this.session.append("chat.delta", { message: this.reply(head), text: e.delta });
         else if (e.type === "error") {
