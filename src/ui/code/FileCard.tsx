@@ -194,7 +194,9 @@ export function FileCard(props: {
         >
           {name}
         </span>
-        <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-fg-3">{dir}</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-fg-3" title={file.path}>
+          {dir}
+        </span>
         <ChangeCount file={file} />
         {props.actions}
       </header>
