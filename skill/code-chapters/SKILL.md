@@ -13,7 +13,7 @@ The file format is in [SPEC.md](SPEC.md), next to this file. Read it before writ
 
 ## 1. Pin down the question and the subject
 
-- **A question about existing code** ("how does auth work?", "why are modules used here?"): `subject.type = "question"`. Set `ref` to the current commit (`git rev-parse HEAD`) unless the working tree has uncommitted changes to the files you'll cite; then omit `ref`.
+- **A question about existing code** ("how does auth work?", "why is this split into packages?"): `subject.type = "question"`. Set `ref` to the current commit (`git rev-parse HEAD`) unless the working tree has uncommitted changes to the files you'll cite; then omit `ref`.
 - **A change** ("explain this branch", "walk me through PR 123", "what did I change?"): `subject.type = "change"`. `base` is the branch it will merge into (usually `main`); `head` is the branch. Omit `head` for uncommitted work.
 - Record the question in the user's own words. If they gave no question (just "explain this branch"), use "What does this change do, and why?".
 

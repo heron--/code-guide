@@ -37,7 +37,7 @@ Guides never contain code. They point at files in the repository; the viewer rea
 | `spec` | yes | Exactly `"code-chapters/v1"`. |
 | `title` | yes | ≤ 8 words. Names the topic, not the process ("Request retries", not "Understanding how request retries work"). |
 | `question` | yes | The reader's question, in their words. For a change with no question, write the question a reviewer would ask ("What does this branch change, and why?"). |
-| `subject` | yes | What code the guide is about. See below. |
+| `subject` | yes | What the guide is about: a question or a change. See below. |
 | `answer` | yes | 1–2 sentences, ≤ 50 words. The answer to `question`, before any chapter. If the reader stops here, they should still have the gist. |
 | `chapters` | yes | 1–7 chapters, in reading order. |
 
