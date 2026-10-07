@@ -19,7 +19,7 @@ import {
   type Layout,
   type Slot,
 } from "./layout";
-import { failedTitle, panelState, sessionActivity } from "./status";
+import { jobLabel, panelState, sessionActivity } from "./status";
 
 type Props = {
   state: SessionState;
@@ -221,11 +221,10 @@ function PanelBody({
   // A failed job shows here as well as in the dock, with its retry, when the panel is in a slot.
   if (m.needsJob && failed && !job)
     return (
-      <Centered title={failedTitle(failed)}>
+      <Centered title={`Couldn't finish the ${m.label.toLowerCase()}`}>
+        <span className="block">{jobLabel(failed)} failed:</span>
         <span className="block text-del">{failed.error}</span>
-        {failed.kind !== m.kind && (
-          <span className="mt-1 block">It shows here once it's been reviewed. Retry picks up from this step.</span>
-        )}
+        <span className="mt-1 block">It shows here once all its jobs are done. Retry picks up from this one.</span>
         <button
           onClick={() => channel.send({ type: "job.start", module: m.name, retry: failed.id })}
           className="mt-3 inline-flex h-7 items-center gap-1.5 border border-border bg-surface px-3 text-[12.5px] text-fg hover:border-fg-3"
