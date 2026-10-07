@@ -50,8 +50,10 @@ export class Chat {
         const parts = [caught.text, ...(await Promise.all(context.map((c) => this.describe(c)))), text];
         // A fatal error while this was prepared already failed it: sending it now would take the next reply.
         if (!this.pending.includes(entry)) return;
-        this.start().send(parts.filter(Boolean).join("\n\n"));
-        for (const id of caught.jobs) this.seen.add(id);
+        const harness = this.start();
+        harness.send(parts.filter(Boolean).join("\n\n"));
+        // Unless it died on the spot: a new harness starts from scratch, so it's told everything again.
+        if (this.harness === harness) for (const id of caught.jobs) this.seen.add(id);
       })
       .catch((e: Error) => {
         // It never reached the harness, so no reply will come: fail it here, or the next reply would be its.
