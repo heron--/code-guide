@@ -18,6 +18,8 @@ export type JobContext = {
 /** One kind of job (guide, quiz, review): what the agent is told, and how its result is submitted and checked. */
 export type JobKind = {
   kind: string;
+  /** What it does, as the reader sees it: "Writing the guide", "Reviewing the guide". */
+  label?: string;
   instructions: string;
   /** The first message, which states the job's one goal. */
   prompt(ctx: JobContext): string;
@@ -82,7 +84,8 @@ export class JobRunner {
     const n = state.jobOrder.filter((id) => state.jobs[id].kind === kind.kind).length + 1;
     const id = `${kind.kind}-${n}`;
     this.jobs.set(id, { kind, module, inputs });
-    this.session.append("job.queued", { job: id, kind: kind.kind, module, inputs });
+    const label = kind.label ?? `Writing the ${kind.kind}`;
+    this.session.append("job.queued", { job: id, kind: kind.kind, label, module, inputs });
     this.queue.push(id);
     this.pump();
     return id;
