@@ -6,7 +6,7 @@ import { Icon } from "./Icon";
 
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 
-type Selection = { context: ChatContext; label: string; x: number; y: number };
+type Selection = { contexts: ChatContext[]; label: string; x: number; y: number };
 
 /**
  * Selecting code in a panel (or prose, if the panel says what it's from) offers to ask about it in Chat. Code is
@@ -48,26 +48,37 @@ export function useAskSelection(
         .filter((i): i is string => i != null)
         .map(Number);
       if (!idx.length) return setSelection(undefined);
-      // New-side numbers, unless only removed lines (or a deleted file) are selected: then the base side's.
+      // Lines on the new side, by their new numbers; removed lines (or a deleted file's) by the base side's.
+      // A selection with both, like a whole replaced hunk, attaches one range from each side.
       const rows = file.lines.slice(Math.min(...idx), Math.max(...idx) + 1);
-      const old = file.status === "deleted" || !rows.some((l) => l.n != null);
-      const nums = rows.map((l) => (old ? l.o : l.n)).filter((n): n is number => n != null);
-      if (!nums.length) return setSelection(undefined);
-      const [start, end] = [Math.min(...nums), Math.max(...nums)];
+      const deleted = file.status === "deleted";
+      const range = (nums: (number | undefined)[]) => {
+        const n = nums.filter((x): x is number => x != null);
+        return n.length ? { start: Math.min(...n), end: Math.max(...n) } : undefined;
+      };
+      const now = deleted ? undefined : range(rows.map((l) => l.n));
+      const before = range(rows.filter((l) => deleted || l.k === "-").map((l) => l.o));
+      const contexts: ChatContext[] = [
+        ...(now ? [{ kind: "code" as const, path, ...now }] : []),
+        ...(before ? [{ kind: "code" as const, path, ...before, side: "old" as const }] : []),
+      ];
+      if (!contexts.length) return setSelection(undefined);
+      const { start, end } = now ?? before!;
+      const lines = start === end ? `line ${start}` : `lines ${start}–${end}`;
       return setSelection({
-        context: { kind: "code", path, start, end, ...(old && { side: "old" as const }) },
-        label: start === end ? `Ask about line ${start}` : `Ask about lines ${start}–${end}`,
+        contexts,
+        label: now && before ? `Ask about ${lines} and the removed lines` : `Ask about ${lines}`,
         ...at,
       });
     }
     const text = sel.toString().trim();
     const context = text && el(sel.anchorNode)?.closest("[data-prose]") ? opts.prose?.(text) : undefined;
-    setSelection(context && { context, label: "Ask about this", ...at });
+    setSelection(context && { contexts: [context], label: "Ask about this", ...at });
   };
 
   const askSelection = () => {
     if (!selection) return;
-    ask(selection.context);
+    for (const c of selection.contexts) ask(c);
     setSelection(undefined);
     window.getSelection()?.removeAllRanges();
   };
