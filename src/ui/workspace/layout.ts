@@ -12,6 +12,8 @@ export type Layout = {
   /** The slot last used: where a panel goes when both are full. */
   recent: Slot;
   maximized?: Slot;
+  /** The panel maximizing sent to the dock from the other slot, put back when the maximized one is restored. */
+  minimized?: string;
   /** The left slot's share of the width, 0–1. */
   split: number;
   /** Jobs already given a dock square, so a discarded panel doesn't come back until a new job starts. */
@@ -55,7 +57,7 @@ export function addToDock(l: Layout, panel: string): Layout {
 export function open(l: Layout, panel: string, into?: Slot): Layout {
   const at = slotOf(l, panel);
   if (at && !into) return { ...l, recent: at };
-  let next: Layout = { ...l, dock: l.dock.filter((p) => p !== panel), maximized: undefined };
+  let next: Layout = { ...l, dock: l.dock.filter((p) => p !== panel), maximized: undefined, minimized: undefined };
   if (at) next = { ...next, [at]: undefined };
   const slot = into ?? (!next.left ? "left" : !next.right ? "right" : next.recent);
   const displaced = next[slot];
@@ -68,12 +70,9 @@ export function open(l: Layout, panel: string, into?: Slot): Layout {
 export function toDock(l: Layout, slot: Slot): Layout {
   const panel = l[slot];
   if (!panel) return l;
-  return {
-    ...l,
-    [slot]: undefined,
-    dock: [...l.dock, panel],
-    maximized: l.maximized === slot ? undefined : l.maximized,
-  };
+  const next = { ...l, [slot]: undefined, dock: [...l.dock, panel] };
+  // Docking the maximized panel brings back the one maximizing hid.
+  return l.maximized === slot ? unmaximize(next) : next;
 }
 
 /** Discard a panel from the dock. */
@@ -85,8 +84,31 @@ export function swap(l: Layout): Layout {
   return { ...l, left: l.right, right: l.left, recent: other(l.recent) };
 }
 
+/**
+ * Maximizing a panel sends the other slot's panel to the dock; restoring puts it back, unless it has since been
+ * opened somewhere else or discarded.
+ */
 export function toggleMaximized(l: Layout, slot: Slot): Layout {
-  return { ...l, maximized: l.maximized === slot ? undefined : slot, recent: slot };
+  if (l.maximized === slot) return { ...unmaximize(l), recent: slot };
+  const restored = unmaximize(l);
+  const neighbor = restored[other(slot)];
+  return {
+    ...restored,
+    [other(slot)]: undefined,
+    dock: neighbor ? [...restored.dock, neighbor] : restored.dock,
+    maximized: slot,
+    minimized: neighbor,
+    recent: slot,
+  };
+}
+
+function unmaximize(l: Layout): Layout {
+  const next = { ...l, maximized: undefined, minimized: undefined };
+  const p = l.minimized;
+  if (!p || !l.dock.includes(p)) return next;
+  const slot = l.maximized ? other(l.maximized) : !l.left ? "left" : "right";
+  if (next[slot]) return next;
+  return { ...next, [slot]: p, dock: next.dock.filter((d) => d !== p) };
 }
 
 export function setSplit(l: Layout, split: number): Layout {

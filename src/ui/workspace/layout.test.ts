@@ -58,6 +58,21 @@ test("discard, swap, maximize and the divider", () => {
   expect(setSplit(l, 0.95).split).toBe(0.8);
 });
 
+test("maximizing docks the neighbor, and restoring brings it back", () => {
+  const l = open(open(emptyLayout, "guide"), "chat");
+  const max = toggleMaximized(l, "right");
+  expect(max).toMatchObject({ left: undefined, right: "chat", maximized: "right", dock: ["guide"] });
+  expect(toggleMaximized(max, "right")).toMatchObject({ left: "guide", right: "chat", maximized: undefined, dock: [] });
+  // Docking the maximized panel restores the neighbor too.
+  expect(toDock(max, "right")).toMatchObject({ left: "guide", right: undefined, dock: ["chat"] });
+  // A neighbor opened or discarded meanwhile stays where it is.
+  expect(toggleMaximized(discard(max, "guide"), "right")).toMatchObject({ left: undefined, dock: [] });
+  const reopened = open(max, "guide");
+  expect(reopened).toMatchObject({ left: "guide", right: "chat", maximized: undefined, minimized: undefined });
+  // With nothing beside it, maximizing only maximizes.
+  expect(toggleMaximized(open(emptyLayout, "guide"), "left")).toMatchObject({ left: "guide", dock: [] });
+});
+
 test("each new job puts its module in the dock once, even after the panel was discarded", () => {
   let l = jobStarted(emptyLayout, "guide-1", "guide");
   expect(l.dock).toEqual(["guide"]);
