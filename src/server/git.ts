@@ -48,9 +48,15 @@ export function splitLines(text: string): string[] {
   return lines;
 }
 
+/**
+ * Code Guide's own session files, left out of every change without the user having to ignore them.
+ * (Code Guide never edits .gitignore.)
+ */
+const NOT_SESSIONS = ":(exclude).code-guide";
+
 /** Untracked, non-ignored files in the working tree. */
 async function untrackedFiles(root: string, path?: string): Promise<string[]> {
-  const out = await git(root, ["ls-files", "-z", "--others", "--exclude-standard", ...(path ? ["--", path] : [])]);
+  const out = await git(root, ["ls-files", "-z", "--others", "--exclude-standard", "--", path ?? ".", NOT_SESSIONS]);
   return out.split("\0").filter(Boolean);
 }
 
@@ -59,8 +65,8 @@ export async function changedFiles(root: string, base: string, head: string | un
   const range = head ? [base, head] : [base];
   // -z: paths come out verbatim instead of quoted/escaped.
   const [numstat, names, untracked] = await Promise.all([
-    git(root, ["diff", "-z", "--no-renames", "--numstat", ...range]),
-    git(root, ["diff", "-z", "--no-renames", "--name-status", ...range]),
+    git(root, ["diff", "-z", "--no-renames", "--numstat", ...range, "--", ".", NOT_SESSIONS]),
+    git(root, ["diff", "-z", "--no-renames", "--name-status", ...range, "--", ".", NOT_SESSIONS]),
     head ? [] : untrackedFiles(root),
   ]);
   const status = new Map<string, FileStatus>();
