@@ -63,8 +63,9 @@ export default defineModule({
             })),
           };
         // Cited lines are read where the reader will see them: the change's head, or the working tree.
-        const ref =
-          ctx.subject.type === "change" && ctx.subject.head ? await revParse(ctx.repo, ctx.subject.head) : undefined;
+        const head = ctx.subject.type === "change" ? ctx.subject.head : undefined;
+        const ref = head ? await revParse(ctx.repo, head) : undefined;
+        if (head && !ref) return { problems: [{ level: "error", where: "quiz", message: `unknown ref "${head}"` }] };
         const problems: Problem[] = [];
         for (const [i, q] of parsed.data.questions.entries()) {
           const where = `questions[${i}]`;

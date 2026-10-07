@@ -126,3 +126,13 @@ test("a harness that dies fails the waiting replies, and the next message starts
   await until(() => replies()[1]?.status === "done");
   expect(harness.starts).toHaveLength(2);
 });
+
+test("a message that can't be prepared fails on its own and doesn't take the next reply", async () => {
+  session.append("job.queued", { job: "guide-1", kind: "guide", module: "guide", inputs: [] });
+  session.append("job.finished", { job: "guide-1", result: "results/missing.json", warnings: [] });
+  await expect(chat.send("Reply with exactly: lost", [])).rejects.toThrow();
+  expect(replies()[0]).toMatchObject({ replyTo: "m-1", status: "failed" });
+  await chat.send("Reply with exactly: next", []);
+  await until(() => replies()[1]?.status === "done");
+  expect(replies()[1]).toMatchObject({ replyTo: "m-3", text: "next" });
+});
