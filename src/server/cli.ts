@@ -6,6 +6,7 @@ import { modules } from "../modules/index.js";
 import { moduleInfo } from "../modules/types.js";
 import type { Subject } from "../shared/protocol.js";
 import { Chat } from "./chat.js";
+import { showStatus } from "./terminal.js";
 import { repoRoot, revParse } from "./git.js";
 import { createHarness, DEFAULT_HARNESS, harnesses } from "./harness/index.js";
 import { JobRunner } from "./jobs.js";
@@ -133,7 +134,8 @@ async function serve(dir: string | undefined, flags: Flags) {
   session.append("harness.status", { harness: harness.name, model: harness.model, state: "ready" });
   const runner = new JobRunner(session, (kind) => (kind === "review" ? reviewer : harness));
   followUps(session, runner, modules);
-  const onRequest = requestHandler(session, runner, modules, new Chat(session, harness));
+  const chat = new Chat(session, harness);
+  const onRequest = requestHandler(session, runner, modules, chat);
   if (flags.subject) await onRequest({ type: "subject.choose", subject: flags.subject });
 
   const { url } = await startServer({
@@ -145,8 +147,15 @@ async function serve(dir: string | undefined, flags: Flags) {
     view: { modules: settings.modules ?? DEFAULT_VIEW.modules, theme: settings.theme ?? DEFAULT_VIEW.theme },
   });
   console.log(`Code Guide for ${relative(process.cwd(), root) || "."} at ${url}`);
-  console.log(`Session ${session.id}. Press Ctrl+C to stop.`);
+  console.log(`Session ${session.id}. Press Ctrl+C to stop.\n`);
   if (opts.open) await open(url).catch(() => console.log("(Couldn't open a browser; visit the URL above.)"));
+  // After the browser opens, so a failure to open prints above the live block, not into it.
+  showStatus(session, modules.map(moduleInfo), {
+    harness: harness.name,
+    model: harness.model,
+    status: () => chat.status,
+    onStatus: (fn) => chat.onStatus(fn),
+  });
   return new Promise<number>(() => {});
 }
 

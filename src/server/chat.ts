@@ -15,6 +15,16 @@ const instructions = `You answer a reader's questions about code they're studyin
 /** Finished results the chat is told about: guides and quizzes. */
 const SEEDED = ["guide", "quiz"];
 
+/** What the chat's agent is doing, for the terminal. */
+export type AgentStatus = {
+  state: "idle" | "working" | "thinking" | "writing" | "tool";
+  /** The tool call, while in one. */
+  activity?: string;
+  /** Tokens in its context, and the model's window, as last reported. */
+  context?: number;
+  window?: number;
+};
+
 /**
  * One long-lived harness session per Code Guide session, for questions as they come up. It starts on the first
  * message and knows the subject and finished guides and quizzes, never job transcripts. Messages and replies
@@ -26,6 +36,22 @@ export class Chat {
   private pending: { id: string; reply?: string; failed?: boolean }[] = [];
   /** Finished results the chat has been told about. */
   private seen = new Set<string>();
+  status: AgentStatus = { state: "idle" };
+  private watchers = new Set<(s: AgentStatus) => void>();
+
+  /** Called whenever `status` changes. Returns a function that stops. */
+  onStatus(fn: (s: AgentStatus) => void): () => void {
+    this.watchers.add(fn);
+    return () => this.watchers.delete(fn);
+  }
+
+  private setStatus(patch: Partial<AgentStatus>) {
+    const next = { ...this.status, ...patch };
+    if (next.state !== "tool") next.activity = undefined;
+    if (JSON.stringify(next) === JSON.stringify(this.status)) return;
+    this.status = next;
+    for (const fn of this.watchers) fn(next);
+  }
 
   constructor(
     private session: Session,
@@ -52,6 +78,7 @@ export class Chat {
         // A fatal error while this was prepared already failed it: sending it now would take the next reply.
         if (!this.pending.includes(entry)) return;
         const harness = this.start();
+        if (this.status.state === "idle") this.setStatus({ state: "working" });
         harness.send(parts.filter(Boolean).join("\n\n"));
         // Unless it died on the spot: a new harness starts from scratch, so it's told everything again.
         if (this.harness === harness) for (const id of caught.jobs) this.seen.add(id);
@@ -125,11 +152,16 @@ export class Chat {
       tools: [],
       cwd: this.session.state.repo!,
       onEvent: (e) => {
+        if (e.type === "usage") return this.setStatus({ context: e.context, window: e.window ?? this.status.window });
+        if (e.type === "thinking") this.setStatus({ state: "thinking" });
+        else if (e.type === "text") this.setStatus({ state: "writing" });
+        else if (e.type === "activity") this.setStatus({ state: "tool", activity: e.activity });
         const head = this.pending[0];
         // A harness that dies between messages is replaced by the next one, which is told everything again.
         if (!head && e.type === "error" && e.fatal) {
           this.harness = undefined;
           this.seen.clear();
+          this.setStatus({ state: "idle", context: undefined });
         }
         if (!head) return;
         if (e.type === "text") this.session.append("chat.delta", { message: this.reply(head), text: e.delta });
@@ -143,9 +175,11 @@ export class Chat {
             this.pending = [];
             this.harness = undefined;
             this.seen.clear();
+            this.setStatus({ state: "idle", context: undefined });
           }
         } else if (e.type === "turn.end") {
           this.pending.shift();
+          this.setStatus({ state: this.pending.length ? "working" : "idle" });
           if (!head.failed) this.session.append("chat.finished", { message: this.reply(head) });
         }
       },

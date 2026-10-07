@@ -195,6 +195,8 @@ export class PiHarness implements Harness {
           if (answering) emit({ type: "turn.end" });
           answering = true;
           wrote = toolSince = false;
+        } else if (e.type === "message_update" && e.assistantMessageEvent.type === "thinking_start") {
+          emit({ type: "thinking" });
         } else if (e.type === "message_update" && e.assistantMessageEvent.type === "text_delta") {
           const delta = e.assistantMessageEvent.delta;
           emit({ type: "text", delta: wrote && toolSince ? `\n\n${delta}` : delta });
@@ -205,6 +207,13 @@ export class PiHarness implements Harness {
           emit({ type: "activity", activity: describeActivity(e.toolName, e.args ?? {}) });
         } else if (e.type === "message_end" && e.message.role === "assistant" && e.message.stopReason === "error") {
           emit({ type: "error", message: e.message.errorMessage ?? "pi failed.", fatal: false });
+        } else if (e.type === "message_end" && e.message.role === "assistant") {
+          const u = e.message.usage;
+          emit({
+            type: "usage",
+            context: u.input + u.cacheRead + u.cacheWrite + u.output,
+            window: model.contextWindow,
+          });
         } else if (e.type === "agent_end") {
           if (answering) emit(cancelling ? { type: "turn.end", cancelled: true } : { type: "turn.end" });
           answering = cancelling = false;

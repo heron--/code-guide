@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
-import type { ModuleInfo } from "../../shared/modules";
-import type { SessionEvent } from "../../shared/protocol";
-import { emptyState, reduce, type SessionState } from "../../shared/state";
-import { panelState, runProgress } from "./status";
+import type { ModuleInfo } from "./modules";
+import type { SessionEvent } from "./protocol";
+import { emptyState, reduce, type SessionState } from "./state";
+import { panelState, runProgress } from "./progress";
 
 const guide: ModuleInfo = { name: "guide", label: "Guide", icon: [], needsJob: true, kind: "guide", maxJobs: 4 };
 

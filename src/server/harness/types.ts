@@ -49,6 +49,10 @@ export type HarnessEvent =
   | { type: "text"; delta: string }
   /** What the agent is doing, for progress, e.g. "Reading src/a.ts". */
   | { type: "activity"; activity: string }
+  /** The agent started reasoning before it answers or acts. Optional: not every harness reports it. */
+  | { type: "thinking" }
+  /** Tokens in the agent's context after its latest model call, and the model's window. Optional. */
+  | { type: "usage"; context: number; window?: number }
   /** The agent finished answering a message. */
   | { type: "turn.end"; cancelled?: boolean }
   /** The harness failed. The session can't be used after a fatal error. */
