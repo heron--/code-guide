@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
 import { z } from "zod";
 import { tool, type Harness, type HarnessEvent, type HarnessSession, type Tool } from "./types.js";
 
@@ -59,6 +59,8 @@ export function harnessContract(make: () => Harness, opts: { timeout?: number } 
     },
   });
 
+  /** Sessions a test started, stopped after it even when an assertion failed. */
+  const started: HarnessSession[] = [];
   function start(tools: Tool[] = [echo]): { s: HarnessSession; r: Recorder } {
     const r = new Recorder();
     const s = harness.start({
@@ -67,6 +69,7 @@ export function harnessContract(make: () => Harness, opts: { timeout?: number } 
       cwd: repo,
       onEvent: r.onEvent,
     });
+    started.push(s);
     return { s, r };
   }
 
@@ -76,6 +79,9 @@ export function harnessContract(make: () => Harness, opts: { timeout?: number } 
       execFileSync("git", ["init", "-q"], { cwd: repo });
       writeFileSync(join(repo, "notes.txt"), "the secret word is pineapple\n");
       harness = make();
+    });
+    afterEach(async () => {
+      await Promise.all(started.splice(0).map((s) => s.stop()));
     });
     afterAll(() => rmSync(repo, { recursive: true, force: true }));
 
