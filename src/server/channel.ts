@@ -2,6 +2,7 @@ import type { IncomingMessage, Server } from "node:http";
 import { WebSocketServer, type WebSocket } from "ws";
 import { PROTOCOL_VERSION, requestSchema, type Request, type ServerFrame } from "../shared/protocol.js";
 import type { ModuleInfo } from "../shared/modules.js";
+import type { ViewSettings } from "../shared/settings.js";
 import type { Session } from "./session.js";
 
 /** Handles every request except "hello". Throwing refuses the request; the message goes back to that tab. */
@@ -29,6 +30,7 @@ export function attachChannel(
   session: Session,
   onRequest: RequestHandler,
   modules: ModuleInfo[] = [],
+  view?: ViewSettings,
 ): () => void {
   const wss = new WebSocketServer({ noServer: true });
 
@@ -68,7 +70,7 @@ export function attachChannel(
           return ws.close();
         }
         stop?.();
-        send({ type: "welcome", v: PROTOCOL_VERSION, session: session.id, modules });
+        send({ type: "welcome", v: PROTOCOL_VERSION, session: session.id, modules, ...(view && { view }) });
         // Replay and subscribe in the same tick, so no event falls between them.
         for (const e of session.eventsAfter(req.session === session.id ? (req.after ?? 0) : 0)) send(e);
         stop = session.subscribe(send);

@@ -13,6 +13,8 @@ import { followUps, requestHandler } from "./requests.js";
 import { resolveGuide } from "./resolve.js";
 import { startServer } from "./server.js";
 import { Session } from "./session.js";
+import { loadSettings, projectSettingsPath, userSettingsPath } from "./settings.js";
+import { DEFAULT_VIEW } from "../shared/settings.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(here, "..");
@@ -33,8 +35,13 @@ Options
   --model <model>       Model for jobs and chat
   --review-model <m>    Model for reviews (default: --model)
   --port <n>            Port to serve on (default 4646, next free port if taken)
-  --no-open             Don't open the browser
+  --open, --no-open     Open the browser, or don't (default: open)
   -h, --help            Show this help
+
+Settings
+  ${userSettingsPath()}, overridden key by key by <repo>/.code-guide/settings.json, overridden by flags:
+  { "harness", "model", "reviewModel", "port", "open", "theme": "light" | "dark" | "system",
+    "modules": ["guide", "chat"] (open when a session starts, left to right) }
 
 Sessions are kept in <repo>/.code-guide/sessions/. Guide spec: ${join(pkgRoot, "docs/spec.md")}`;
 
@@ -56,7 +63,14 @@ async function check(files: string[]) {
   return errors ? 1 : 0;
 }
 
-type Flags = { port: number; open: boolean; harness?: string; model?: string; reviewModel?: string; subject?: Subject };
+type Flags = {
+  port?: number;
+  open?: boolean;
+  harness?: string;
+  model?: string;
+  reviewModel?: string;
+  subject?: Subject;
+};
 
 function parseSubject(flag: string, value: string | undefined): Subject {
   if (!value) throw new Error(`${flag} needs a value`);
@@ -77,6 +91,29 @@ async function serve(dir: string | undefined, flags: Flags) {
     console.error(`${target} isn't inside a git repository. Run code-guide from inside one.`);
     return 1;
   }
+  let settings;
+  try {
+    settings = await loadSettings(root);
+  } catch (e) {
+    console.error(`Bad settings: ${(e as Error).message}`);
+    return 1;
+  }
+  const unknown = settings.modules?.filter((name) => !modules.some((m) => m.name === name));
+  if (unknown?.length) {
+    console.error(
+      `Bad settings: no module named ${unknown.map((n) => `"${n}"`).join(", ")} (in ${userSettingsPath()} or ${projectSettingsPath(root)}). ` +
+        `Choose from: ${modules.map((m) => m.name).join(", ")}`,
+    );
+    return 1;
+  }
+  // Flags win over settings.
+  const opts = {
+    harness: flags.harness ?? settings.harness,
+    model: flags.model ?? settings.model,
+    reviewModel: flags.reviewModel ?? settings.reviewModel,
+    port: flags.port ?? settings.port ?? 4646,
+    open: flags.open ?? settings.open ?? true,
+  };
   // A ref that doesn't resolve would fail every submission; say so now instead.
   if (flags.subject?.type === "change")
     for (const ref of [flags.subject.base, flags.subject.head])
@@ -84,13 +121,13 @@ async function serve(dir: string | undefined, flags: Flags) {
         console.error(`--change: unknown ref "${ref}"`);
         return 1;
       }
-  const harness = createHarness(flags.harness, flags.model);
+  const harness = createHarness(opts.harness, opts.model);
   const ok = await harness.check();
   if (!ok.ok) {
     console.error(`Can't use ${harness.name}: ${ok.reason}`);
     return 1;
   }
-  const reviewer = flags.reviewModel ? createHarness(flags.harness, flags.reviewModel) : harness;
+  const reviewer = opts.reviewModel ? createHarness(opts.harness, opts.reviewModel) : harness;
 
   const session = await Session.create(root);
   session.append("harness.status", { harness: harness.name, model: harness.model, state: "ready" });
@@ -104,21 +141,23 @@ async function serve(dir: string | undefined, flags: Flags) {
     onRequest,
     modules: modules.map(moduleInfo),
     uiDir: join(here, "ui"),
-    port: flags.port,
+    port: opts.port,
+    view: { modules: settings.modules ?? DEFAULT_VIEW.modules, theme: settings.theme ?? DEFAULT_VIEW.theme },
   });
   console.log(`Code Guide for ${relative(process.cwd(), root) || "."} at ${url}`);
   console.log(`Session ${session.id}. Press Ctrl+C to stop.`);
-  if (flags.open) await open(url).catch(() => console.log("(Couldn't open a browser; visit the URL above.)"));
+  if (opts.open) await open(url).catch(() => console.log("(Couldn't open a browser; visit the URL above.)"));
   return new Promise<number>(() => {});
 }
 
 async function main(argv: string[]) {
   const args: string[] = [];
-  const flags: Flags = { port: 4646, open: true };
+  const flags: Flags = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "-h" || a === "--help") return (console.log(HELP), 0);
     else if (a === "--no-open") flags.open = false;
+    else if (a === "--open") flags.open = true;
     else if (a === "--port") flags.port = Number(argv[++i]);
     else if (a === "--harness") flags.harness = argv[++i];
     else if (a === "--model") flags.model = argv[++i];

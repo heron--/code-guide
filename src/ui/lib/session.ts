@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { ModuleInfo } from "../../shared/modules";
 import { PROTOCOL_VERSION, type Request, type ServerFrame } from "../../shared/protocol";
+import { DEFAULT_VIEW, type ViewSettings } from "../../shared/settings";
 import { emptyState, reduce, type SessionState } from "../../shared/state";
 
 export type ChannelStatus = "connecting" | "open" | "closed";
@@ -11,6 +12,8 @@ export type ChannelSnapshot = {
   state?: SessionState;
   /** The modules the server offers. */
   modules: ModuleInfo[];
+  /** Settings the browser applies. */
+  view: ViewSettings;
   /** The last refusal or failure the server sent. */
   error?: string;
   /** The server ended the connection for good (e.g. a different protocol version): no reconnect is coming. */
@@ -26,7 +29,7 @@ export class SessionChannel {
   private retry = 250;
   private stopped = false;
   private listeners = new Set<() => void>();
-  snapshot: ChannelSnapshot = { status: "connecting", modules: [] };
+  snapshot: ChannelSnapshot = { status: "connecting", modules: [], view: DEFAULT_VIEW };
 
   constructor(
     private url: string,
@@ -69,6 +72,7 @@ export class SessionChannel {
         status: "open",
         error: undefined,
         modules: f.modules,
+        view: f.view ?? DEFAULT_VIEW,
         state: s?.id === f.session ? s : emptyState(f.session),
       });
     } else if (f.type === "error") {

@@ -2,6 +2,7 @@ import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "
 import type { ResolvedFile } from "../../shared/guide";
 import type { ChatContext } from "../../shared/protocol";
 import { unavailable, type ModuleInfo } from "../../shared/modules";
+import { DEFAULT_VIEW } from "../../shared/settings";
 import type { SessionState } from "../../shared/state";
 import { panelFor } from "@/lib/panels";
 import type { SessionChannel } from "@/lib/session";
@@ -40,18 +41,17 @@ import { jobLabel, panelState, runProgress, sessionActivity } from "./status";
 type Props = {
   state: SessionState;
   modules: ModuleInfo[];
+  /** Modules a new session opens, left to right (the `modules` setting). */
+  panels?: string[];
   channel: SessionChannel;
   /** A lost connection or a refused request, shown in the status bar. */
   problem?: string;
 };
 
-/** Open in a new session: the guide (showing its progress until it's written) beside Chat. */
-const DEFAULT_PANELS = ["guide", "chat"];
-
 /** The frame every module lives in: a status bar, two slots, and (below) the dock. No navigation rail. */
-export function Workspace({ state, modules, channel, problem }: Props) {
+export function Workspace({ state, modules, panels = DEFAULT_VIEW.modules, channel, problem }: Props) {
   const [stored, setLayout] = usePersistent<Layout>(`cg:${state.id}:layout`, () =>
-    initialLayout(DEFAULT_PANELS.filter((p) => modules.some((m) => m.name === p && !unavailable(m, state)))),
+    initialLayout(panels.filter((p) => modules.some((m) => m.name === p && !unavailable(m, state)))),
   );
   const layout = { ...emptyLayout, ...stored };
   const byName = (name?: string) => modules.find((m) => m.name === name);
