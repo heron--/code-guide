@@ -23,6 +23,7 @@ import {
   dropFromDock,
   dropTarget,
   emptyLayout,
+  initialLayout,
   jobStarted,
   markSeen,
   open,
@@ -34,7 +35,7 @@ import {
   type Layout,
   type Slot,
 } from "./layout";
-import { jobLabel, panelState, sessionActivity } from "./status";
+import { jobLabel, panelState, runProgress, sessionActivity } from "./status";
 
 type Props = {
   state: SessionState;
@@ -44,9 +45,14 @@ type Props = {
   problem?: string;
 };
 
+/** Open in a new session: the guide (showing its progress until it's written) beside Chat. */
+const DEFAULT_PANELS = ["guide", "chat"];
+
 /** The frame every module lives in: a status bar, two slots, and (below) the dock. No navigation rail. */
 export function Workspace({ state, modules, channel, problem }: Props) {
-  const [stored, setLayout] = usePersistent<Layout>(`cg:${state.id}:layout`, emptyLayout);
+  const [stored, setLayout] = usePersistent<Layout>(`cg:${state.id}:layout`, () =>
+    initialLayout(DEFAULT_PANELS.filter((p) => modules.some((m) => m.name === p && !unavailable(m, state)))),
+  );
   const layout = { ...emptyLayout, ...stored };
   const byName = (name?: string) => modules.find((m) => m.name === name);
 
@@ -410,6 +416,14 @@ function PanelBody({
   if (m.needsJob && !job)
     return (
       <Centered title={busy ? `${stage ?? `Writing ${m.label.toLowerCase()}`}…` : `No ${m.label.toLowerCase()} yet`}>
+        {busy && (
+          <span className="relative mx-auto mb-2 block h-[5px] w-40 border border-border">
+            <span
+              className="absolute inset-y-0 left-0 bg-accent transition-[width] duration-700"
+              style={{ width: `${Math.max(0.04, runProgress(m, state).fraction) * 100}%` }}
+            />
+          </span>
+        )}
         {activity}
       </Centered>
     );
@@ -452,9 +466,7 @@ function EmptySlot({ slot, state, modules }: { slot: Slot; state: SessionState; 
   return (
     <div className="flex min-w-0 flex-1 items-center justify-center border border-dashed border-border">
       {writing ? (
-        <Centered title="Your guide is being written">
-          It will wait in the dock below, marked when it’s ready. Nothing opens on its own.
-        </Centered>
+        <Centered title="Your guide is being written">It will wait in the dock below, marked when it’s ready.</Centered>
       ) : (
         <Centered title="Empty slot">Open Chat or Diff from New panel, or drag a square up from the dock.</Centered>
       )}
