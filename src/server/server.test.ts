@@ -69,3 +69,11 @@ test("serves any file as the subject shows it, for citations", async () => {
   rmSync(join(repo, "out"));
   rmSync(outside, { recursive: true, force: true });
 });
+
+test("serves the repository's glossary terms, or none", async () => {
+  const get = await serve({ subject: { type: "question", question: "Q?" }, label: "" });
+  expect((await get("/api/glossary")).body).toEqual([]);
+  writeFileSync(join(repo, "Glossary.md"), "| Term | Definition |\n| --- | --- |\n| **Widget** | A thing. |\n");
+  const again = await serve({ subject: { type: "question", question: "Q?" }, label: "" });
+  expect((await again("/api/glossary")).body).toEqual([{ term: "Widget", definition: "A thing." }]);
+});
