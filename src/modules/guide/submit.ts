@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { guideSchema, SPEC_VERSION, type Guide, type Problem } from "../shared/guide.js";
-import type { Subject } from "../shared/protocol.js";
-import type { JobContext, JobKind } from "./jobs.js";
-import { checkGuide } from "./resolve.js";
+import { guideSchema, SPEC_VERSION, type Guide, type Problem } from "../../shared/guide.js";
+import type { Subject } from "../../shared/protocol.js";
+import type { JobContext, JobKind } from "../../server/jobs.js";
+import { checkGuide } from "../../server/resolve.js";
 
 /** What the agent submits: a guide without `spec` and `subject`, which come from the session. */
 export const guideSubmissionSchema = guideSchema.omit({ spec: true, subject: true });

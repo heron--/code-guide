@@ -24,6 +24,7 @@ export function requestHandler(session: Session, runner: JobRunner, modules: Mod
       case "subject.choose":
         if (session.state.subject) throw new Error("This session already has a subject");
         session.append("session.subject", { subject: req.subject, label: subjectLabel(req.subject) });
+        for (const m of modules) if (m.job && m.startsWithSession) runner.start(m.job, m.name);
         return;
       case "job.start": {
         const m = modules.find((m) => m.name === req.module);

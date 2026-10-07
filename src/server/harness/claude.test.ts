@@ -6,10 +6,13 @@ import { ClaudeHarness, describeActivity, isReadOnlyGit, staysInside } from "./c
 import { harnessContract } from "./contract";
 
 describe("read-only Bash", () => {
-  test.each(["git log --oneline -5", "git show HEAD:src/a.ts", "git diff main...HEAD -- src", "git blame -L 1,9 a.ts"])(
-    "allows %s",
-    (c) => expect(isReadOnlyGit(c)).toBe(true),
-  );
+  test.each([
+    "git log --oneline -5",
+    "git show HEAD:src/a.ts",
+    "git diff main...HEAD -- src",
+    "git blame -L 1,9 a.ts",
+    "git ls-files --others --exclude-standard -- . ':!.code-guide'",
+  ])("allows %s", (c) => expect(isReadOnlyGit(c)).toBe(true));
   test.each([
     "git checkout main",
     "git commit -am x",
