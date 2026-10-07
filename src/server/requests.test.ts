@@ -55,7 +55,7 @@ afterEach(async () => {
 test("labels subjects for the status bar", () => {
   expect(subjectLabel({ type: "change", base: "main", head: "feat/retry-policy" })).toBe("feat/retry-policy vs main");
   expect(subjectLabel({ type: "change", base: "main" })).toBe("working tree vs main");
-  expect(subjectLabel({ type: "change", base: "main", head: "pr-12", pr: 12 })).toBe("#12 · pr-12 vs main");
+  expect(subjectLabel({ type: "change", base: "origin/main", head: "3f9c2a1", pr: 12 })).toBe("#12 vs origin/main");
   expect(subjectLabel({ type: "path", path: "src/retry" })).toBe("src/retry");
 });
 

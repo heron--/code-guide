@@ -1,15 +1,15 @@
-import { useState } from "react";
 import { BookOpen } from "lucide-react";
 import { latestDone } from "../../shared/modules";
-import type { Subject } from "../../shared/protocol";
 import { href } from "@/lib/router";
-import { sessionChannel, useSession } from "@/lib/session";
+import { useSession } from "@/lib/session";
 import { Message } from "./GuideView";
+import { SubjectPicker } from "./SubjectPicker";
 
 /** The session at a glance, until the workspace (M8) replaces it: its subject, harness, and jobs. */
 export function SessionHome() {
   const { status, state, error } = useSession();
   if (!state) return <Message title={status === "closed" ? "Not connected" : "Connecting…"}>{error}</Message>;
+  if (!state.subject) return <SubjectPicker />;
 
   return (
     <div className="mx-auto max-w-3xl px-8 py-12">
@@ -20,7 +20,7 @@ export function SessionHome() {
         {state.repo} · {state.harness ? `${state.harness.harness} · ${state.harness.model}` : "no harness"}
       </p>
       {error && <p className="mt-4 text-del">{error}</p>}
-      {state.subject ? <p className="mt-6 text-[15px]">{state.subject.label}</p> : <ChooseSubject />}
+      <p className="mt-6 text-[15px]">{state.subject.label}</p>
       <ul className="mt-6 space-y-2">
         {state.jobOrder.map((id) => {
           const job = state.jobs[id];
@@ -40,33 +40,5 @@ export function SessionHome() {
         })}
       </ul>
     </div>
-  );
-}
-
-function ChooseSubject() {
-  const [text, setText] = useState("");
-  const choose = (subject: Subject) => sessionChannel().send({ type: "subject.choose", subject });
-  return (
-    <form
-      className="mt-6 flex gap-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (text.trim()) choose({ type: "question", question: text.trim() });
-      }}
-    >
-      <input
-        className="flex-1 rounded-md border border-border bg-card px-3 py-2"
-        placeholder="Ask a question about this repository"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-      />
-      <button
-        type="button"
-        className="rounded-md border border-border px-3"
-        onClick={() => choose({ type: "change", base: "HEAD" })}
-      >
-        Uncommitted changes
-      </button>
-    </form>
   );
 }

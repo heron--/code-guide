@@ -6,12 +6,13 @@ import type { Chat } from "./chat.js";
 import { revParse } from "./git.js";
 import type { JobRunner } from "./jobs.js";
 import type { Session } from "./session.js";
+import { preparePullRequest } from "./subjects.js";
 
 /** How a subject reads in the status bar, e.g. "feat/retry-policy vs main". */
 export function subjectLabel(s: Subject): string {
   switch (s.type) {
     case "change":
-      return `${s.pr ? `#${s.pr} · ` : ""}${s.head ?? "working tree"} vs ${s.base}`;
+      return s.pr ? `#${s.pr} vs ${s.base}` : `${s.head ?? "working tree"} vs ${s.base}`;
     case "path":
       return s.path;
     case "question":
@@ -25,11 +26,16 @@ export function requestHandler(session: Session, runner: JobRunner, modules: Mod
     switch (req.type) {
       case "subject.choose":
         if (session.state.subject) throw new Error("This session already has a subject");
+        const subject =
+          req.subject.type === "change" && req.subject.pr
+            ? await preparePullRequest(session.state.repo!, req.subject)
+            : req.subject;
         // A ref that doesn't resolve (a typo, or HEAD in a repository with no commits) would fail every job.
-        if (req.subject.type === "change")
-          for (const ref of [req.subject.base, req.subject.head])
+        if (subject.type === "change")
+          for (const ref of [subject.base, subject.head])
             if (ref && !(await revParse(session.state.repo!, ref))) throw new Error(`unknown ref "${ref}"`);
-        session.append("session.subject", { subject: req.subject, label: subjectLabel(req.subject) });
+        if (session.state.subject) throw new Error("This session already has a subject");
+        session.append("session.subject", { subject, label: subjectLabel(subject) });
         for (const m of modules) if (m.job && m.startsWithSession) runner.start(m.job, m.name);
         return;
       case "job.start": {
