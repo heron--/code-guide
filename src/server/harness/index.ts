@@ -1,5 +1,6 @@
 import { ClaudeHarness } from "./claude.js";
 import { FakeHarness } from "./fake.js";
+import { PiHarness } from "./pi.js";
 import type { Harness } from "./types.js";
 
 export type { Harness, HarnessEvent, HarnessSession, Tool } from "./types.js";
@@ -8,6 +9,7 @@ export { tool } from "./types.js";
 /** Every adapter, by the name users pick it with. */
 export const harnesses: Record<string, (model?: string) => Harness> = {
   claude: (model) => new ClaudeHarness(model),
+  pi: (model) => new PiHarness(model),
   fake: () => new FakeHarness(),
 };
 
