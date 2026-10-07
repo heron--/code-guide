@@ -1,49 +1,83 @@
 # Code Guide
 
-Learn unfamiliar code and code changes faster. Ask a question ("how does auth work?", "why is this split into packages?", "what does this branch change?") and get back a **guide**: a few brief **chapters**, each showing one idea next to the exact code that proves it.
+Learn unfamiliar code and code changes faster. Pick a subject (a change, a path, or a question like "how does auth work?") and Code Guide has your coding agent write a **guide**: a few brief **chapters**, each showing one idea next to the exact code that proves it.
 
 ```
-┌ Retry only safe requests ─────────┐ ┌ client.ts  src ──────────────── +23 -10 ┐
-│ 02 / 03   ↓ ↑   ☐ Reviewed        │ │ 10  const IDEMPOTENT = new Set([...]);  │
-│                                   │ │ 11  const RETRYABLE = new Set([...]);   │
-│ Only idempotent methods get more  │ │ ⇕ 7 unchanged lines                     │
-│ than one attempt; a repeated POST │ │ 31  if (!RETRYABLE.has(res.status) ...  │
-│ could double-write.               │ │ 32    log("request failed", ...);       │
-│       ┈┈┈┈┈┈┈┈┈┈┈┈ ← anchor       │ │ 33    throw new Error(...);             │
-└───────────────────────────────────┘ └─────────────────────────────────────────┘
+┌ Retry only safe requests ──────────┐ ┌ client.ts  src ──────────────── +23 -10 ┐
+│ 02 / 03  ↑ ↓  ☐ Reviewed      Ask  │ │ 10  const IDEMPOTENT = new Set([...]);  │
+│                                    │ │ 11  const RETRYABLE = new Set([...]);   │
+│ Only idempotent methods get more   │ │ ⇕ 7 unchanged lines                     │
+│ than one attempt; a repeated POST  │ │ 31  if (!RETRYABLE.has(res.status) ...  │
+│ could double-write.                │ │ 32    log("request failed", ...);       │
+│       ┈┈┈┈┈┈┈┈┈┈┈┈ ← anchor        │ │ 33    throw new Error(...);             │
+└────────────────────────────────────┘ └─────────────────────────────────────────┘
 ```
 
 There are three parts:
 
-| Part | What it is |
-| --- | --- |
-| [Spec](docs/spec.md) | The guide format and its rules. `code-guide check` enforces them. |
-| Guide job | Code Guide drives your coding agent (Claude Code by default, through the Claude Agent SDK) to write a guide, read-only, with [these instructions](src/modules/guide/instructions.ts). A guide is accepted only once it passes the spec. |
-| Viewer | `code-guide`, a local web app for reading guides chapter by chapter. |
+- **[Spec](docs/spec.md)**: the guide format and its rules. `code-guide check` enforces them, and so does every guide job.
+- **Jobs**: background work by your coding agent, read-only, through a harness: Claude Code (the default, via the Claude Agent SDK) or [pi](https://github.com/badlogic/pi-mono). The guide job follows [these instructions](src/modules/guide/instructions.ts); a separate review job then judges the guide against a quality bar.
+- **Viewer**: a local web app for reading the guide chapter by chapter, with an overview, the diff, a quiz and a chat beside it.
 
-Terms are defined in the [glossary](GLOSSARY.md). Code Guide sends nothing anywhere itself; the agent it drives talks to its own model.
+Terms are defined in the [glossary](GLOSSARY.md).
 
 ## Install
 
-Requires Node 22.12+, git, and Claude Code signed in (`claude`). To use [pi](https://github.com/badlogic/pi-mono) instead, sign in to a model with `pi` and run `code-guide --harness pi` (`--model provider/id` to choose one; otherwise pi's default).
+Requires Node 22.12+, git, and Claude Code signed in (run `claude` once). To use pi instead, sign in to a model in `pi` and run `code-guide --harness pi`, with `--model provider/id` to choose one (otherwise pi's default model).
+
+The [GitHub CLI](https://cli.github.com/) (`gh`), signed in, is optional. With it, open pull requests are offered as subjects and the Overview shows a pull request's description.
 
 ```sh
-npm install -g github:heron--/code-chapters   # or: git clone … && npm install && npm link
+npm install -g github:heron--/code-guide   # or: git clone … && npm install && npm link
 ```
 
 ## Use
 
-Run `code-guide` anywhere inside a git repository. It starts a session and a local server and opens your browser, where you pick a subject: a change, a path, or a question. Code Guide writes a guide about it (and has another job review it), and you can ask questions as you read. While it runs, the terminal shows the agent you chat with (harness, model, how full its context is, and whether it's thinking, writing, in a tool call or idle) and a progress bar for each running job, with finished and failed jobs logged above.
+Run `code-guide` anywhere inside a git repository. It starts a session, serves the viewer on `127.0.0.1`, and opens your browser.
 
 ```
-code-guide [dir]                   Start a session (default: the repo containing .)
-code-guide check <guide.json>…     Validate guides; exits 1 on errors
-  --change <base>[...<head>]   --path <path>   --question <text>   pick the subject up front
-  --harness <name>   --model <m>   --review-model <m>
-  --port <n>   default 4646      --no-open / --open   don't (or do) open a browser
+code-guide [dir]                   Start a session in the repo containing dir (default: .)
+code-guide check <guide.json>…     Validate guides against the spec; exits 1 on errors
+
+  --change <base>[...<head>]   --path <path>   --question <text>   choose the subject up front
+  --harness <claude|pi|fake>   --model <m>   --review-model <m>    reviews default to --model
+  --port <n>                   default 4646, or the next free port after it
+  --open / --no-open           open a browser, or don't (default: open)
 ```
 
-Sessions are kept in `.code-guide/sessions/` in the repository; add it to your `.gitignore` if you like.
+### Choosing a subject
+
+The browser asks what you want to understand and suggests the subjects that apply: uncommitted changes, the current branch against the default branch when it's ahead, and open pull requests (with `gh`). You can also type a commit range (`main...feature`), a path in the repository, or anything else as a question. `--change`, `--path` and `--question` skip the picker. A session has one subject; run `code-guide` again for another.
+
+A change runs from the merge-base of its base and head to its head, or to the working tree when it has no head. Code Guide fetches the base from its remote first, so a stale local copy doesn't pull other people's commits into the change; offline, it uses the local copy. For a pull request it fetches the head commit without creating a branch.
+
+### Jobs
+
+Choosing a subject starts two jobs: the guide and the overview. Every guide goes to a review job that sees only the guide and the code. If the review asks for changes, one revision is written and reviewed again, and you see the latest guide that passed the spec. The quiz job starts when you open Quiz, once the guide is done.
+
+A job submits its result through a tool that checks it; errors go back to the agent, which gets 5 submissions to fix them. Two jobs run at a time. The agent can read and search files inside the repository and run single read-only git commands; it can't edit anything. A failed job shows its reason in its panel and dock square, with **Retry**.
+
+While the session runs, the terminal shows the chat's agent (harness, model, how full its context is, and whether it's thinking, writing, in a tool call or idle) and a progress bar for each running job, with the subject and finished and failed jobs logged above.
+
+### Reading a guide
+
+The browser shows a workspace: two slots side by side and a dock along the bottom. A new session opens Guide on the left, showing its progress while it's written, and Chat on the right. Other panels wait in the dock as squares, marked when they have a new result: click one to open it, or drag it up into a slot. Drag a panel's title bar onto the other slot to swap them, or the divider to resize. **New panel** opens any module, or says why it can't yet.
+
+- **Overview**: a short summary of the subject, an intro before the chapters. For a change with a pull request, a second tab shows the pull request's description.
+- **Guide**: one chapter at a time, its prose and file list beside the code. Keys work while focus is in the panel: <kbd>J</kbd>/<kbd>K</kbd> (or <kbd>⌥</kbd><kbd>↓</kbd>/<kbd>↑</kbd>) for chapters, <kbd>[</kbd>/<kbd>]</kbd> for files, <kbd>R</kbd> to mark the chapter Reviewed. Each file can be marked Reviewed too, which collapses it. The status bar counts the chapters you've reviewed.
+- **Anchors** (accent-coloured links in the prose) scroll the code to their lines and highlight them. **Go back** (or <kbd>Esc</kbd>) jumps back.
+- **Glossary terms**: if the repository has a `GLOSSARY.md` with a Term | Definition table, like [this one](GLOSSARY.md), its terms get a dotted underline in chapter prose and show their definition on hover.
+- **Diff** (for changes): every changed file, like a pull request. **Full diff** shows every line of every file instead of just the changes.
+- **Quiz**: 3–5 multiple-choice questions on the guide. Each answer explains itself and cites the code.
+- **Chat**: ask about the code as you read. It knows the subject and the finished guides and quizzes. **Ask** on a chapter brings it in; so does selecting lines in the Guide or Diff, or prose in the Guide, and choosing **Ask about this** (or <kbd>⌘</kbd><kbd>L</kbd> / <kbd>Ctrl</kbd><kbd>L</kbd>).
+- **Citations** (`file:line` chips in Chat, Quiz and the Overview) show their lines in the Guide if the current chapter has the file, else in the Diff, else in a file view.
+- **Maximize** a panel to send its neighbor to the dock; restoring it brings the neighbor back.
+
+The layout, Reviewed marks and the Full diff toggle are saved in your browser, per session.
+
+### Sessions
+
+Each session is a folder in `.code-guide/sessions/` in the repository: `events.jsonl`, the session's complete record (see the [event protocol](docs/protocol.md)), and the finished results in `results/`. Code Guide never edits `.gitignore`; add `.code-guide/` to it if you like.
 
 ### Settings
 
@@ -61,23 +95,7 @@ Sessions are kept in `.code-guide/sessions/` in the repository; add it to your `
 }
 ```
 
-`modules` are the panels a new session opens, left slot first. `theme` is `light`, `dark` or `system`.
-
-### Reading a guide
-
-The browser shows a workspace: two slots side by side and a dock along the bottom. It opens with the Guide on the left, showing its progress while it's written, and Chat on the right. Other jobs wait in the dock with their progress; click a square to open it, or drag it up into a slot.
-
-- **Overview**: a short summary of the subject, an intro before the chapters. For a change with a pull request, a second tab shows the pull request's description (found with `gh`). It waits in the dock; add `"overview"` to the `modules` setting to open it with the session.
-- **Guide**: one chapter at a time, its prose and file list beside the code. Keys work while focus is in the panel: <kbd>J</kbd>/<kbd>K</kbd> (or <kbd>⌥</kbd><kbd>↓</kbd>/<kbd>↑</kbd>) for chapters, <kbd>[</kbd>/<kbd>]</kbd> for files, <kbd>R</kbd> to mark the chapter Reviewed.
-- **Diff** (for changes): every changed file. Open it from **New panel**. **Full diff** at its top shows every line of every file instead of just the changes.
-- **Quiz**: a few questions on the guide, answered by tapping an option. Each answer explains itself and cites the code.
-- **Citations** (`file:line` chips) show the lines in the Guide if the chapter has the file, else in the Diff, else in a file view.
-- **Chat**: ask about the code as you read. It knows the guides and quizzes so far. Select lines in the Guide or Diff, or prose in the Guide, and choose **Ask about this** to bring them in.
-- **Anchors** (accent-coloured links in the prose) scroll the code to their lines and highlight them. **Go back** (or <kbd>Esc</kbd>) jumps back instantly.
-- **Maximize** a panel to send its neighbor to the dock; restoring it brings the neighbor back.
-- "Reviewed" marks and the layout are saved in your browser.
-
-This repo has a guide about itself in `.code-chapters/how-anchors-work.json`; `code-guide check` validates it.
+`modules` are the panels a new session opens, left slot first; a third and later wait in the dock. Choose from `overview`, `guide`, `quiz`, `diff` and `chat`. `theme` is `light`, `dark` or `system`. `reviewModel` defaults to `model`, and `model` to `claude-opus-5-5` with Claude Code. An invalid settings file stops `code-guide` with the file and the problem named.
 
 ## Develop
 
@@ -89,6 +107,16 @@ npm run build        # dist/ui (Vite) + dist/cli.js (tsup)
 # Live UI development: run the API, then Vite with a proxy to it
 node dist/cli.js --no-open --port 4646 &
 npm run dev
+npm run dev:server   # rebuilds dist/cli.js on change; restart the API to pick it up
 ```
 
-Layout: `src/shared` (guide schema and prose parsing), `src/server` (CLI, git resolution, validation, highlighting), `src/modules` (each module: its job and its panel), `src/ui` (React + Tailwind: the workspace).
+`CODE_GUIDE_LIVE=1 npm test` also runs the tests that talk to a real Claude model (`CODE_GUIDE_MODEL` to choose one); they take minutes. `--harness fake` is the scripted harness those tests otherwise use; it doesn't write guides.
+
+Layout:
+
+- `src/shared`: the guide schema, prose parsing, the event protocol, and the rules for when a module can open, used by server and browser alike.
+- `src/server`: the CLI, sessions, the job runner, chat, harness adapters (`harness/`), git, validation and highlighting.
+- `src/modules`: one folder per module, with its job in `module.ts` and its panel in `panel.tsx`, registered in `index.ts`.
+- `src/ui`: the workspace (React + Tailwind).
+
+This repo has a guide about itself in `.code-chapters/how-anchors-work.json`; `code-guide check` validates it.
