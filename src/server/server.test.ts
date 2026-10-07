@@ -53,3 +53,12 @@ test("has no diff for a question", async () => {
   const get = await serve({ subject: { type: "question", question: "Q?" }, label: "" });
   expect((await get("/api/diff")).status).toBe(404);
 });
+
+test("serves any file as the subject shows it, for citations", async () => {
+  const change = await serve({ subject: { type: "change", base: "main", head: "feature" }, label: "" });
+  expect((await change("/api/file?path=a.ts")).body.status).toBe("modified");
+  const question = await serve({ subject: { type: "question", question: "Q?" }, label: "" });
+  const f = await question("/api/file?path=a.ts");
+  expect([f.body.status, f.body.lines.length]).toEqual(["unchanged", 2]);
+  expect((await question("/api/file?path=../etc/passwd")).status).toBe(404);
+});

@@ -6,7 +6,7 @@ import type { ModuleInfo } from "../shared/modules.js";
 import type { Session } from "./session.js";
 import { parseInput, suggestions } from "./subjects.js";
 import { changedFiles } from "./git.js";
-import { changeRefs, checkGuide, parseGuide, resolveChangedFile } from "./resolve.js";
+import { changeRefs, checkGuide, parseGuide, resolveChangedFile, resolveSubjectFile } from "./resolve.js";
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -78,6 +78,13 @@ export function startServer(opts: ServeOptions): Promise<{ url: string; close: (
         return f ? send(res, 200, f) : send(res, 404, { error: `${path} is not changed` });
       }
       return send(res, 200, { changed: await changedFiles(repo, refs.base, refs.head) });
+    }
+    // Any file as the subject shows it, for citations from chat and quizzes.
+    if (parts[1] === "file") {
+      const subject = session.state.subject?.subject;
+      const path = url.searchParams.get("path") ?? "";
+      const f = subject && (await resolveSubjectFile(repo, subject, path));
+      return f ? send(res, 200, f) : send(res, 404, { error: `${path} not found` });
     }
     // A finished job's result, e.g. a quiz.
     if (parts[1] === "results" && parts[2]) {

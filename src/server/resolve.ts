@@ -284,3 +284,34 @@ export async function changeRefs(
   if (!b || (change.head && !h)) return undefined;
   return { base: await mergeBase(repo, b, h ?? "HEAD"), head: h };
 }
+
+/**
+ * Any file as the session's subject shows it: its diff if the change touches it, else the file at the change's
+ * head, or in the working tree. For citations, which can point anywhere.
+ */
+export async function resolveSubjectFile(
+  repo: string,
+  subject: { type: string; base?: string; head?: string },
+  path: string,
+): Promise<ResolvedFile | undefined> {
+  if (path.startsWith("/") || path.split("/").includes("..")) return undefined;
+  let ref: string | undefined;
+  if (subject.type === "change" && subject.base) {
+    const refs = await changeRefs(repo, { base: subject.base, head: subject.head });
+    if (!refs) return undefined;
+    const changed = await resolveChangedFile(repo, refs.base, refs.head, path);
+    if (changed) return changed;
+    ref = refs.head;
+  }
+  const text = await fileAt(repo, ref, path);
+  if (text === undefined) return undefined;
+  const raw = splitLines(text).map((t, i): RawLine => ({ k: " ", o: i + 1, n: i + 1, text: t }));
+  const tokens = await highlight(
+    path,
+    raw.map((l) => l.text),
+  );
+  return {
+    ...toResolved(path, raw, "unchanged"),
+    lines: raw.map(({ text: _, ...l }, i) => ({ ...l, t: tokens[i] })),
+  };
+}

@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import type { PanelProps } from "@/lib/panels";
 import { usePersistent, usePersistentSet } from "@/lib/storage";
 import { cn } from "@/lib/utils";
+import { useLineShower } from "@/workspace/actions";
 import { Icon } from "@/workspace/Icon";
 import { Prose, type AnchorTarget } from "./Prose";
 
@@ -133,6 +134,12 @@ function ChapterView(props: {
     });
     jumpTo(document.getElementById(fileDomId(chapter, a.path))?.querySelector(`[data-idx="${ir[0]}"]`));
   };
+
+  // Citations from chat or a quiz land here when this chapter shows the file.
+  useLineShower("guide", {
+    canShow: (path) => c.excerpts.some((e) => e.path === path) && !!data.files[path],
+    show: (t) => onAnchor({ kind: "anchor", text: "", path: t.path, range: { start: t.start, end: t.end } }),
+  });
 
   const onFile = (i: number) => {
     const path = c.excerpts[i]?.path;
