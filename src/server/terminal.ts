@@ -99,8 +99,11 @@ export function showStatus(
     } else later();
   });
   const stopAgent = agent.onStatus(later);
-  // A subject chosen before this started (e.g. with --change) is logged now.
-  if (session.state.subject) out.write(`Subject: ${session.state.subject.label}\n`);
+  // What happened before this started (a subject chosen with --change, jobs already done) is logged now.
+  for (const e of session.eventsAfter(0)) {
+    const line = logLine(e, session.state);
+    if (line) out.write(line + "\n");
+  }
   draw();
   return () => {
     stopSession();

@@ -55,6 +55,7 @@ test("off a terminal, only the log is written", () => {
   const fake = {
     state: running,
     subscribe: (fn: (e: SessionEvent) => void) => ((listener = fn), () => {}),
+    eventsAfter: () => [],
   } as unknown as Parameters<typeof showStatus>[0];
   let written = "";
   const stop = showStatus(
@@ -69,10 +70,15 @@ test("off a terminal, only the log is written", () => {
   expect(written).toBe("✓ Writing the guide (guide-1)\n");
 });
 
-test("a subject chosen before the status started is logged first", () => {
+test("what happened before the status started is logged first", () => {
+  const before = [
+    ev(1, "session.subject", { subject: { type: "path", path: "src" }, label: "src" }),
+    ev(7, "job.finished", { job: "guide-1", result: "r", warnings: [] }),
+  ];
   const fake = {
-    state: { ...running, subject: { subject: { type: "path", path: "src" }, label: "src" } },
+    state: before.reduce(reduce, running),
     subscribe: () => () => {},
+    eventsAfter: () => before,
   } as unknown as Parameters<typeof showStatus>[0];
   let written = "";
   showStatus(
@@ -81,5 +87,5 @@ test("a subject chosen before the status started is logged first", () => {
     { harness: "h", model: "m", status: () => ({ state: "idle" }), onStatus: () => () => {} },
     { write: (s: string) => (written += s), isTTY: false },
   )();
-  expect(written).toBe("Subject: src\n");
+  expect(written).toBe("Subject: src\n✓ Writing the guide (guide-1)\n");
 });
