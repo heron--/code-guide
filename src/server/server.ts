@@ -1,7 +1,9 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { dirname, extname, join, normalize, resolve } from "node:path";
+import { attachChannel, type RequestHandler } from "./channel.js";
 import { repoRoot } from "./git.js";
+import type { Session } from "./session.js";
 import { resolveChangedFile, resolveGuide, summarize, guideId } from "./resolve.js";
 
 const MIME: Record<string, string> = {
@@ -22,7 +24,8 @@ export type ServeOptions = {
   files: string[];
   uiDir: string;
   port: number;
-  host?: string;
+  /** The session to serve over the WebSocket channel, and what to do with its requests. */
+  session?: { session: Session; onRequest: RequestHandler };
 };
 
 async function discover(opts: ServeOptions): Promise<Map<string, string>> {
@@ -100,7 +103,10 @@ export function startServer(opts: ServeOptions): Promise<{ url: string; close: (
     handle(req, res).catch((e) => send(res, 500, { error: String(e?.message ?? e) }));
   });
 
-  const host = opts.host ?? "127.0.0.1";
+  const detach = opts.session ? attachChannel(server, opts.session.session, opts.session.onRequest) : undefined;
+
+  // Localhost only: the server reads the repository and drives an agent.
+  const host = "127.0.0.1";
   return new Promise((ok, fail) => {
     let port = opts.port;
     const tryListen = () => server.listen(port, host);
@@ -113,7 +119,13 @@ export function startServer(opts: ServeOptions): Promise<{ url: string; close: (
     server.on("listening", () => {
       const addr = server.address();
       const p = typeof addr === "object" && addr ? addr.port : port;
-      ok({ url: `http://${host === "127.0.0.1" ? "localhost" : host}:${p}`, close: () => server.close() });
+      ok({
+        url: `http://localhost:${p}`,
+        close: () => {
+          detach?.();
+          server.close();
+        },
+      });
     });
     tryListen();
   });

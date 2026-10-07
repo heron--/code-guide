@@ -9,5 +9,5 @@ export default defineConfig({
   resolve: { alias: { "@": resolve(import.meta.dirname, "src/ui") } },
   build: { outDir: resolve(import.meta.dirname, "dist/ui"), emptyOutDir: true },
   // `npm run dev` proxies the API to a running `code-guide --no-open` server.
-  server: { proxy: { "/api": "http://localhost:4646" } },
+  server: { proxy: { "/api": { target: "http://localhost:4646", ws: true } } },
 });

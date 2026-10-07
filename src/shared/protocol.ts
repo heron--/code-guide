@@ -131,8 +131,16 @@ export const sessionEventSchema = z.discriminatedUnion(
 // ---- Browser → server ----
 
 export const requestSchema = z.discriminatedUnion("type", [
-  /** First message on every connection. `after` is the last seq this tab saw; omit it for a fresh tab. */
-  z.object({ type: z.literal("hello"), v: z.number(), after: z.number().int().nonnegative().optional() }),
+  /**
+   * First message on every connection. A tab that has seen events sends its session and the last seq it saw;
+   * if the server is on another session (it restarted), the tab gets that session from the start instead.
+   */
+  z.object({
+    type: z.literal("hello"),
+    v: z.number(),
+    session: z.string().optional(),
+    after: z.number().int().nonnegative().optional(),
+  }),
   z.object({ type: z.literal("subject.choose"), subject: subjectSchema }),
   /** Start a job for a module. `retry` names a failed job to run again. */
   z.object({ type: z.literal("job.start"), module: z.string(), retry: z.string().optional() }),
