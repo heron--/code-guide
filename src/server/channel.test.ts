@@ -97,7 +97,8 @@ test("a tab follows the server onto a new session", async () => {
   // Same tab, new server: point it at the new port.
   (c as unknown as { url: string }).url = server.url.replace("http", "ws") + "/api/session";
   expect(server.url).not.toBe(old);
-  await until(() => c.snapshot.state?.id === next.id);
+  // The id arrives with the welcome, before the session's events: wait for the last of them too.
+  await until(() => c.snapshot.state?.id === next.id && c.snapshot.state.seq === next.state.seq);
   expect(c.snapshot.state).toEqual(next.state);
 });
 
