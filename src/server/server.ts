@@ -1,8 +1,8 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readdir, readFile, stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { attachChannel, type RequestHandler } from "./channel.js";
-import { parseGlossary, type Term } from "../shared/glossary.js";
+import { readGlossary } from "./glossary.js";
 import type { ModuleInfo } from "../shared/modules.js";
 import type { ViewSettings } from "../shared/settings.js";
 import type { Session } from "./session.js";
@@ -57,16 +57,7 @@ async function serveStatic(uiDir: string, urlPath: string, res: ServerResponse) 
   }
 }
 
-/** glossary.md at the repository root, any case. No glossary, or one that doesn't parse, means no terms. */
-async function readGlossary(repo: string): Promise<Term[]> {
-  const name = (await readdir(repo).catch(() => [] as string[])).find((n) => n.toLowerCase() === "glossary.md");
-  if (!name) return [];
-  return parseGlossary(await readFile(join(repo, name), "utf8").catch(() => ""));
-}
-
 export function startServer(opts: ServeOptions): Promise<{ url: string; close: () => void }> {
-  // Read once, the first time it's asked for.
-  let glossary: Promise<Term[]> | undefined;
   const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     const parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
@@ -74,12 +65,17 @@ export function startServer(opts: ServeOptions): Promise<{ url: string; close: (
 
     const { session } = opts;
     const repo = session.state.repo!;
-    // The repository's glossary, if it has one, for highlighting its terms in guides.
-    if (parts[1] === "glossary") return send(res, 200, await (glossary ??= readGlossary(repo)));
+    // The repository's glossary (its own, else the one Code Guide wrote), for highlighting its terms in guides.
+    // Read each time: a generated one can appear during the session.
+    if (parts[1] === "glossary") return send(res, 200, await readGlossary(repo));
     // Subjects worth one click, and what typed input would mean.
     if (parts[1] === "subjects") {
       const input = url.searchParams.get("input");
-      return send(res, 200, input ? await parseInput(repo, input) : await suggestions(repo));
+      try {
+        return send(res, 200, input ? await parseInput(repo, input) : await suggestions(repo));
+      } catch (e) {
+        return send(res, 400, { error: String((e as Error).message ?? e) });
+      }
     }
     // The session's change, for the Diff module: every changed file, then one file at a time.
     if (parts[1] === "diff") {

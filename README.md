@@ -40,7 +40,8 @@ code-guide [dir]                   Start a session in the repo containing dir (d
 code-guide check <guide.json>…     Validate guides against the spec; exits 1 on errors
 code-guide --version               The version and the commit it was built from, e.g. 0.1.0#a1b2c
 
-  --change <base>[...<head>]   --path <path>   --question <text>   choose the subject up front
+  --change <base>[...<head>]   --branch <name>   --pr <number|link>
+  --path <path>   --question <text>                                choose the subject up front
   --harness <claude|pi|fake>   --model <m>   --review-model <m>    reviews default to --model
   --port <n>                   default 4646, or the next free port after it
   --open / --no-open           open a browser, or don't (default: open)
@@ -48,7 +49,7 @@ code-guide --version               The version and the commit it was built from,
 
 ### Choosing a subject
 
-The browser asks what you want to understand and suggests the subjects that apply: uncommitted changes, the current branch against the default branch when it's ahead, and the 10 newest open pull requests (with `gh`). For an older one, type its branches as a commit range. You can also type a commit range (`main...feature`), a path in the repository, or anything else as a question. `--change`, `--path` and `--question` skip the picker. A session has one subject; run `code-guide` again for another. The status bar names it; a question is named by its guide's title once the guide is written, with the full question on hover.
+The browser asks what you want to understand and suggests the subjects that apply: uncommitted changes, the current branch against the default branch when it's ahead, and the 10 newest open pull requests (with `gh`). For any other branch, type its name (local or on origin) to see what it changes compared to the default branch; for any other pull request, paste its link or type its number (`#12`). You can also type a commit range (`main...feature`), a path in the repository, or anything else as a question. `--change`, `--branch`, `--pr`, `--path` and `--question` skip the picker. A session has one subject; run `code-guide` again for another. The status bar names it; a question is named by its guide's title once the guide is written, with the full question on hover.
 
 A change runs from the merge-base of its base and head to its head, or to the working tree when it has no head. Code Guide fetches the base from its remote first, so a stale local copy doesn't pull other people's commits into the change; offline, it uses the local copy. For a pull request it fetches the head commit without creating a branch.
 
@@ -69,7 +70,7 @@ The browser shows a workspace: two slots side by side and a dock along the botto
 - **Overview**: a short summary of the subject, an intro before the chapters. For a change with a pull request, a second tab shows the pull request's description. The summary, the description and chat replies render as Markdown; raw HTML in them shows as text.
 - **Guide**: one chapter at a time, its prose and file list beside the code. The code scrolls straight through every chapter and the prose follows: a chapter becomes current as its first file reaches the top (or, scrolling up, as its last file comes back). The prose column widens with the panel, up to a comfortable line length. Keys work while focus is in the panel (hover the chapter arrows for a reminder): <kbd>J</kbd>/<kbd>K</kbd> (or <kbd>⌥</kbd><kbd>↓</kbd>/<kbd>↑</kbd>) for chapters, <kbd>[</kbd>/<kbd>]</kbd> for files, <kbd>R</kbd> to mark the chapter Reviewed. Each file can be marked Reviewed too, which collapses it. The status bar counts the chapters you've reviewed.
 - **Anchors** (accent-coloured links in the prose) scroll the code to their lines and highlight them. **Go back** (or <kbd>⌘</kbd><kbd>[</kbd> / <kbd>Ctrl</kbd><kbd>[</kbd>, or <kbd>Esc</kbd>) jumps back.
-- **Glossary terms**: if the repository has a `GLOSSARY.md` with a Term | Definition table, like [this one](GLOSSARY.md), its terms get a dotted underline in chapter prose and show their definition on hover.
+- **Glossary terms**: guides use the repository's own terms from its `glossary.md` (at the root, any case; a Term | Definition table, like [this one](GLOSSARY.md)). Its terms get a dotted underline in chapter prose and show their definition on hover. A repository without one gets one: the first session writes `.code-guide/glossary.md` in the background, and later sessions reuse it. Add your own `glossary.md` and Code Guide uses that instead.
 - **Diff** (for changes): every changed file, like a pull request. **Full diff** shows every line of every file instead of just the changes.
 - **Quiz**: 3–5 multiple-choice questions on the guide. Each answer explains itself and cites the code.
 - **Chat**: ask about the code as you read. It knows the subject and the finished guides and quizzes. It follows a reply as it streams in, until you scroll up to reread; scroll back down, or send a message, to follow again. **Ask** on a chapter brings it in; so does selecting lines in the Guide or Diff, or prose in the Guide, and choosing **Ask about this** (or <kbd>⌘</kbd><kbd>L</kbd> / <kbd>Ctrl</kbd><kbd>L</kbd>).

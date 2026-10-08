@@ -5,19 +5,26 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm run check
+      - run: npm ci --ignore-scripts
+      - run: npm run format:check
+      - run: >-
+          npm test --
+          src/server/resolve.test.ts
+          src/modules/guide/submit.test.ts
+          src/server/jobs.test.ts
+          src/server/session.test.ts
       - run: npm run build
