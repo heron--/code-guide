@@ -129,7 +129,7 @@ export function SubjectPicker() {
                 {busy ? "Starting…" : "Start"}
               </button>
             </div>
-            <p className="h-4 font-mono text-[11px] text-fg-3">
+            <p role="status" className="h-4 font-mono text-[11px] text-fg-3">
               {parsed && input.trim() ? describe(parsed) : checking ? "Checking…" : ""}
             </p>
           </form>
