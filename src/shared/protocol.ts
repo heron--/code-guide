@@ -9,7 +9,7 @@ import type { ViewSettings } from "./settings.js";
  * session's log and streamed to every connected tab. The browser never changes state itself: it sends a
  * request, and renders whatever events come back.
  */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 // ---- Shared payload shapes ----
 
@@ -60,6 +60,8 @@ export const eventPayloads = {
   /** First event of every session. */
   "session.started": z.object({ repo: z.string() }),
   "session.subject": z.object({ subject: subjectSchema, label: z.string() }),
+  /** A better label for the subject, e.g. a question's guide title in place of the whole question. */
+  "session.label": z.object({ label: z.string() }),
   "harness.status": z.object({
     harness: z.string(),
     model: z.string(),

@@ -379,7 +379,11 @@ function GuideView(props: {
         </div>
       ) : (
         <>
-          <div ref={proseColumn} className="w-[300px] flex-none overflow-y-auto border-r border-border-subtle p-5">
+          {/* The prose column grows with the panel (the design: 300px in a slot, 380px maximized), capped for line length. */}
+          <div
+            ref={proseColumn}
+            className="w-[clamp(300px,27%,480px)] flex-none overflow-y-auto border-r border-border-subtle p-5"
+          >
             {prose(chapter)}
           </div>
           <div ref={scroller} onScroll={onScroll} className="min-w-0 flex-1 overflow-y-auto bg-surface-2">
