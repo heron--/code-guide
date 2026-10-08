@@ -123,3 +123,8 @@ test("cancels and retries jobs", async () => {
   await handle({ type: "job.start", module: "echo", retry: "echo-1" });
   await until(() => session.state.jobs["echo-2"]?.status === "finished");
 });
+
+test("updating a subject needs new commits on its pull request", async () => {
+  await handle({ type: "subject.choose", subject: { type: "question", question: "Q?" } });
+  await expect(handle({ type: "subject.update" })).rejects.toThrow("No new commits");
+});

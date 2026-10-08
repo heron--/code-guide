@@ -74,7 +74,14 @@ export class Chat {
     const sent = this.queue
       .then(async () => {
         const caught = await this.catchUp();
-        const parts = [caught.text, ...(await Promise.all(context.map((c) => this.describe(c)))), text];
+        // The subject moved to newer commits since the agent started: say so before anything else.
+        const moved = this.harness && this.told !== this.about() ? (this.told = this.about()) : undefined;
+        const parts = [
+          moved && `The reader updated the session to newer commits. They are now studying ${moved}.`,
+          caught.text,
+          ...(await Promise.all(context.map((c) => this.describe(c)))),
+          text,
+        ];
         // A fatal error while this was prepared already failed it: sending it now would take the next reply.
         if (!this.pending.includes(entry)) return;
         const harness = this.start();
@@ -138,17 +145,23 @@ export class Chat {
       : `The reader selected this passage from ${where}:\n> ${c.text}`;
   }
 
+  /** What the reader is studying, as the agent is told it. */
+  private about(): string {
+    const { subject } = this.session.state.subject!;
+    return subject.type === "change"
+      ? `the change from the merge-base of ${subject.base} to ${subject.head ?? "the working tree"} (see it with \`git diff ${subject.head ? `${subject.base}...${subject.head}` : `--merge-base ${subject.base}`}\`)`
+      : subject.type === "path"
+        ? `${subject.path}, in the working tree`
+        : `this question about the working tree: ${subject.question}`;
+  }
+  /** The subject the running agent was last told about. */
+  private told?: string;
+
   private start(): HarnessSession {
     if (this.harness) return this.harness;
-    const { subject, label } = this.session.state.subject!;
-    const about =
-      subject.type === "change"
-        ? `the change from the merge-base of ${subject.base} to ${subject.head ?? "the working tree"} (see it with \`git diff ${subject.head ? `${subject.base}...${subject.head}` : `--merge-base ${subject.base}`}\`)`
-        : subject.type === "path"
-          ? `${subject.path}, in the working tree`
-          : `this question about the working tree: ${subject.question}`;
+    this.told = this.about();
     this.harness = this.agent.start({
-      instructions: `${instructions}\n\nThe reader is studying ${about}. In the status bar: ${label}.`,
+      instructions: `${instructions}\n\nThe reader is studying ${this.told}. In the status bar: ${this.session.state.subject!.label}.`,
       tools: [],
       cwd: this.session.state.repo!,
       onEvent: (e) => {

@@ -18,7 +18,7 @@ Every event has the same envelope. `seq` counts up from 1 within a session. A ta
 
 ```json
 {
-  "v": 2,
+  "v": 3,
   "seq": 1,
   "at": "2026-10-07T09:12:03.120Z",
   "session": "2026-10-07-091203-k3f9",
@@ -35,7 +35,7 @@ The examples below show only `type` and `payload`.
 { "type": "session.subject", "payload": { "subject": { "type": "change", "base": "main", "head": "feat/retry-policy" }, "label": "feat/retry-policy vs main" } }
 ```
 
-A subject is a `change` (`base`, optional `head`, optional `pr`), a `path`, or a `question`.
+A subject is a `change` (`base`, optional `head`, optional `pr`), a `path`, or a `question`. It comes again when the reader updates a pull request subject to new commits (`subject.update`).
 
 ```json
 { "type": "session.label", "payload": { "label": "How retries are scheduled" } }
@@ -46,6 +46,12 @@ A shorter label for the subject, replacing the one in `session.subject`. A quest
 ```json
 { "type": "harness.status", "payload": { "harness": "claude-code", "model": "opus-5.5", "state": "ready" } }
 ```
+
+```json
+{ "type": "subject.remote", "payload": { "number": 12, "url": "https://github.com/acme/payments/pull/12", "head": "9d1e0c4b7a2f" } }
+```
+
+The pull request a change subject comes from, reported when the subject is chosen and again whenever it changes (checked every minute with `gh`). `head`, its latest commit, is there only when the subject is the pull request itself; when it differs from the subject's `head`, the pull request has new commits.
 
 ### Jobs
 
@@ -114,7 +120,7 @@ Replies stream as text deltas, appended in order.
 ## Requests
 
 ```json
-{ "type": "hello", "v": 2, "session": "2026-10-07-091203-k3f9", "after": 41 }
+{ "type": "hello", "v": 3, "session": "2026-10-07-091203-k3f9", "after": 41 }
 ```
 
 The first message on every connection. A tab that reconnects sends its session and the last `seq` it saw, and gets only what came after. A fresh tab omits both, and so does a tab whose session isn't the server's any more: either gets the whole session.
@@ -122,6 +128,12 @@ The first message on every connection. A tab that reconnects sends its session a
 ```json
 { "type": "subject.choose", "subject": { "type": "question", "question": "How are retries scheduled?" } }
 ```
+
+```json
+{ "type": "subject.update" }
+```
+
+Moves a pull request subject to the pull request's latest commit: cancels running jobs, sends `session.subject` with the new `head`, and starts again every module that has run (except one that reads another's result, like a quiz, which waits for the reader).
 
 ```json
 { "type": "job.start", "module": "guide" }
@@ -144,7 +156,7 @@ A chat message's context can be a `chapter`, a selected range of chapter `prose`
 ## Notices
 
 ```json
-{ "type": "welcome", "v": 2, "session": "2026-10-07-091203-k3f9", "modules": [{ "name": "diff", "label": "Diff", "icon": ["M3 2.5h10v11H3z", "M8 5v4M6 7h4M6 11h4"], "needsJob": false, "subjects": ["change"] }], "view": { "modules": ["guide", "chat"], "theme": "system" } }
+{ "type": "welcome", "v": 3, "session": "2026-10-07-091203-k3f9", "modules": [{ "name": "diff", "label": "Diff", "icon": ["M3 2.5h10v11H3z", "M8 5v4M6 7h4M6 11h4"], "needsJob": false, "subjects": ["change"] }], "view": { "modules": ["guide", "chat"], "theme": "system" } }
 ```
 
 `welcome` lists the modules this server offers, so the browser can show them without knowing any by name. `view` carries the settings the browser applies: its theme, and the modules a new session opens.
