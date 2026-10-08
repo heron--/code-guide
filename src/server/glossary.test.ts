@@ -41,28 +41,29 @@ test("a generated glossary reads back as the terms it was written from", () => {
   expect(parseGlossary(glossaryMarkdown(terms))).toEqual(terms);
 });
 
-test("a submission needs distinct terms that fit in one table row each", async () => {
+test("a submission needs distinct terms that fit in one table row each, and is saved once valid", async () => {
+  const ctx = { repo } as never;
   const t = (term: string, definition = "A thing.") => ({ term, definition });
-  const ok = await glossaryJob.submit.validate({ terms: [t("A"), t("B"), t("C")] }, undefined as never);
-  expect(ok.problems).toEqual([]);
-  const bad = await glossaryJob.submit.validate({ terms: [t("A"), t("a"), t("C | D")] }, undefined as never);
+  const bad = await glossaryJob.submit.validate({ terms: [t("A"), t("a"), t("C | D")] }, ctx);
   expect(bad.problems.map((p) => p.message)).toEqual([
     '"a" is listed twice',
     "no | or line breaks: each term is one table row",
   ]);
+  expect(glossaryPath(repo)).toBeUndefined();
+  const ok = await glossaryJob.submit.validate({ terms: [t("A"), t("B"), t("C")] }, ctx);
+  expect(ok.problems).toEqual([]);
+  expect(parseGlossary(readFileSync(generatedGlossary(repo), "utf8")).map((x) => x.term)).toEqual(["A", "B", "C"]);
 });
 
-test("starts once per repository without a glossary, and saves the result", async () => {
+test("starts once per repository without a glossary", async () => {
   const session = await Session.create(repo);
   const started: string[] = [];
-  let finish: (job: string, result: unknown) => void = () => {};
   const runner = {
     start: (kind: { kind: string }) => {
       session.append("job.queued", { job: "glossary-1", kind: kind.kind, module: "glossary", inputs: [] });
       started.push(kind.kind);
       return "glossary-1";
     },
-    onFinished: (fn: typeof finish) => ((finish = fn), () => {}),
   } as unknown as JobRunner;
   generateGlossary(session, runner);
 
@@ -73,19 +74,13 @@ test("starts once per repository without a glossary, and saves the result", asyn
   session.append("session.subject", { subject: { type: "path", path: "." }, label: "." });
   await Promise.resolve();
   expect(started).toEqual(["glossary"]);
-
-  finish("glossary-1", { terms: [{ term: "Widget", definition: "A thing." }] });
-  await new Promise((r) => setTimeout(r, 50));
-  expect(parseGlossary(readFileSync(generatedGlossary(repo), "utf8"))).toEqual([
-    { term: "Widget", definition: "A thing." },
-  ]);
 });
 
 test("doesn't start when the repository has a glossary", async () => {
   writeFileSync(join(repo, "glossary.md"), table);
   const session = await Session.create(repo);
   const started: string[] = [];
-  const runner = { start: () => started.push("x"), onFinished: () => () => {} } as unknown as JobRunner;
+  const runner = { start: () => started.push("x") } as unknown as JobRunner;
   generateGlossary(session, runner);
   session.append("session.subject", { subject: { type: "path", path: "." }, label: "." });
   await Promise.resolve();

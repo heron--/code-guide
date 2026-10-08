@@ -79,7 +79,7 @@ You can read files, search, and run read-only git commands. Submit with \`submit
     tool: "submit_glossary",
     description: `Submit the glossary: 3-${MAX_TERMS} terms, each with a definition of at most ${DEFINITION_WORDS} words.`,
     input: submission,
-    async validate(input) {
+    async validate(input, ctx) {
       const parsed = submission.safeParse(input);
       if (!parsed.success)
         return {
@@ -106,6 +106,12 @@ You can read files, search, and run read-only git commands. Submit with \`submit
         if (n > DEFINITION_WORDS)
           problems.push({ level: "error", where: `terms.${i}`, message: `${n} words; at most ${DEFINITION_WORDS}` });
       });
+      // Saved before the job is accepted, so the glossary is there by the time anyone hears it finished.
+      if (!problems.some((p) => p.level === "error")) {
+        const path = generatedGlossary(ctx.repo);
+        await mkdir(join(path, ".."), { recursive: true });
+        await writeFile(path, glossaryMarkdown(parsed.data.terms));
+      }
       return { problems };
     },
   },
@@ -126,8 +132,8 @@ ${rows.join("\n")}
 
 /**
  * Writes a glossary for a repository that has none: when a subject is chosen, it starts the glossary job (after
- * the modules' jobs, so the guide isn't queued behind it), and saves the result as the generated glossary, so
- * it runs once per repository. Returns a function that stops.
+ * the modules' jobs, so the guide isn't queued behind it). The job saves its result as the generated glossary,
+ * so it runs once per repository. Returns a function that stops.
  */
 export function generateGlossary(session: Session, runner: JobRunner): () => void {
   const start = () => {
@@ -138,17 +144,5 @@ export function generateGlossary(session: Session, runner: JobRunner): () => voi
     );
     if (!written) runner.start(glossaryJob, "glossary");
   };
-  const stopStarting = session.subscribe((e) => e.type === "session.subject" && queueMicrotask(start));
-  const stopSaving = runner.onFinished((id, result) => {
-    if (session.state.jobs[id]?.kind !== "glossary") return;
-    const path = generatedGlossary(session.state.repo!);
-    // Best effort: without it, the next session writes one again.
-    mkdir(join(path, ".."), { recursive: true })
-      .then(() => writeFile(path, glossaryMarkdown((result as { terms: Term[] }).terms)))
-      .catch(() => {});
-  });
-  return () => {
-    stopStarting();
-    stopSaving();
-  };
+  return session.subscribe((e) => e.type === "session.subject" && queueMicrotask(start));
 }
