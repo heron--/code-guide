@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { useActions, useLineShower } from "@/workspace/actions";
 import { useAskSelection } from "@/workspace/ask";
 import { Icon } from "@/workspace/Icon";
-import { altKey, Kbd } from "@/workspace/Kbd";
+import { altKey, isMac, Kbd } from "@/workspace/Kbd";
 import { Prose, type AnchorTarget } from "./Prose";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -240,7 +240,8 @@ function GuideView(props: {
     else if (plain && e.key === "]") onFile((fileIdx + 1) % c.excerpts.length);
     else if (plain && e.key === "[") onFile((fileIdx - 1 + c.excerpts.length) % c.excerpts.length);
     else if (plain && e.key === "r") props.setChapterReviewed(chapter, !props.reviewedChapters.has(String(chapter)));
-    else if (e.key === "Escape" && back !== undefined) goBack();
+    // Go back: ⌘[ (Ctrl+[), like a browser or editor, or Esc.
+    else if (back !== undefined && (e.key === "Escape" || (e.key === "[" && (isMac ? e.metaKey : e.ctrlKey)))) goBack();
     else if (!selecting.onKey(e)) return;
     e.preventDefault();
   };
@@ -357,7 +358,7 @@ function GuideView(props: {
         <Icon paths={["M10 4L6 8l4 4"]} size={12} />
         Go back
       </button>
-      <Kbd>Esc</Kbd>
+      <Kbd>{isMac ? "⌘[" : "Ctrl+["}</Kbd>
     </div>
   );
 
