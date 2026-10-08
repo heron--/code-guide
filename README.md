@@ -48,7 +48,7 @@ code-guide --version               The version and the commit it was built from,
 
 ### Choosing a subject
 
-The browser asks what you want to understand and suggests the subjects that apply: uncommitted changes, the current branch against the default branch when it's ahead, and open pull requests (with `gh`). You can also type a commit range (`main...feature`), a path in the repository, or anything else as a question. `--change`, `--path` and `--question` skip the picker. A session has one subject; run `code-guide` again for another. The status bar names it; a question is named by its guide's title once the guide is written, with the full question on hover.
+The browser asks what you want to understand and suggests the subjects that apply: uncommitted changes, the current branch against the default branch when it's ahead, and the 10 newest open pull requests (with `gh`). For an older one, type its branches as a commit range. You can also type a commit range (`main...feature`), a path in the repository, or anything else as a question. `--change`, `--path` and `--question` skip the picker. A session has one subject; run `code-guide` again for another. The status bar names it; a question is named by its guide's title once the guide is written, with the full question on hover.
 
 A change runs from the merge-base of its base and head to its head, or to the working tree when it has no head. Code Guide fetches the base from its remote first, so a stale local copy doesn't pull other people's commits into the change; offline, it uses the local copy. For a pull request it fetches the head commit without creating a branch.
 
