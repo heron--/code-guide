@@ -16,6 +16,7 @@ import { watchPullRequest } from "./remote.js";
 import { resolveGuide } from "./resolve.js";
 import { startServer } from "./server.js";
 import { Session } from "./session.js";
+import { branchChange, pullRequestChange, pullRequestNumber } from "./subjects.js";
 import { loadSettings, projectSettingsPath, userSettingsPath } from "./settings.js";
 import { DEFAULT_VIEW } from "../shared/settings.js";
 
@@ -38,6 +39,8 @@ Usage
 
 Subject (optional; otherwise pick one in the browser)
   --change <base>[...<head>]   A change: from the merge-base of base to head (default: the working tree)
+  --branch <name>              A branch, local or on origin: what it changes compared to the default branch
+  --pr <number|link>           A pull request, by number or link
   --path <path>                A directory, package or service
   --question <text>            A question about the code
 
@@ -82,6 +85,9 @@ type Flags = {
   model?: string;
   reviewModel?: string;
   subject?: Subject;
+  /** A branch or pull request: what it means depends on the repository, so it's read once that's known. */
+  branch?: string;
+  pr?: string;
 };
 
 function parseSubject(flag: string, value: string | undefined): Subject {
@@ -126,8 +132,23 @@ async function serve(dir: string | undefined, flags: Flags) {
     port: flags.port ?? settings.port ?? 4646,
     open: flags.open ?? settings.open ?? true,
   };
+  if (flags.branch) {
+    flags.subject = await branchChange(root, flags.branch);
+    if (!flags.subject) {
+      console.error(`--branch: no branch "${flags.branch}" here or on origin`);
+      return 1;
+    }
+  }
+  if (flags.pr) {
+    const pr = pullRequestNumber(/^\d+$/.test(flags.pr) ? `#${flags.pr}` : flags.pr);
+    if (!pr) {
+      console.error(`--pr: "${flags.pr}" isn't a pull request number or link`);
+      return 1;
+    }
+    flags.subject = await pullRequestChange(root, pr);
+  }
   // A ref that doesn't resolve would fail every submission; say so now instead.
-  if (flags.subject?.type === "change")
+  if (flags.subject?.type === "change" && !flags.branch && !flags.pr)
     for (const ref of [flags.subject.base, flags.subject.head])
       if (ref && !(await revParse(root, ref))) {
         console.error(`--change: unknown ref "${ref}"`);
@@ -188,7 +209,11 @@ async function main(argv: string[]) {
     else if (a === "--model") flags.model = argv[++i];
     else if (a === "--review-model") flags.reviewModel = argv[++i];
     else if (a === "--change" || a === "--path" || a === "--question") flags.subject = parseSubject(a, argv[++i]);
-    else args.push(a);
+    else if (a === "--branch" || a === "--pr") {
+      const value = argv[++i];
+      if (!value) throw new Error(`${a} needs a value`);
+      flags[a === "--branch" ? "branch" : "pr"] = value;
+    } else args.push(a);
   }
   if (args[0] === "check") return check(args.slice(1));
   return serve(args[0], flags);

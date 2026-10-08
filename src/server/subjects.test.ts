@@ -3,7 +3,15 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { parseInput, prepareChange, preparePullRequest, pullRequestFor, suggestions } from "./subjects";
+import type { Subject } from "../shared/protocol";
+import {
+  parseInput,
+  prepareChange,
+  preparePullRequest,
+  pullRequestFor,
+  pullRequestNumber,
+  suggestions,
+} from "./subjects";
 
 let dir: string;
 let repo: string;
@@ -83,6 +91,23 @@ test("reads typed input as a range, a path, or a question", async () => {
     question: "How do retries work?",
   });
   expect(await parseInput(repo, "../outside")).toEqual({ type: "question", question: "../outside" });
+});
+
+test("reads a branch name as what it changes, fetching one only origin has", async () => {
+  expect(await parseInput(repo, "feature")).toEqual({ type: "change", base: "origin/main", head: "feature" });
+  const remote = await parseInput(repo, "contributor/fix");
+  expect(remote).toEqual({ type: "change", base: "origin/main", head: "origin/contributor/fix" });
+  await prepareChange(repo, remote as Subject & { type: "change" });
+  expect(git(repo, "rev-parse", "origin/contributor/fix")).toBe(prCommit);
+  expect(await parseInput(repo, "no-such-branch")).toEqual({ type: "question", question: "no-such-branch" });
+});
+
+test("reads a pull request link or number", async () => {
+  const pr = { type: "change", base: "origin/main", pr: 7 };
+  expect(await parseInput(repo, "https://github.com/acme/app/pull/7")).toEqual(pr);
+  expect(await parseInput(repo, "https://github.com/acme/app/pull/7/files#diff-1")).toEqual(pr);
+  expect(await parseInput(repo, "#7")).toEqual(pr);
+  expect(pullRequestNumber("https://github.com/acme/app/issues/7")).toBeUndefined();
 });
 
 test("a pull request is fetched and pinned to its head commit", async () => {

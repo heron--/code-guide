@@ -6,7 +6,9 @@ type Suggestion = { subject: Subject; title: string; detail: string };
 
 const describe = (s: Subject) =>
   s.type === "change"
-    ? `Change · ${s.base}...${s.head ?? "working tree"}`
+    ? s.pr
+      ? `Pull request · #${s.pr}`
+      : `Change · ${s.base}...${s.head ?? "working tree"}`
     : s.type === "path"
       ? `Path · ${s.path}`
       : "Question";
@@ -87,7 +89,8 @@ export function SubjectPicker() {
             }}
           >
             <label htmlFor="subject-input" className="text-xs text-fg-2">
-              Or a path, a question, or a commit range (<span className="font-mono">main...feature</span>)
+              Or a path, a branch, a pull request link, a question, or a range ({""}
+              <span className="font-mono">main...feature</span>)
             </label>
             <div className="flex gap-2">
               <input
