@@ -1,10 +1,11 @@
 import { expect, test } from "vitest";
-import type { SessionEvent } from "./protocol";
+import { PROTOCOL_VERSION, type SessionEvent } from "./protocol";
 import { emptyState, hasNewCommits, reduce } from "./state";
 
 const session = (...events: [string, Record<string, unknown>][]) =>
   events.reduce(
-    (s, [type, payload], i) => reduce(s, { v: 1, seq: i + 1, at: "", session: "s", type, payload } as SessionEvent),
+    (s, [type, payload], i) =>
+      reduce(s, { v: PROTOCOL_VERSION, seq: i + 1, at: "", session: "s", type, payload } as SessionEvent),
     emptyState("s"),
   );
 const pr = { type: "change", base: "origin/main", head: "aaa", pr: 12 };

@@ -9,7 +9,7 @@ import type { ViewSettings } from "./settings.js";
  * session's log and streamed to every connected tab. The browser never changes state itself: it sends a
  * request, and renders whatever events come back.
  */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 // ---- Shared payload shapes ----
 
