@@ -69,12 +69,12 @@ Sessions are kept in `.code-guide/sessions/` in the repository; add it to your `
 The browser shows a workspace: two slots side by side and a dock along the bottom. It opens with the Guide on the left, showing its progress while it's written, and Chat on the right. Other jobs wait in the dock with their progress; click a square to open it, or drag it up into a slot.
 
 - **Overview**: a short summary of the subject, an intro before the chapters. For a change with a pull request, a second tab shows the pull request's description (found with `gh`). It waits in the dock; add `"overview"` to the `modules` setting to open it with the session.
-- **Guide**: one chapter at a time, its prose and file list beside the code. Keys work while focus is in the panel: <kbd>J</kbd>/<kbd>K</kbd> (or <kbd>⌥</kbd><kbd>↓</kbd>/<kbd>↑</kbd>) for chapters, <kbd>[</kbd>/<kbd>]</kbd> for files, <kbd>R</kbd> to mark the chapter Reviewed.
+- **Guide**: one chapter at a time, its prose and file list beside the code. The code scrolls straight through every chapter, and the prose follows: a chapter becomes current as its first file reaches the top (or, scrolling up, as its last file comes back). Keys work while focus is in the panel: <kbd>J</kbd>/<kbd>K</kbd> (or <kbd>⌥</kbd><kbd>↓</kbd>/<kbd>↑</kbd>) for chapters, <kbd>[</kbd>/<kbd>]</kbd> for files, <kbd>R</kbd> to mark the chapter Reviewed.
 - **Diff** (for changes): every changed file. Open it from **New panel**. **Full diff** at its top shows every line of every file instead of just the changes.
 - **Quiz**: a few questions on the guide, answered by tapping an option. Each answer explains itself and cites the code.
 - **Citations** (`file:line` chips) show the lines in the Guide if the chapter has the file, else in the Diff, else in a file view.
 - **Chat**: ask about the code as you read. It knows the guides and quizzes so far. Select lines in the Guide or Diff, or prose in the Guide, and choose **Ask about this** to bring them in.
-- **Anchors** (accent-coloured links in the prose) scroll the code to their lines and highlight them. **Go back** (or <kbd>Esc</kbd>) jumps back instantly.
+- **Anchors** (accent-coloured links in the prose) scroll the code to their lines and highlight them. **Go back** (or <kbd>⌘</kbd><kbd>[</kbd> / <kbd>Ctrl</kbd><kbd>[</kbd>, or <kbd>Esc</kbd>) jumps back instantly.
 - **Maximize** a panel to send its neighbor to the dock; restoring it brings the neighbor back.
 - "Reviewed" marks and the layout are saved in your browser.
 

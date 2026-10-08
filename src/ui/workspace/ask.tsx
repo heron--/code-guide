@@ -13,7 +13,11 @@ type Selection = { contexts: ChatContext[]; label: string; x: number; y: number 
  */
 export function useAskSelection(
   root: RefObject<HTMLElement | null>,
-  opts: { file: (path: string) => ResolvedFile | undefined; prose?: (text: string) => ChatContext | undefined },
+  opts: {
+    file: (path: string) => ResolvedFile | undefined;
+    /** `block` is the selection's `[data-prose]` element, for a panel that shows more than one. */
+    prose?: (text: string, block: HTMLElement) => ChatContext | undefined;
+  },
 ) {
   const { ask } = useActions();
   const [selection, setSelection] = useState<Selection>();
@@ -71,7 +75,8 @@ export function useAskSelection(
       });
     }
     const text = sel.toString().trim();
-    const context = text && el(sel.anchorNode)?.closest("[data-prose]") ? opts.prose?.(text) : undefined;
+    const block = el(sel.anchorNode)?.closest<HTMLElement>("[data-prose]");
+    const context = text && block ? opts.prose?.(text, block) : undefined;
     setSelection(context && { contexts: [context], label: "Ask about this", ...at });
   };
 
