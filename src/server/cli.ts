@@ -140,7 +140,7 @@ async function serve(dir: string | undefined, flags: Flags) {
     }
   }
   if (flags.pr) {
-    const pr = pullRequestNumber(/^\d+$/.test(flags.pr) ? `#${flags.pr}` : flags.pr);
+    const pr = await pullRequestNumber(root, /^\d+$/.test(flags.pr) ? `#${flags.pr}` : flags.pr);
     if (!pr) {
       console.error(`--pr: "${flags.pr}" isn't a pull request number or link`);
       return 1;

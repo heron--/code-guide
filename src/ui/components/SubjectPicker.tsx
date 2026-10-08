@@ -18,6 +18,7 @@ export function SubjectPicker() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>();
   const [input, setInput] = useState("");
   const [parsed, setParsed] = useState<Subject>();
+  const [inputError, setInputError] = useState<string>();
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -28,14 +29,19 @@ export function SubjectPicker() {
   useEffect(() => {
     // Whatever was read before belongs to other text: never submit it, and drop answers that arrive late.
     setParsed(undefined);
+    setInputError(undefined);
     if (!input.trim()) return;
     let current = true;
     const t = setTimeout(() => {
       fetch(`/api/subjects?input=${encodeURIComponent(input)}`)
-        .then((r) => r.json())
+        .then(async (r) => {
+          const body = await r.json();
+          if (!r.ok) throw new Error(body.error ?? "Could not read subject");
+          return body as Subject;
+        })
         .then(
-          (s: Subject) => current && setParsed(s),
-          () => {},
+          (s) => current && setParsed(s),
+          (e: Error) => current && setInputError(e.message),
         );
     }, 150);
     return () => {
@@ -60,7 +66,7 @@ export function SubjectPicker() {
         <header className="border-b border-rule bg-surface-3 px-3 py-1.5 text-xs font-semibold">New session</header>
         <div className="flex flex-col gap-5 p-5">
           <h1 className="text-xl font-semibold tracking-tight">What do you want to understand?</h1>
-          {error && <p className="text-[12.5px] text-del">{error}</p>}
+          {(inputError || error) && <p className="text-[12.5px] text-del">{inputError || error}</p>}
           {suggestions === undefined ? (
             <p className="font-mono text-xs text-fg-3">Looking for changes…</p>
           ) : (

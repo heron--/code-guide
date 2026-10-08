@@ -63,10 +63,20 @@ export async function suggestions(repo: string): Promise<Suggestion[]> {
   return out;
 }
 
-/** The pull request a link (`https://github.com/acme/app/pull/12`, or a page of it like `/files`) or `#12` names. */
-export function pullRequestNumber(text: string): number | undefined {
-  const m = text.trim().match(/^(?:#|https?:\/\/[^/\s]+\/[^/\s]+\/[^/\s]+\/pull\/)(\d+)(?:[/?#]\S*)?$/);
-  return m ? Number(m[1]) : undefined;
+/** The pull request a link or `#12` names. Links must belong to the repository `gh` uses for this session. */
+export async function pullRequestNumber(repo: string, text: string): Promise<number | undefined> {
+  const m = text.trim().match(/^(#|https?:\/\/[^/\s]+\/[^/\s]+\/[^/\s]+\/pull\/)(\d+)(?:[/?#]\S*)?$/);
+  if (!m) return undefined;
+  if (m[1] !== "#") {
+    const link = new URL(m[1]);
+    const current = new URL(JSON.parse(await sh(repo, "gh", ["repo", "view", "--json", "url"])).url);
+    if (
+      link.host.toLowerCase() !== current.host.toLowerCase() ||
+      link.pathname.toLowerCase() !== `${current.pathname}/pull/`.toLowerCase()
+    )
+      throw new Error(`Pull request link must belong to ${current.host}${current.pathname}`);
+  }
+  return Number(m[2]);
 }
 
 /** A pull request as a subject. Its base is a placeholder until `preparePullRequest` asks GitHub for the real one. */
@@ -80,7 +90,7 @@ export async function pullRequestChange(repo: string, pr: number): Promise<Subje
  */
 export async function branchChange(repo: string, name: string): Promise<Subject | undefined> {
   const base = await defaultBranch(repo);
-  if (!base || !/^[\w./@{}~^-]+$/.test(name)) return undefined;
+  if (!base || (await quiet(sh(repo, "git", ["check-ref-format", "--branch", name]))) === undefined) return undefined;
   if (await revParse(repo, name)) return { type: "change", base, head: name };
   if (await revParse(repo, `origin/${name}`)) return { type: "change", base, head: `origin/${name}` };
   // Never prompt for credentials: a branch that can't be checked quietly isn't one.
@@ -99,7 +109,7 @@ export async function branchChange(repo: string, name: string): Promise<Subject 
  */
 export async function parseInput(repo: string, input: string): Promise<Subject> {
   const text = input.trim();
-  const pr = pullRequestNumber(text);
+  const pr = await pullRequestNumber(repo, text);
   if (pr) return pullRequestChange(repo, pr);
   const range = text.match(/^(\S+?)\.\.\.?(\S+)$/);
   if (range && (await revParse(repo, range[1])) && (await revParse(repo, range[2])))
