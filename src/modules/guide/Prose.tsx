@@ -6,7 +6,7 @@ import { useSession } from "@/lib/session";
 
 export type AnchorTarget = Extract<Inline, { kind: "anchor" }>;
 
-let glossary: { written: number; terms: Promise<Term[]> } | undefined;
+let glossary: { key: string; terms: Promise<Term[]> } | undefined;
 /** The repository's glossary terms: fetched once, and again when the session writes one. */
 function useGlossary(): Term[] {
   const { state } = useSession();
@@ -14,10 +14,12 @@ function useGlossary(): Term[] {
     ? Object.values(state.jobs).filter((j) => j.kind === "glossary" && j.status === "finished").length
     : 0;
   const [terms, setTerms] = useState<Term[]>([]);
+  // Per session too: a tab can outlive its server and reconnect to another repository's.
+  const key = `${state?.id}:${written}`;
   useEffect(() => {
-    if (glossary?.written !== written)
+    if (glossary?.key !== key)
       glossary = {
-        written,
+        key,
         terms: fetch("/api/glossary").then(
           (r) => (r.ok ? r.json() : []),
           () => [],
@@ -28,7 +30,7 @@ function useGlossary(): Term[] {
     return () => {
       current = false;
     };
-  }, [written]);
+  }, [key]);
   return terms;
 }
 

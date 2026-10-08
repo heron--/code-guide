@@ -76,6 +76,20 @@ test("starts once per repository without a glossary", async () => {
   expect(started).toEqual(["glossary"]);
 });
 
+test("waits until the session's other jobs are done", async () => {
+  const session = await Session.create(repo);
+  const started: string[] = [];
+  const runner = { start: (kind: { kind: string }) => started.push(kind.kind) } as unknown as JobRunner;
+  generateGlossary(session, runner);
+  session.append("session.subject", { subject: { type: "path", path: "." }, label: "." });
+  session.append("job.queued", { job: "guide-1", kind: "guide", module: "guide", inputs: [] });
+  await Promise.resolve();
+  expect(started).toEqual([]);
+  session.append("job.finished", { job: "guide-1", result: "results/guide-1.json", warnings: [] });
+  await Promise.resolve();
+  expect(started).toEqual(["glossary"]);
+});
+
 test("doesn't start when the repository has a glossary", async () => {
   writeFileSync(join(repo, "glossary.md"), table);
   const session = await Session.create(repo);

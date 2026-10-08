@@ -131,18 +131,21 @@ ${rows.join("\n")}
 }
 
 /**
- * Writes a glossary for a repository that has none: when a subject is chosen, it starts the glossary job (after
- * the modules' jobs, so the guide isn't queued behind it). The job saves its result as the generated glossary,
- * so it runs once per repository. Returns a function that stops.
+ * Writes a glossary for a repository that has none, once the session's other jobs are done, so it never holds
+ * up the guide or its review. The job saves its result as the generated glossary, so it runs once per
+ * repository. Returns a function that stops.
  */
 export function generateGlossary(session: Session, runner: JobRunner): () => void {
   const start = () => {
-    const { repo, jobs } = session.state;
-    if (!repo || glossaryPath(repo)) return;
-    const written = Object.values(jobs).some(
-      (j) => j.kind === "glossary" && j.status !== "failed" && j.status !== "cancelled",
-    );
-    if (!written) runner.start(glossaryJob, "glossary");
+    const { repo, jobs, subject } = session.state;
+    if (!repo || !subject || glossaryPath(repo)) return;
+    const all = Object.values(jobs);
+    if (all.some((j) => j.status === "queued" || j.status === "running")) return;
+    if (all.some((j) => j.kind === "glossary" && j.status !== "failed" && j.status !== "cancelled")) return;
+    runner.start(glossaryJob, "glossary");
   };
-  return session.subscribe((e) => e.type === "session.subject" && queueMicrotask(start));
+  // After the event is applied, and after anything it sets off (a review queued when a guide finishes).
+  return session.subscribe(
+    (e) => ["session.subject", "job.finished", "job.failed", "job.cancelled"].includes(e.type) && queueMicrotask(start),
+  );
 }
