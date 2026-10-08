@@ -18,7 +18,7 @@ Every event has the same envelope. `seq` counts up from 1 within a session. A ta
 
 ```json
 {
-  "v": 1,
+  "v": 2,
   "seq": 1,
   "at": "2026-10-07T09:12:03.120Z",
   "session": "2026-10-07-091203-k3f9",
@@ -114,7 +114,7 @@ Replies stream as text deltas, appended in order.
 ## Requests
 
 ```json
-{ "type": "hello", "v": 1, "session": "2026-10-07-091203-k3f9", "after": 41 }
+{ "type": "hello", "v": 2, "session": "2026-10-07-091203-k3f9", "after": 41 }
 ```
 
 The first message on every connection. A tab that reconnects sends its session and the last `seq` it saw, and gets only what came after. A fresh tab omits both, and so does a tab whose session isn't the server's any more: either gets the whole session.
@@ -144,7 +144,7 @@ A chat message's context can be a `chapter`, a selected range of chapter `prose`
 ## Notices
 
 ```json
-{ "type": "welcome", "v": 1, "session": "2026-10-07-091203-k3f9", "modules": [{ "name": "diff", "label": "Diff", "icon": ["M3 2.5h10v11H3z", "M8 5v4M6 7h4M6 11h4"], "needsJob": false, "subjects": ["change"] }], "view": { "modules": ["guide", "chat"], "theme": "system" } }
+{ "type": "welcome", "v": 2, "session": "2026-10-07-091203-k3f9", "modules": [{ "name": "diff", "label": "Diff", "icon": ["M3 2.5h10v11H3z", "M8 5v4M6 7h4M6 11h4"], "needsJob": false, "subjects": ["change"] }], "view": { "modules": ["guide", "chat"], "theme": "system" } }
 ```
 
 `welcome` lists the modules this server offers, so the browser can show them without knowing any by name. `view` carries the settings the browser applies: its theme, and the modules a new session opens.
