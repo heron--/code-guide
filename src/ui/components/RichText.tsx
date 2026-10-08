@@ -3,7 +3,15 @@ import remarkGfm from "remark-gfm";
 import { CiteChip } from "@/code/CiteChip";
 
 /** A link into the repository with lines, e.g. `src/a.ts#L3-L9`. Anything with a scheme is a web link. */
-const CITATION = /^([^:#?\s]+)#L(\d+)(?:-L?(\d+))?$/;
+const CITATION = /^([^:#?]+)#L(\d+)(?:-L?(\d+))?$/;
+
+function safeDecode(s: string): string {
+  try {
+    return decodeURI(s);
+  } catch {
+    return s;
+  }
+}
 
 type Node = { type: string; value?: string; children?: Node[] };
 
@@ -26,7 +34,8 @@ function htmlAsText() {
 
 const components: Components = {
   a: ({ href = "", children }) => {
-    const cite = href.match(CITATION);
+    // Destinations arrive URL-encoded, so a path with spaces (written `<my dir/a.ts#L2>`) reads as %20.
+    const cite = safeDecode(href).match(CITATION);
     if (cite) {
       const start = Number(cite[2]);
       return <CiteChip path={cite[1]} start={start} end={cite[3] ? Number(cite[3]) : start} />;

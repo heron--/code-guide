@@ -11,6 +11,10 @@ test("repository links with lines become file:line chips; web links stay links",
   expect(out).toContain('<a href="https://x.dev/a#L5" target="_blank" rel="noreferrer"');
 });
 
+test("cites paths with spaces, written as CommonMark allows", () => {
+  expect(html("[it](<my dir/a b.ts#L2-L3>)")).toContain('title="my dir/a b.ts, lines 2–3"');
+});
+
 test("keeps an ordered list's numbers", () => {
   expect(html("3. three\n4. four")).toMatch(/<ol start="3"[^>]*>\s*<li[^>]*>three<\/li>/);
 });
