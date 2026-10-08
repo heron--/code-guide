@@ -66,6 +66,20 @@ export function requestHandler(session: Session, runner: JobRunner, modules: Mod
   };
 }
 
+/**
+ * A question is labelled with its own text, which is often too long for the status bar. Once a guide answers it,
+ * the guide's title (a short name for the question) labels it instead. Returns a function that stops.
+ */
+export function labelQuestions(session: Session, runner: Pick<JobRunner, "onFinished">): () => void {
+  return runner.onFinished((id, result) => {
+    const title = (result as { title?: unknown } | undefined)?.title;
+    const { subject } = session.state;
+    if (session.state.jobs[id]?.kind !== "guide" || subject?.subject.type !== "question") return;
+    if (typeof title === "string" && title.trim() && title !== subject.label)
+      session.append("session.label", { label: title.trim() });
+  });
+}
+
 /** Starts each module's follow-up jobs as its jobs finish. Returns a function that stops. */
 export function followUps(session: Session, runner: JobRunner, modules: Module[]): () => void {
   return runner.onFinished((id, result) => {

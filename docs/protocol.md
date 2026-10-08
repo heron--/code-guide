@@ -38,6 +38,12 @@ The examples below show only `type` and `payload`.
 A subject is a `change` (`base`, optional `head`, optional `pr`), a `path`, or a `question`.
 
 ```json
+{ "type": "session.label", "payload": { "label": "How retries are scheduled" } }
+```
+
+A shorter label for the subject, replacing the one in `session.subject`. A question starts labelled with its own text; when a guide answers it, the guide's title becomes the label.
+
+```json
 { "type": "harness.status", "payload": { "harness": "claude-code", "model": "opus-5.5", "state": "ready" } }
 ```
 

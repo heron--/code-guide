@@ -60,6 +60,8 @@ export const eventPayloads = {
   /** First event of every session. */
   "session.started": z.object({ repo: z.string() }),
   "session.subject": z.object({ subject: subjectSchema, label: z.string() }),
+  /** A better label for the subject, e.g. a question's guide title in place of the whole question. */
+  "session.label": z.object({ label: z.string() }),
   "harness.status": z.object({
     harness: z.string(),
     model: z.string(),
