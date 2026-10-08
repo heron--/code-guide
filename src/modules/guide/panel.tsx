@@ -340,9 +340,10 @@ function GuideView(props: {
     </div>
   );
 
-  // Room below the last chapter, so its start can reach the top.
+  // Room below the last chapter, so even a short one's start can reach the current line: the scroller is never
+  // taller than the window, so 80% of the window covers the 80% of the scroller below that line.
   const sectionsList = (
-    <div className="pb-[50vh]">
+    <div className="pb-[80vh]">
       {chapters.map((_, n) => (
         <section key={n} ref={(el) => void (sections.current[n] = el)} aria-label={`Chapter ${n + 1}`}>
           {narrow && prose(n)}
