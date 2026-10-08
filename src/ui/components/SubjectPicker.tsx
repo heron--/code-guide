@@ -19,7 +19,10 @@ export function SubjectPicker() {
   const [input, setInput] = useState("");
   const [parsed, setParsed] = useState<Subject>();
   const [inputError, setInputError] = useState<string>();
-  const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState(false);
+  // The subject being started: a change fetches from its remote first, which can take seconds.
+  const [starting, setStarting] = useState<Subject>();
+  const busy = starting !== undefined;
 
   useEffect(() => {
     fetch("/api/subjects")
@@ -30,9 +33,12 @@ export function SubjectPicker() {
     // Whatever was read before belongs to other text: never submit it, and drop answers that arrive late.
     setParsed(undefined);
     setInputError(undefined);
+    setChecking(false);
     if (!input.trim()) return;
     let current = true;
     const t = setTimeout(() => {
+      // A branch only on origin is looked up there, which can take a moment.
+      setChecking(true);
       fetch(`/api/subjects?input=${encodeURIComponent(input)}`)
         .then(async (r) => {
           const body = await r.json();
@@ -42,7 +48,8 @@ export function SubjectPicker() {
         .then(
           (s) => current && setParsed(s),
           (e: Error) => current && setInputError(e.message),
-        );
+        )
+        .finally(() => current && setChecking(false));
     }, 150);
     return () => {
       current = false;
@@ -53,11 +60,11 @@ export function SubjectPicker() {
   // A refused choice (e.g. a pull request that couldn't be fetched) comes back as an error: let them try again.
   const { error } = useSession();
   useEffect(() => {
-    if (error) setBusy(false);
+    if (error) setStarting(undefined);
   }, [error]);
 
   const choose = (subject: Subject) => {
-    setBusy(sessionChannel().send({ type: "subject.choose", subject }));
+    if (sessionChannel().send({ type: "subject.choose", subject })) setStarting(subject);
   };
 
   return (
@@ -66,7 +73,14 @@ export function SubjectPicker() {
         <header className="border-b border-rule bg-surface-3 px-3 py-1.5 text-xs font-semibold">New session</header>
         <div className="flex flex-col gap-5 p-5">
           <h1 className="text-xl font-semibold tracking-tight">What do you want to understand?</h1>
-          {(inputError || error) && <p className="text-[12.5px] text-del">{inputError || error}</p>}
+          {starting ? (
+            <p role="status" className="flex items-center gap-1.5 font-mono text-[11.5px] text-fg-2">
+              <span className="size-1.5 animate-pulse bg-accent" />
+              {starting.type === "change" ? "Fetching the latest commits…" : "Starting…"}
+            </p>
+          ) : (
+            (inputError || error) && <p className="text-[12.5px] text-del">{inputError || error}</p>
+          )}
           {suggestions === undefined ? (
             <p className="font-mono text-xs text-fg-3">Looking for changes…</p>
           ) : (
@@ -112,10 +126,12 @@ export function SubjectPicker() {
                 disabled={!parsed || busy}
                 className="border border-accent bg-accent px-3 text-[13px] text-surface disabled:border-border disabled:bg-surface-3 disabled:text-fg-3"
               >
-                Start
+                {busy ? "Starting…" : "Start"}
               </button>
             </div>
-            <p className="h-4 font-mono text-[11px] text-fg-3">{parsed && input.trim() ? describe(parsed) : ""}</p>
+            <p className="h-4 font-mono text-[11px] text-fg-3">
+              {parsed && input.trim() ? describe(parsed) : checking ? "Checking…" : ""}
+            </p>
           </form>
         </div>
       </div>
