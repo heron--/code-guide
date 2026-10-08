@@ -18,7 +18,7 @@ Every event has the same envelope. `seq` counts up from 1 within a session. A ta
 
 ```json
 {
-  "v": 1,
+  "v": 2,
   "seq": 1,
   "at": "2026-10-07T09:12:03.120Z",
   "session": "2026-10-07-091203-k3f9",
@@ -36,6 +36,12 @@ The examples below show only `type` and `payload`.
 ```
 
 A subject is a `change` (`base`, optional `head`, optional `pr`), a `path`, or a `question`.
+
+```json
+{ "type": "session.label", "payload": { "label": "How retries are scheduled" } }
+```
+
+A shorter label for the subject, replacing the one in `session.subject`. A question starts labelled with its own text; when a guide answers it, the guide's title becomes the label.
 
 ```json
 { "type": "harness.status", "payload": { "harness": "claude-code", "model": "opus-5.5", "state": "ready" } }
@@ -108,7 +114,7 @@ Replies stream as text deltas, appended in order.
 ## Requests
 
 ```json
-{ "type": "hello", "v": 1, "session": "2026-10-07-091203-k3f9", "after": 41 }
+{ "type": "hello", "v": 2, "session": "2026-10-07-091203-k3f9", "after": 41 }
 ```
 
 The first message on every connection. A tab that reconnects sends its session and the last `seq` it saw, and gets only what came after. A fresh tab omits both, and so does a tab whose session isn't the server's any more: either gets the whole session.
@@ -138,7 +144,7 @@ A chat message's context can be a `chapter`, a selected range of chapter `prose`
 ## Notices
 
 ```json
-{ "type": "welcome", "v": 1, "session": "2026-10-07-091203-k3f9", "modules": [{ "name": "diff", "label": "Diff", "icon": ["M3 2.5h10v11H3z", "M8 5v4M6 7h4M6 11h4"], "needsJob": false, "subjects": ["change"] }], "view": { "modules": ["guide", "chat"], "theme": "system" } }
+{ "type": "welcome", "v": 2, "session": "2026-10-07-091203-k3f9", "modules": [{ "name": "diff", "label": "Diff", "icon": ["M3 2.5h10v11H3z", "M8 5v4M6 7h4M6 11h4"], "needsJob": false, "subjects": ["change"] }], "view": { "modules": ["guide", "chat"], "theme": "system" } }
 ```
 
 `welcome` lists the modules this server offers, so the browser can show them without knowing any by name. `view` carries the settings the browser applies: its theme, and the modules a new session opens.
