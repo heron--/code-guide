@@ -52,6 +52,8 @@ The browser asks what you want to understand and suggests the subjects that appl
 
 A change runs from the merge-base of its base and head to its head, or to the working tree when it has no head. Code Guide fetches the base from its remote first, so a stale local copy doesn't pull other people's commits into the change; offline, it uses the local copy. For a pull request it fetches the head commit without creating a branch.
 
+When a change comes from a pull request, the status bar links to it (with `gh`). While the subject is the pull request itself, Code Guide checks it every minute; when new commits are pushed, the status bar offers **Update modules**, which moves the session to the latest commit and writes its guide and overview again. A quiz waits for you to start it again, so it isn't built from the old guide.
+
 ### Jobs
 
 Choosing a subject starts two jobs: the guide and the overview. Every guide goes to a review job that sees only the guide and the code. If the review asks for changes, one revision is written and reviewed again, and you see the latest guide that passed the spec. The quiz job starts when you open Quiz, once the guide is done.
@@ -64,9 +66,9 @@ While the session runs, the **console** (what Code Guide prints in the terminal)
 
 The browser shows a workspace: two slots side by side and a dock along the bottom. A new session opens Guide on the left, showing its progress while it's written, and Chat on the right. Other panels wait in the dock as squares, marked when they have a new result: click one to open it, or drag it up into a slot. Drag a panel's title bar onto the other slot to swap them, or the divider to resize. **New panel** opens any module, or says why it can't yet.
 
-- **Overview**: a short summary of the subject, an intro before the chapters. For a change with a pull request, a second tab shows the pull request's description.
-- **Guide**: one chapter at a time, its prose and file list beside the code. The prose column widens with the panel, up to a comfortable line length. Keys work while focus is in the panel (hover the chapter arrows for a reminder): <kbd>J</kbd>/<kbd>K</kbd> (or <kbd>⌥</kbd><kbd>↓</kbd>/<kbd>↑</kbd>) for chapters, <kbd>[</kbd>/<kbd>]</kbd> for files, <kbd>R</kbd> to mark the chapter Reviewed. Each file can be marked Reviewed too, which collapses it. The status bar counts the chapters you've reviewed.
-- **Anchors** (accent-coloured links in the prose) scroll the code to their lines and highlight them. **Go back** (or <kbd>Esc</kbd>) jumps back.
+- **Overview**: a short summary of the subject, an intro before the chapters. For a change with a pull request, a second tab shows the pull request's description. The summary, the description and chat replies render as Markdown; raw HTML in them shows as text.
+- **Guide**: one chapter at a time, its prose and file list beside the code. The code scrolls straight through every chapter and the prose follows: a chapter becomes current as its first file reaches the top (or, scrolling up, as its last file comes back). The prose column widens with the panel, up to a comfortable line length. Keys work while focus is in the panel (hover the chapter arrows for a reminder): <kbd>J</kbd>/<kbd>K</kbd> (or <kbd>⌥</kbd><kbd>↓</kbd>/<kbd>↑</kbd>) for chapters, <kbd>[</kbd>/<kbd>]</kbd> for files, <kbd>R</kbd> to mark the chapter Reviewed. Each file can be marked Reviewed too, which collapses it. The status bar counts the chapters you've reviewed.
+- **Anchors** (accent-coloured links in the prose) scroll the code to their lines and highlight them. **Go back** (or <kbd>⌘</kbd><kbd>[</kbd> / <kbd>Ctrl</kbd><kbd>[</kbd>, or <kbd>Esc</kbd>) jumps back.
 - **Glossary terms**: if the repository has a `GLOSSARY.md` with a Term | Definition table, like [this one](GLOSSARY.md), its terms get a dotted underline in chapter prose and show their definition on hover.
 - **Diff** (for changes): every changed file, like a pull request. **Full diff** shows every line of every file instead of just the changes.
 - **Quiz**: 3–5 multiple-choice questions on the guide. Each answer explains itself and cites the code.

@@ -33,14 +33,23 @@ export default function DiffPanel({ state }: PanelProps) {
     if (target && changed) jump(target.path);
   }, [target, changed]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Again when the subject moves to new commits.
+  const head = subject?.type === "change" ? subject.head : undefined;
   useEffect(() => {
+    files.current.clear();
+    setError(undefined);
+    // A reply for an earlier head that lands late must not replace this one's.
+    let current = true;
     fetch("/api/diff")
       .then(async (r) => (r.ok ? r.json() : Promise.reject(new Error((await r.json()).error))))
       .then(
-        (d: { changed: Changed[] }) => setChanged(d.changed),
-        (e: Error) => setError(e.message),
+        (d: { changed: Changed[] }) => current && setChanged(d.changed),
+        (e: Error) => current && setError(e.message),
       );
-  }, []);
+    return () => {
+      current = false;
+    };
+  }, [head]);
 
   function jump(path: string) {
     const el = document.getElementById(domId(path));
@@ -109,7 +118,7 @@ export default function DiffPanel({ state }: PanelProps) {
         <div className="flex flex-col gap-3 p-3 pb-[40vh]">
           {changed.map((f) => (
             <DiffFile
-              key={f.path}
+              key={`${head}:${f.path}`}
               path={f.path}
               full={full}
               onLoad={(f) => files.current.set(f.path, f)}
@@ -173,17 +182,23 @@ function DiffFile({
   }, [scroller]);
   useEffect(() => {
     if (!near || file || failed) return;
+    // A reply that lands after this card is gone (the head moved on) must not register its file.
+    let current = true;
     fetch(`/api/diff/file?path=${encodeURIComponent(path)}`)
       .then(async (r) => (r.ok ? r.json() : Promise.reject(new Error((await r.json()).error))))
       .then(
         (f: ResolvedFile) => {
+          if (!current) return;
           onLoad(f);
           setFile(f);
           setVisible(initialVisible(f));
         },
         // E.g. a working-tree file reverted since the list was made.
-        (e: Error) => setFailed(e.message),
+        (e: Error) => current && setFailed(e.message),
       );
+    return () => {
+      current = false;
+    };
   }, [near, file, failed, path]);
 
   return (

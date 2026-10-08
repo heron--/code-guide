@@ -9,7 +9,7 @@ import type { ViewSettings } from "./settings.js";
  * session's log and streamed to every connected tab. The browser never changes state itself: it sends a
  * request, and renders whatever events come back.
  */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 // ---- Shared payload shapes ----
 
@@ -68,6 +68,11 @@ export const eventPayloads = {
     state: z.enum(["starting", "ready", "unavailable"]),
     message: z.string().optional(),
   }),
+  /**
+   * The pull request a change subject comes from, as GitHub has it now. `head` (its latest commit) is watched only
+   * when the subject is the pull request itself; when it differs from the subject's, the reader can update.
+   */
+  "subject.remote": z.object({ number: z.number().int().positive(), url: z.string(), head: z.string().optional() }),
 
   /** A job was asked for. It starts when a slot under the concurrency limit is free. */
   "job.queued": z.object({
@@ -150,6 +155,8 @@ export const requestSchema = z.discriminatedUnion("type", [
     after: z.number().int().nonnegative().optional(),
   }),
   z.object({ type: z.literal("subject.choose"), subject: subjectSchema }),
+  /** Move a pull request subject to the pull request's latest commit, and run its modules again. */
+  z.object({ type: z.literal("subject.update") }),
   /** Start a job for a module. `retry` names a failed job to run again. */
   z.object({ type: z.literal("job.start"), module: z.string(), retry: z.string().optional() }),
   z.object({ type: z.literal("job.cancel"), job: z.string() }),
