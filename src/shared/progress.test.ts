@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { ModuleInfo } from "./modules";
-import type { SessionEvent } from "./protocol";
+import { PROTOCOL_VERSION, type SessionEvent } from "./protocol";
 import { emptyState, reduce, type SessionState } from "./state";
 import { panelState, runProgress } from "./progress";
 
@@ -9,7 +9,8 @@ const guide: ModuleInfo = { name: "guide", label: "Guide", icon: [], needsJob: t
 /** A session built from events, numbered in order. */
 function session(...events: [string, Record<string, unknown>][]): SessionState {
   return events.reduce(
-    (s, [type, payload], i) => reduce(s, { v: 1, seq: i + 1, at: "", session: "s", type, payload } as SessionEvent),
+    (s, [type, payload], i) =>
+      reduce(s, { v: PROTOCOL_VERSION, seq: i + 1, at: "", session: "s", type, payload } as SessionEvent),
     emptyState("s"),
   );
 }

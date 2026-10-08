@@ -75,7 +75,7 @@ const cells = (ch: string) => eastAsianWidth(ch.codePointAt(0)!);
 const widthOf = (s: string) => [...s].reduce((n, ch) => n + cells(ch), 0);
 
 /**
- * Shows the session in the terminal while it runs: a log of finished and failed jobs, and on a terminal, a live
+ * The console: shows the session in the terminal while it runs: a log of finished and failed jobs, and on a terminal, a live
  * block below it with the chat's agent and each running job, redrawn in place. Returns a function that stops.
  */
 export function showStatus(
