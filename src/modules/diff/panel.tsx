@@ -37,6 +37,7 @@ export default function DiffPanel({ state }: PanelProps) {
   const head = subject?.type === "change" ? subject.head : undefined;
   useEffect(() => {
     files.current.clear();
+    setError(undefined);
     fetch("/api/diff")
       .then(async (r) => (r.ok ? r.json() : Promise.reject(new Error((await r.json()).error))))
       .then(
