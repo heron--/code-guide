@@ -3,12 +3,19 @@ import { readFileSync } from "node:fs";
 import { defineConfig } from "tsup";
 
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
-/** The commit this build is from, so a running Code Guide can say whether it's up to date. Empty outside git. */
+/**
+ * The commit this build is from, so a running Code Guide can say whether it's up to date: "-dirty" when the
+ * build includes uncommitted changes to tracked files. Empty outside git.
+ */
 function commit(): string {
-  try {
-    return execFileSync("git", ["rev-parse", "--short=5", "HEAD"], { stdio: ["ignore", "pipe", "ignore"] })
+  const git = (...args: string[]) =>
+    execFileSync("git", args, { stdio: ["ignore", "pipe", "ignore"] })
       .toString()
       .trim();
+  try {
+    return (
+      git("rev-parse", "--short=5", "HEAD") + (git("status", "--porcelain", "--untracked-files=no") ? "-dirty" : "")
+    );
   } catch {
     return "";
   }
