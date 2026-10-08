@@ -35,7 +35,7 @@ The examples below show only `type` and `payload`.
 { "type": "session.subject", "payload": { "subject": { "type": "change", "base": "main", "head": "feat/retry-policy" }, "label": "feat/retry-policy vs main" } }
 ```
 
-A subject is a `change` (`base`, optional `head`, optional `pr`), a `path`, or a `question`.
+A subject is a `change` (`base`, optional `head`, optional `pr`), a `path`, or a `question`. It comes again when the reader updates a pull request subject to new commits (`subject.update`).
 
 ```json
 { "type": "session.label", "payload": { "label": "How retries are scheduled" } }
@@ -46,6 +46,12 @@ A shorter label for the subject, replacing the one in `session.subject`. A quest
 ```json
 { "type": "harness.status", "payload": { "harness": "claude-code", "model": "opus-5.5", "state": "ready" } }
 ```
+
+```json
+{ "type": "subject.remote", "payload": { "number": 12, "url": "https://github.com/acme/payments/pull/12", "head": "9d1e0c4b7a2f" } }
+```
+
+The pull request a change subject comes from, reported when the subject is chosen and again whenever it changes (checked every minute with `gh`). `head`, its latest commit, is there only when the subject is the pull request itself; when it differs from the subject's `head`, the pull request has new commits.
 
 ### Jobs
 
@@ -122,6 +128,12 @@ The first message on every connection. A tab that reconnects sends its session a
 ```json
 { "type": "subject.choose", "subject": { "type": "question", "question": "How are retries scheduled?" } }
 ```
+
+```json
+{ "type": "subject.update" }
+```
+
+Moves a pull request subject to the pull request's latest commit: cancels running jobs, sends `session.subject` with the new `head`, and starts again every module that has run (except one that reads another's result, like a quiz, which waits for the reader).
 
 ```json
 { "type": "job.start", "module": "guide" }

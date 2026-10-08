@@ -11,6 +11,7 @@ import { repoRoot, revParse } from "./git.js";
 import { createHarness, DEFAULT_HARNESS, harnesses } from "./harness/index.js";
 import { JobRunner } from "./jobs.js";
 import { followUps, labelQuestions, requestHandler } from "./requests.js";
+import { watchPullRequest } from "./remote.js";
 import { resolveGuide } from "./resolve.js";
 import { startServer } from "./server.js";
 import { Session } from "./session.js";
@@ -135,6 +136,7 @@ async function serve(dir: string | undefined, flags: Flags) {
   const runner = new JobRunner(session, (kind) => (kind === "review" ? reviewer : harness));
   followUps(session, runner, modules);
   labelQuestions(session, runner);
+  watchPullRequest(session);
   const chat = new Chat(session, harness);
   const onRequest = requestHandler(session, runner, modules, chat);
   if (flags.subject) await onRequest({ type: "subject.choose", subject: flags.subject });

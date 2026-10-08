@@ -41,6 +41,7 @@ export type SessionState = {
   repo?: string;
   subject?: { subject: Subject; label: string };
   harness?: EventPayload<"harness.status">;
+  remote?: EventPayload<"subject.remote">;
   jobs: Record<string, JobState>;
   /** Job ids, oldest first. */
   jobOrder: string[];
@@ -73,6 +74,9 @@ export function reduce(state: SessionState, e: SessionEvent): SessionState {
       break;
     case "harness.status":
       s.harness = e.payload;
+      break;
+    case "subject.remote":
+      s.remote = e.payload;
       break;
 
     case "job.queued": {
@@ -150,4 +154,10 @@ export function reduce(state: SessionState, e: SessionEvent): SessionState {
       break;
   }
   return s;
+}
+
+/** Whether the pull request this session is about has commits past the ones it was read at. */
+export function hasNewCommits(state: SessionState): boolean {
+  const s = state.subject?.subject;
+  return s?.type === "change" && !!s.pr && !!state.remote?.head && state.remote.head !== s.head;
 }

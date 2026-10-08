@@ -33,14 +33,17 @@ export default function DiffPanel({ state }: PanelProps) {
     if (target && changed) jump(target.path);
   }, [target, changed]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Again when the subject moves to new commits.
+  const head = subject?.type === "change" ? subject.head : undefined;
   useEffect(() => {
+    files.current.clear();
     fetch("/api/diff")
       .then(async (r) => (r.ok ? r.json() : Promise.reject(new Error((await r.json()).error))))
       .then(
         (d: { changed: Changed[] }) => setChanged(d.changed),
         (e: Error) => setError(e.message),
       );
-  }, []);
+  }, [head]);
 
   function jump(path: string) {
     const el = document.getElementById(domId(path));
@@ -109,7 +112,7 @@ export default function DiffPanel({ state }: PanelProps) {
         <div className="flex flex-col gap-3 p-3 pb-[40vh]">
           {changed.map((f) => (
             <DiffFile
-              key={f.path}
+              key={`${head}:${f.path}`}
               path={f.path}
               full={full}
               onLoad={(f) => files.current.set(f.path, f)}

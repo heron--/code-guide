@@ -3,7 +3,7 @@ import type { ResolvedFile } from "../../shared/guide";
 import type { ChatContext } from "../../shared/protocol";
 import { unavailable, type ModuleInfo } from "../../shared/modules";
 import { DEFAULT_VIEW } from "../../shared/settings";
-import type { SessionState } from "../../shared/state";
+import { hasNewCommits, type SessionState } from "../../shared/state";
 import { panelFor } from "@/lib/panels";
 import type { SessionChannel } from "@/lib/session";
 import { usePersistent, usePersistentSet } from "@/lib/storage";
@@ -200,7 +200,13 @@ export function Workspace({ state, modules, panels = DEFAULT_VIEW.modules, chann
             drag && dragged.current && "cursor-grabbing select-none",
           )}
         >
-          <StatusBar state={state} modules={modules} onStart={startModule} problem={problem} />
+          <StatusBar
+            state={state}
+            modules={modules}
+            onStart={startModule}
+            onUpdate={() => channel.send({ type: "subject.update" })}
+            problem={problem}
+          />
           <main ref={mainRef} className="flex min-h-0 flex-1 p-2.5">
             {over?.whole && dragged.current ? (
               slot("left")
@@ -502,14 +508,17 @@ function StatusBar({
   state,
   modules,
   onStart,
+  onUpdate,
   problem,
 }: {
   state: SessionState;
   modules: ModuleInfo[];
   onStart: (m: ModuleInfo) => void;
+  onUpdate: () => void;
   problem?: string;
 }) {
   const subject = state.subject?.subject;
+  const { remote } = state;
   const activity = sessionActivity(state);
   const guide = modules.find((m) => m.name === "guide");
   const guideJob = guide && panelState(guide, state).job;
@@ -526,7 +535,34 @@ function StatusBar({
           <span className="truncate" title={subject?.type === "question" ? subject.question : state.subject?.label}>
             {state.subject?.label}
           </span>
+          {remote && (
+            <a
+              href={remote.url}
+              target="_blank"
+              rel="noreferrer"
+              title="Open the pull request"
+              className="flex-none text-accent-fg underline-offset-2 hover:underline"
+            >
+              {/* A pull request subject's label already names it. */}
+              {subject?.type === "change" && subject.pr ? "↗" : `#${remote.number} ↗`}
+            </a>
+          )}
         </span>
+        {hasNewCommits(state) && (
+          <>
+            <Sep />
+            <span className="flex flex-none items-center gap-2 font-mono text-[11.5px] text-fg-2">
+              New commits on #{remote!.number}
+              <button
+                onClick={onUpdate}
+                title="Read the pull request's latest commit, and write this session's modules again"
+                className="flex h-[22px] items-center border border-accent bg-surface px-[7px] font-sans text-xs text-accent-fg hover:bg-accent-bg"
+              >
+                Update modules
+              </button>
+            </span>
+          </>
+        )}
         {state.harness && (
           <>
             <Sep />
