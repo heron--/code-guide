@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Guide, Problem } from "../../shared/guide.js";
 import { LIMITS } from "../../server/resolve.js";
+import { glossaryNote } from "../../server/glossary.js";
 import type { JobContext, JobKind } from "../../server/jobs.js";
 import { instructions as guideInstructions, prompt as guidePrompt } from "./instructions.js";
 import { submitGuide } from "./submit.js";
@@ -108,7 +109,7 @@ You're revising a guide that a reviewer found wanting. You get the guide and the
           `- ${f.chapter === undefined ? "Guide" : `Chapter ${f.chapter}`} (${f.rule}): ${f.problem} Fix: ${f.fix}`,
       )
       .join("\n");
-    return `Revise this guide. It was written for this task:\n\n> ${guidePrompt(ctx.subject)}\n\nThe guide:\n\n${JSON.stringify(inputGuide(ctx), null, 2)}\n\nThe review's findings:\n${findings}`;
+    return `Revise this guide. It was written for this task:\n\n> ${guidePrompt(ctx.subject)}\n\nThe guide:\n\n${JSON.stringify(inputGuide(ctx), null, 2)}\n\nThe review's findings:\n${findings}${glossaryNote(ctx.repo)}`;
   },
   submit: submitGuide,
 };

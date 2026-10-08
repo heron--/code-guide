@@ -15,5 +15,5 @@ Use these words, and only these words, for these ideas: in the spec, the skill, 
 | **Subject** | What a session is about: a change, a path, or a question. | An anchor. An anchor points at lines; the subject is the whole thing being explained. |
 | **Session** | One run of Code Guide on one subject. Short-lived and disposable. | A harness's own session. One Code Guide session may run several. |
 | **Module** | One way of working with the subject in Code Guide: Guide, Quiz, Chat, Diff, or Overview. Shown in a panel. | A panel, which is the window a module appears in. Also not a Go or JavaScript module; when the code's modules come up, say "Go module" or "package." |
-| **Job** | Background agent work that produces one guide, quiz, or review, and ends when the result passes validation. | Chat. A job has one goal and no back-and-forth with the reader. |
+| **Job** | Background agent work that produces one result and ends when it passes validation. | Chat. A job has one goal and no back-and-forth with the reader. |
 | **Review** | A judgment of a guide against the quality bar, made by a separate job that sees only the guide and the code. | Code review, and validation. Validation checks the spec mechanically; review judges quality. |
