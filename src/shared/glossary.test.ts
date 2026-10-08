@@ -5,7 +5,18 @@ import { markTerms, parseGlossary } from "./glossary";
 test("reads this repository's glossary", () => {
   const terms = parseGlossary(readFileSync(new URL("../../GLOSSARY.md", import.meta.url), "utf8"));
   expect(terms.map((t) => t.term)).toEqual(
-    expect.arrayContaining(["Guide", "Chapter", "Excerpt", "Anchor", "Subject", "Session", "Module", "Job", "Review"]),
+    expect.arrayContaining([
+      "Guide",
+      "Chapter",
+      "Excerpt",
+      "Anchor",
+      "Subject",
+      "Session",
+      "Module",
+      "Job",
+      "Review",
+      "Console",
+    ]),
   );
   expect(terms.find((t) => t.term === "Anchor")).toMatchObject({
     definition: expect.stringMatching(/^A link in chapter prose/),

@@ -33,7 +33,7 @@ npm install -g github:heron--/code-chapters   # or: git clone … && npm install
 
 ## Use
 
-Run `code-guide` anywhere inside a git repository. It starts a session and a local server and opens your browser, where you pick a subject: a change, a path, or a question. Code Guide writes a guide about it (and has another job review it), and you can ask questions as you read. While it runs, the terminal shows the agent you chat with (harness, model, how full its context is, and whether it's thinking, writing, in a tool call or idle) and a progress bar for each running job, with finished and failed jobs logged above. It starts by printing the version and the commit it was built from, so you can tell whether it's up to date.
+Run `code-guide` anywhere inside a git repository. It starts a session and a local server and opens your browser, where you pick a subject: a change, a path, or a question. Code Guide writes a guide about it (and has another job review it), and you can ask questions as you read. While it runs, the console (what Code Guide prints in the terminal) shows the agent you chat with (harness, model, how full its context is, and whether it's thinking, writing, in a tool call or idle) and a progress bar for each running job, with finished and failed jobs logged above. It starts by printing the version and the commit it was built from, so you can tell whether it's up to date.
 
 ```
 code-guide [dir]                   Start a session (default: the repo containing .)
