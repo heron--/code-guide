@@ -33,12 +33,13 @@ npm install -g github:heron--/code-chapters   # or: git clone … && npm install
 
 ## Use
 
-Run `code-guide` anywhere inside a git repository. It starts a session and a local server and opens your browser, where you pick a subject: a change, a path, or a question. Code Guide writes a guide about it (and has another job review it), and you can ask questions as you read. While it runs, the console (what Code Guide prints in the terminal) shows the agent you chat with (harness, model, how full its context is, and whether it's thinking, writing, in a tool call or idle) and a progress bar for each running job, with finished and failed jobs logged above. It starts by printing the version and the commit it was built from, so you can tell whether it's up to date.
+Run `code-guide` anywhere inside a git repository. It starts a session and a local server and opens your browser, where you pick a subject: a change, a path, or a question. Type a branch name, local or on origin, to see what it changes, or paste a pull request's link. Code Guide writes a guide about it (and has another job review it), and you can ask questions as you read. While it runs, the console (what Code Guide prints in the terminal) shows the agent you chat with (harness, model, how full its context is, and whether it's thinking, writing, in a tool call or idle) and a progress bar for each running job, with finished and failed jobs logged above. It starts by printing the version and the commit it was built from, so you can tell whether it's up to date.
 
 ```
 code-guide [dir]                   Start a session (default: the repo containing .)
 code-guide check <guide.json>…     Validate guides; exits 1 on errors
-  --change <base>[...<head>]   --path <path>   --question <text>   pick the subject up front
+  --change <base>[...<head>]   --branch <name>   --pr <number|link>
+  --path <path>   --question <text>                                pick the subject up front
   --harness <name>   --model <m>   --review-model <m>
   --port <n>   default 4646      --no-open / --open   don't (or do) open a browser
 code-guide --version               The version and the commit it was built from, e.g. 0.1.0#a1b2c

@@ -3,7 +3,18 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { parseInput, prepareChange, preparePullRequest, pullRequestFor, suggestions } from "./subjects";
+import type { Subject } from "../shared/protocol";
+import { startServer } from "./server";
+import { Session } from "./session";
+import {
+  branchChange,
+  parseInput,
+  prepareChange,
+  preparePullRequest,
+  pullRequestFor,
+  pullRequestNumber,
+  suggestions,
+} from "./subjects";
 
 let dir: string;
 let repo: string;
@@ -48,11 +59,18 @@ beforeAll(() => {
   mkdirSync(bin);
   writeFileSync(
     join(bin, "gh.js"),
-    `const [, , , cmd] = process.argv;
+    `const [, , kind, cmd] = process.argv;
+if (kind === "repo" && cmd === "view") {
+  if (process.env.CODE_GUIDE_TEST_REPO_UNAVAILABLE) {
+    console.error("Cannot identify repository");
+    process.exit(1);
+  }
+  console.log('{"url":"https://github.com/acme/app"}');
+}
 if (cmd === "list") console.log('[{"number":7,"title":"Fix retries","author":{"login":"sam"},"baseRefName":"main"}]');
-if (cmd === "view" && process.argv.includes("headRefOid,baseRefName"))
+if (kind === "pr" && cmd === "view" && process.argv.includes("headRefOid,baseRefName"))
   console.log('{"headRefOid":"${prCommit}","baseRefName":"main"}');
-else if (cmd === "view") console.log(JSON.stringify({ number: 8, title: process.argv[4], url: "u", body: "" }));
+else if (kind === "pr" && cmd === "view") console.log(JSON.stringify({ number: 8, title: process.argv[4], url: "u", body: "" }));
 `,
   );
   writeFileSync(join(bin, "gh"), `#!/bin/sh\nexec node "$(dirname "$0")/gh.js" "$@"\n`);
@@ -83,6 +101,86 @@ test("reads typed input as a range, a path, or a question", async () => {
     question: "How do retries work?",
   });
   expect(await parseInput(repo, "../outside")).toEqual({ type: "question", question: "../outside" });
+});
+
+test("reads a branch name as what it changes, fetching one only origin has", async () => {
+  expect(await parseInput(repo, "feature")).toEqual({ type: "change", base: "origin/main", head: "feature" });
+  const remote = await parseInput(repo, "contributor/fix");
+  expect(remote).toEqual({ type: "change", base: "origin/main", head: "origin/contributor/fix" });
+  await prepareChange(repo, remote as Subject & { type: "change" });
+  expect(git(repo, "rev-parse", "origin/contributor/fix")).toBe(prCommit);
+  expect(await parseInput(repo, "no-such-branch")).toEqual({ type: "question", question: "no-such-branch" });
+});
+
+test.each(["feature+fast", "feature=fast", "feature%fast", "feature,fast", "機能"])(
+  "reads the valid Git branch name %s locally and on origin",
+  async (name) => {
+    git(repo, "branch", name, "feature");
+    const local = { type: "change", base: "origin/main", head: name };
+    expect(await branchChange(repo, name)).toEqual(local);
+    expect(await parseInput(repo, name)).toEqual(local);
+
+    const remoteName = `contributor/${name}`;
+    git(origin, "branch", remoteName, prCommit);
+    const remote = await parseInput(repo, remoteName);
+    expect(remote).toEqual({ type: "change", base: "origin/main", head: `origin/${remoteName}` });
+    await prepareChange(repo, remote as Subject & { type: "change" });
+    expect(git(repo, "rev-parse", `origin/${remoteName}`)).toBe(prCommit);
+    expect(await branchChange(repo, remoteName)).toEqual(remote);
+  },
+);
+
+test.each(["-feature", "feature..fast", "feature fast", "feature*", "feature~1", "feature^"])(
+  "does not read the invalid branch name %s as a branch",
+  async (name) => {
+    expect(await branchChange(repo, name)).toBeUndefined();
+  },
+);
+
+test("reads a pull request link or number", async () => {
+  const pr = { type: "change", base: "origin/main", pr: 7 };
+  expect(await parseInput(repo, "https://github.com/acme/app/pull/7")).toEqual(pr);
+  expect(await parseInput(repo, "https://github.com/acme/app/pull/7/files#diff-1")).toEqual(pr);
+  expect(await parseInput(repo, "https://github.com/Acme/App/pull/7?tab=commits")).toEqual(pr);
+  expect(await parseInput(repo, "#7")).toEqual(pr);
+  expect(await pullRequestNumber(repo, "https://github.com/acme/app/issues/7")).toBeUndefined();
+});
+
+test.each([
+  "https://github.com/other/app/pull/7",
+  "https://github.com/acme/other/pull/7/files#diff-1",
+  "https://other.example.com/acme/app/pull/7",
+])("rejects a pull request link outside the session repository: %s", async (link) => {
+  await expect(pullRequestNumber(repo, link)).rejects.toThrow("Pull request link must belong to github.com/acme/app");
+  await expect(parseInput(repo, link)).rejects.toThrow("Pull request link must belong to github.com/acme/app");
+});
+
+test("numbers work without repository lookup, but links require a verified repository", async () => {
+  process.env.CODE_GUIDE_TEST_REPO_UNAVAILABLE = "1";
+  try {
+    expect(await parseInput(repo, "#7")).toEqual({ type: "change", base: "origin/main", pr: 7 });
+    await expect(parseInput(repo, "https://github.com/acme/app/pull/7")).rejects.toThrow("Cannot identify repository");
+  } finally {
+    delete process.env.CODE_GUIDE_TEST_REPO_UNAVAILABLE;
+  }
+});
+
+test("the subject API rejects a mismatched pull request link without choosing a subject", async () => {
+  const session = await Session.create(repo);
+  const server = await startServer({ session, onRequest: async () => {}, uiDir: repo, port: 0 });
+  try {
+    const response = await fetch(
+      `${server.url}/api/subjects?input=${encodeURIComponent("https://github.com/other/app/pull/7")}`,
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Pull request link must belong to github.com/acme/app" });
+    expect(session.state.subject).toBeUndefined();
+    const valid = await fetch(`${server.url}/api/subjects?input=%237`);
+    expect(valid.status).toBe(200);
+    expect(await valid.json()).toEqual({ type: "change", base: "origin/main", pr: 7 });
+  } finally {
+    server.close();
+  }
 });
 
 test("a pull request is fetched and pinned to its head commit", async () => {

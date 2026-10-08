@@ -71,7 +71,11 @@ export function startServer(opts: ServeOptions): Promise<{ url: string; close: (
     // Subjects worth one click, and what typed input would mean.
     if (parts[1] === "subjects") {
       const input = url.searchParams.get("input");
-      return send(res, 200, input ? await parseInput(repo, input) : await suggestions(repo));
+      try {
+        return send(res, 200, input ? await parseInput(repo, input) : await suggestions(repo));
+      } catch (e) {
+        return send(res, 400, { error: String((e as Error).message ?? e) });
+      }
     }
     // The session's change, for the Diff module: every changed file, then one file at a time.
     if (parts[1] === "diff") {
