@@ -10,9 +10,9 @@ import { cn } from "@/lib/utils";
 import { useActions, useLineShower } from "@/workspace/actions";
 import { useAskSelection } from "@/workspace/ask";
 import { Icon } from "@/workspace/Icon";
+import { altKey, Kbd } from "@/workspace/Kbd";
 import { Prose, type AnchorTarget } from "./Prose";
 
-const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 const pad = (n: number) => String(n).padStart(2, "0");
 const fileDomId = (chapter: number, path: string) => `c${chapter}-${encodeURIComponent(path)}`;
 
@@ -174,7 +174,11 @@ function ChapterView(props: {
     prose: (text) => ({ kind: "prose", job, chapter, text }),
   });
 
-  // Keys work while focus is inside this panel, so two panels never fight over them.
+  // Keys work while focus is inside this panel, so two panels never fight over them. Changing chapter remounts
+  // this view and drops focus to the page, so take it back then (and on first show) unless something else has it.
+  useEffect(() => {
+    if (document.activeElement === document.body) root.current?.focus({ preventScroll: true });
+  }, []);
   const onKeyDown = (e: React.KeyboardEvent) => {
     const t = e.target as HTMLElement;
     if (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName)) return;
@@ -281,9 +285,7 @@ function ChapterView(props: {
         <Icon paths={["M10 4L6 8l4 4"]} size={12} />
         Go back
       </button>
-      <kbd className="min-w-4 border border-border bg-surface-3 px-1 text-center font-mono text-[10.5px] leading-4 text-fg-2">
-        Esc
-      </kbd>
+      <Kbd>Esc</Kbd>
     </div>
   );
 
@@ -319,17 +321,30 @@ function ChapterView(props: {
 
 function NavButton({ dir, disabled, onClick }: { dir: "next" | "prev"; disabled: boolean; onClick: () => void }) {
   const label = dir === "next" ? "Next chapter" : "Previous chapter";
-  const keys = `${isMac ? "⌥" : "Alt+"}${dir === "next" ? "↓" : "↑"} or ${dir === "next" ? "J" : "K"}`;
   return (
-    <button
-      aria-label={label}
-      title={`${label} (${keys})`}
-      disabled={disabled}
-      onClick={onClick}
-      className="flex size-[22px] items-center justify-center border border-border bg-surface text-fg-2 hover:border-fg-3 hover:text-fg disabled:opacity-40"
-    >
-      <Icon paths={dir === "next" ? ["M8 3v10M4 9l4 4 4-4"] : ["M8 13V3M4 7l4-4 4 4"]} size={12} />
-    </button>
+    <span className="group/nav relative flex">
+      <button
+        aria-label={label}
+        aria-keyshortcuts={dir === "next" ? "Alt+ArrowDown J" : "Alt+ArrowUp K"}
+        disabled={disabled}
+        onClick={onClick}
+        className="flex size-[22px] items-center justify-center border border-border bg-surface text-fg-2 hover:border-fg-3 hover:text-fg disabled:opacity-40"
+      >
+        <Icon paths={dir === "next" ? ["M8 3v10M4 9l4 4 4-4"] : ["M8 13V3M4 7l4-4 4 4"]} size={12} />
+      </button>
+      <span
+        aria-hidden="true"
+        className="pointer-events-none invisible absolute top-[30px] -left-1 z-30 flex items-center gap-1.5 border border-rule bg-surface px-2 py-[5px] text-xs whitespace-nowrap text-fg shadow-active group-hover/nav:visible group-has-focus-visible/nav:visible"
+      >
+        {label}
+        <span className="flex gap-0.5">
+          <Kbd>{altKey}</Kbd>
+          <Kbd>{dir === "next" ? "↓" : "↑"}</Kbd>
+        </span>
+        <span className="text-fg-3">or</span>
+        <Kbd>{dir === "next" ? "J" : "K"}</Kbd>
+      </span>
+    </span>
   );
 }
 

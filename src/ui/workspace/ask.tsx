@@ -3,8 +3,7 @@ import type { ResolvedFile } from "../../shared/guide";
 import type { ChatContext } from "../../shared/protocol";
 import { useActions } from "./actions";
 import { Icon } from "./Icon";
-
-const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+import { isMac, Kbd } from "./Kbd";
 
 type Selection = { contexts: ChatContext[]; label: string; x: number; y: number };
 
@@ -103,9 +102,7 @@ export function useAskSelection(
         <Icon paths={["M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"]} size={12} />
         {selection.label}
       </button>
-      <kbd className="min-w-4 border border-border bg-surface-3 px-1 text-center font-mono text-[10.5px] leading-4 text-fg-2">
-        {isMac ? "⌘L" : "Ctrl+L"}
-      </kbd>
+      <Kbd>{isMac ? "⌘L" : "Ctrl+L"}</Kbd>
     </div>
   );
 
