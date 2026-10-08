@@ -305,7 +305,10 @@ function ChapterView(props: {
         </div>
       ) : (
         <>
-          <div className="w-[300px] flex-none overflow-y-auto border-r border-border-subtle p-5">{prose}</div>
+          {/* The prose column grows with the panel (the design: 300px in a slot, 380px maximized), capped for line length. */}
+          <div className="w-[clamp(300px,27%,480px)] flex-none overflow-y-auto border-r border-border-subtle p-5">
+            {prose}
+          </div>
           <div ref={scroller} className="min-w-0 flex-1 overflow-y-auto bg-surface-2">
             {code}
           </div>
