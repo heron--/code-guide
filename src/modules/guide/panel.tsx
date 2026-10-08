@@ -127,7 +127,9 @@ function GuideView(props: {
   const [visible, setVisible] = useState<Record<string, boolean[]>>(initial);
   const [marked, setMarked] = useState<{ chapter: number; path: string; range: [number, number] }>();
   const [back, setBack] = useState<number>();
-  const [fileIdx, setFileIdx] = useState(0);
+  // The file last jumped to, by chapter: a new chapter starts at its first.
+  const [file, setFile] = useState({ chapter, idx: 0 });
+  const fileIdx = file.chapter === chapter ? file.idx : 0;
 
   const reveal = useCallback((key: string, from: number, to: number) => {
     setVisible((prev) => {
@@ -137,9 +139,8 @@ function GuideView(props: {
     });
   }, []);
 
-  // A new chapter starts at its first file, with its prose from the top.
+  // A new chapter's prose starts from the top.
   useEffect(() => {
-    setFileIdx(0);
     proseColumn.current?.scrollTo({ top: 0 });
   }, [chapter]);
 
@@ -207,12 +208,13 @@ function GuideView(props: {
     },
   });
 
-  const onFile = (i: number) => {
-    const path = c.excerpts[i]?.path;
+  const onFile = (i: number, n = chapter) => {
+    const path = chapters[n].excerpts[i]?.path;
     if (!path) return;
-    setFileIdx(i);
+    if (n !== chapter) setChapter(n);
+    setFile({ chapter: n, idx: i });
     setMarked(undefined);
-    jumpTo(document.getElementById(fileDomId(chapter, path)), 0);
+    jumpTo(document.getElementById(fileDomId(n, path)), 0);
   };
 
   const goBack = () => {
@@ -224,7 +226,8 @@ function GuideView(props: {
   // Selecting prose or code offers to ask about it in Chat.
   const selecting = useAskSelection(root, {
     file: (path) => data.files[path],
-    prose: (text) => ({ kind: "prose", job, chapter, text }),
+    // Narrow, every chapter's prose is on screen: the block says which one was selected.
+    prose: (text, block) => ({ kind: "prose", job, chapter: Number(block.dataset.prose || chapter), text }),
   });
 
   // Keys work while focus is inside this panel, so two panels never fight over them.
@@ -270,7 +273,7 @@ function GuideView(props: {
             </button>
           </div>
         </div>
-        <div data-prose>
+        <div data-prose={n}>
           <Prose body={ch.body} onAnchor={(a) => onAnchor(a, n)} />
         </div>
         <nav aria-label="Files in this chapter" className="flex flex-col gap-1.5">
@@ -280,7 +283,7 @@ function GuideView(props: {
             return (
               <button
                 key={e.path}
-                onClick={() => (n === chapter ? onFile(i) : goToChapter(n))}
+                onClick={() => onFile(i, n)}
                 title={e.path}
                 className={cn(
                   "flex min-w-0 items-center gap-2 border border-border-subtle bg-surface px-[9px] py-[7px] text-left hover:border-border",
