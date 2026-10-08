@@ -88,6 +88,11 @@ test("waits until the session's other jobs are done", async () => {
   session.append("job.finished", { job: "guide-1", result: "results/guide-1.json", warnings: [] });
   await Promise.resolve();
   expect(started).toEqual(["glossary"]);
+  // A failed glossary isn't retried in the same session.
+  session.append("job.queued", { job: "glossary-1", kind: "glossary", module: "glossary", inputs: [] });
+  session.append("job.failed", { job: "glossary-1", error: "quota", problems: [] });
+  await Promise.resolve();
+  expect(started).toEqual(["glossary"]);
 });
 
 test("doesn't start when the repository has a glossary", async () => {

@@ -141,7 +141,8 @@ export function generateGlossary(session: Session, runner: JobRunner): () => voi
     if (!repo || !subject || glossaryPath(repo)) return;
     const all = Object.values(jobs);
     if (all.some((j) => j.status === "queued" || j.status === "running")) return;
-    if (all.some((j) => j.kind === "glossary" && j.status !== "failed" && j.status !== "cancelled")) return;
+    // One attempt per session: a failed or cancelled one waits for the next session, rather than retrying forever.
+    if (all.some((j) => j.kind === "glossary")) return;
     runner.start(glossaryJob, "glossary");
   };
   // After the event is applied, and after anything it sets off (a review queued when a guide finishes).
