@@ -53,6 +53,12 @@ export default function GuidePanel({ state, job }: PanelProps) {
   const [reviewedChapters, toggleChapter] = usePersistentSet(`${key}:chapters`);
   const [reviewedFiles, toggleFile] = usePersistentSet(`${key}:files`);
   const [chapter, setChapter] = usePersistent(`cg:${state.id}:${job}:chapter`, 0);
+  // Whether the chapter view had focus when the chapter changed, so the next one takes it over.
+  const keepFocus = useRef(false);
+  const goTo = (n: number) => {
+    keepFocus.current = !!root.current?.contains(document.activeElement);
+    setChapter(n);
+  };
 
   let body;
   if (error) body = <Note title="Couldn't load this guide">{error}</Note>;
@@ -70,7 +76,8 @@ export default function GuidePanel({ state, job }: PanelProps) {
         data={data}
         chapter={ch}
         narrow={width < NARROW}
-        setChapter={setChapter}
+        setChapter={goTo}
+        keepFocus={keepFocus}
         reviewedChapters={reviewedChapters}
         setChapterReviewed={(n, v) => toggleChapter(String(n), v)}
         reviewedFiles={reviewedFiles}
@@ -91,6 +98,7 @@ function ChapterView(props: {
   chapter: number;
   narrow: boolean;
   setChapter: (n: number) => void;
+  keepFocus: React.RefObject<boolean>;
   reviewedChapters: Set<string>;
   setChapterReviewed: (n: number, v: boolean) => void;
   reviewedFiles: Set<string>;
@@ -174,11 +182,14 @@ function ChapterView(props: {
     prose: (text) => ({ kind: "prose", job, chapter, text }),
   });
 
-  // Keys work while focus is inside this panel, so two panels never fight over them. Changing chapter remounts
-  // this view and drops focus to the page, so take it back then (and on first show) unless something else has it.
+  // Changing chapter remounts this view, which drops focus to the page: take it back, so keys keep working.
   useEffect(() => {
-    if (document.activeElement === document.body) root.current?.focus({ preventScroll: true });
+    if (props.keepFocus.current && document.activeElement === document.body)
+      root.current?.focus({ preventScroll: true });
+    props.keepFocus.current = false;
   }, []);
+
+  // Keys work while focus is inside this panel, so two panels never fight over them.
   const onKeyDown = (e: React.KeyboardEvent) => {
     const t = e.target as HTMLElement;
     if (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName)) return;
