@@ -68,6 +68,9 @@ export function reduce(state: SessionState, e: SessionEvent): SessionState {
     case "session.subject":
       s.subject = e.payload;
       break;
+    case "session.label":
+      if (s.subject) s.subject = { ...s.subject, label: e.payload.label };
+      break;
     case "harness.status":
       s.harness = e.payload;
       break;

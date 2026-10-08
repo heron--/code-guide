@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { ModuleInfo } from "../shared/modules";
-import type { SessionEvent } from "../shared/protocol";
+import { PROTOCOL_VERSION, type SessionEvent } from "../shared/protocol";
 import { emptyState, reduce, type SessionState } from "../shared/state";
 import { logLine, printable, showStatus, statusLines } from "./terminal";
 
@@ -9,7 +9,7 @@ const quiz: ModuleInfo = { name: "quiz", label: "Quiz", icon: [], needsJob: true
 const chat: ModuleInfo = { name: "chat", label: "Chat", icon: [], needsJob: false };
 
 const ev = (seq: number, type: string, payload: Record<string, unknown>) =>
-  ({ v: 1, seq, at: "", session: "s", type, payload }) as SessionEvent;
+  ({ v: PROTOCOL_VERSION, seq, at: "", session: "s", type, payload }) as SessionEvent;
 function session(...events: [string, Record<string, unknown>][]): SessionState {
   return events.reduce((s, [type, payload], i) => reduce(s, ev(i + 1, type, payload)), emptyState("s"));
 }

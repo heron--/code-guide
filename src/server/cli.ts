@@ -10,12 +10,20 @@ import { showStatus } from "./terminal.js";
 import { repoRoot, revParse } from "./git.js";
 import { createHarness, DEFAULT_HARNESS, harnesses } from "./harness/index.js";
 import { JobRunner } from "./jobs.js";
-import { followUps, requestHandler } from "./requests.js";
+import { followUps, labelQuestions, requestHandler } from "./requests.js";
 import { resolveGuide } from "./resolve.js";
 import { startServer } from "./server.js";
 import { Session } from "./session.js";
 import { loadSettings, projectSettingsPath, userSettingsPath } from "./settings.js";
 import { DEFAULT_VIEW } from "../shared/settings.js";
+
+declare const __VERSION__: string | undefined;
+declare const __COMMIT__: string | undefined;
+/** Set by the build (tsup.config.ts); absent when the source runs directly, as in tests. */
+const VERSION =
+  typeof __VERSION__ === "string"
+    ? `${__VERSION__}${typeof __COMMIT__ === "string" && __COMMIT__ ? `#${__COMMIT__}` : ""}`
+    : "dev";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(here, "..");
@@ -37,6 +45,7 @@ Options
   --review-model <m>    Model for reviews (default: --model)
   --port <n>            Port to serve on (default 4646, next free port if taken)
   --open, --no-open     Open the browser, or don't (default: open)
+  -v, --version         Show the version and the commit it was built from
   -h, --help            Show this help
 
 Settings
@@ -134,6 +143,7 @@ async function serve(dir: string | undefined, flags: Flags) {
   session.append("harness.status", { harness: harness.name, model: harness.model, state: "ready" });
   const runner = new JobRunner(session, (kind) => (kind === "review" ? reviewer : harness));
   followUps(session, runner, modules);
+  labelQuestions(session, runner);
   const chat = new Chat(session, harness);
   const onRequest = requestHandler(session, runner, modules, chat);
   if (flags.subject) await onRequest({ type: "subject.choose", subject: flags.subject });
@@ -146,6 +156,7 @@ async function serve(dir: string | undefined, flags: Flags) {
     port: opts.port,
     view: { modules: settings.modules ?? DEFAULT_VIEW.modules, theme: settings.theme ?? DEFAULT_VIEW.theme },
   });
+  console.log(`Running version ${VERSION}`);
   console.log(`Code Guide for ${relative(process.cwd(), root) || "."} at ${url}`);
   console.log(`Session ${session.id}. Press Ctrl+C to stop.\n`);
   if (opts.open) await open(url).catch(() => console.log("(Couldn't open a browser; visit the URL above.)"));
@@ -165,6 +176,7 @@ async function main(argv: string[]) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "-h" || a === "--help") return (console.log(HELP), 0);
+    else if (a === "-v" || a === "--version") return (console.log(VERSION), 0);
     else if (a === "--no-open") flags.open = false;
     else if (a === "--open") flags.open = true;
     else if (a === "--port") flags.port = Number(argv[++i]);

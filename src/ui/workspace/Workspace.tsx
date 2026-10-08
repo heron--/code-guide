@@ -523,7 +523,9 @@ function StatusBar({
         <Sep />
         <span className="flex min-w-0 items-center gap-1.5 font-mono text-[11.5px]">
           {subject?.type === "change" && <Icon paths={icons.branch} size={12} className="text-fg-2" />}
-          <span className="truncate">{state.subject?.label}</span>
+          <span className="truncate" title={subject?.type === "question" ? subject.question : state.subject?.label}>
+            {state.subject?.label}
+          </span>
         </span>
         {state.harness && (
           <>

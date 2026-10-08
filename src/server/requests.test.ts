@@ -7,7 +7,7 @@ import { modules } from "../modules";
 import { defineModule } from "../modules/types";
 import { FakeHarness } from "./harness/fake";
 import { JobRunner } from "./jobs";
-import { requestHandler, subjectLabel } from "./requests";
+import { labelQuestions, requestHandler, subjectLabel } from "./requests";
 import { Session } from "./session";
 
 /** A fifth module, defined entirely here: the registry and runner need nothing else to run it. */
@@ -50,6 +50,27 @@ afterEach(async () => {
   for (const id of session.state.jobOrder)
     if (["queued", "running"].includes(session.state.jobs[id].status)) await runner.cancel(id);
   rmSync(repo, { recursive: true, force: true });
+});
+
+/** Calls labelQuestions' listener as if the guide job had finished with `result`. */
+function finishGuide(result: unknown) {
+  let finished: (job: string, result: unknown) => void = () => {};
+  labelQuestions(session, { onFinished: (fn) => ((finished = fn), () => {}) });
+  session.append("job.queued", { job: "guide-1", kind: "guide", module: "guide", inputs: [] });
+  finished("guide-1", result);
+}
+
+test("a question is relabelled with its guide's title", () => {
+  const question = "When the retry budget runs out mid-request, which component decides whether to fail?";
+  session.append("session.subject", { subject: { type: "question", question }, label: question });
+  finishGuide({ title: "Who gives up when retries run out" });
+  expect(session.state.subject?.label).toBe("Who gives up when retries run out");
+});
+
+test("other subjects keep their labels", () => {
+  session.append("session.subject", { subject: { type: "path", path: "src/retry" }, label: "src/retry" });
+  finishGuide({ title: "How src/retry works" });
+  expect(session.state.subject?.label).toBe("src/retry");
 });
 
 test("labels subjects for the status bar", () => {

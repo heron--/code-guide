@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
-import { eventPayloads, requestSchema, sessionEventSchema } from "./protocol";
+import { eventPayloads, PROTOCOL_VERSION, requestSchema, sessionEventSchema } from "./protocol";
 
 const doc = readFileSync(new URL("../../docs/protocol.md", import.meta.url), "utf8");
 const examples = [...doc.matchAll(/```json\r?\n([\s\S]*?)```/g)].map((m) => JSON.parse(m[1]));
-const envelope = { v: 1, seq: 1, at: "2026-10-07T09:12:03.120Z", session: "s" };
+const envelope = { v: PROTOCOL_VERSION, seq: 1, at: "2026-10-07T09:12:03.120Z", session: "s" };
 
 test("docs/protocol.md has a valid example of every event and request", () => {
   const events = new Set<string>();

@@ -38,6 +38,7 @@ Run `code-guide` anywhere inside a git repository. It starts a session, serves t
 ```
 code-guide [dir]                   Start a session in the repo containing dir (default: .)
 code-guide check <guide.json>…     Validate guides against the spec; exits 1 on errors
+code-guide --version               The version and the commit it was built from, e.g. 0.1.0#a1b2c
 
   --change <base>[...<head>]   --path <path>   --question <text>   choose the subject up front
   --harness <claude|pi|fake>   --model <m>   --review-model <m>    reviews default to --model
@@ -47,7 +48,7 @@ code-guide check <guide.json>…     Validate guides against the spec; exits 1 o
 
 ### Choosing a subject
 
-The browser asks what you want to understand and suggests the subjects that apply: uncommitted changes, the current branch against the default branch when it's ahead, and open pull requests (with `gh`). You can also type a commit range (`main...feature`), a path in the repository, or anything else as a question. `--change`, `--path` and `--question` skip the picker. A session has one subject; run `code-guide` again for another.
+The browser asks what you want to understand and suggests the subjects that apply: uncommitted changes, the current branch against the default branch when it's ahead, and open pull requests (with `gh`). You can also type a commit range (`main...feature`), a path in the repository, or anything else as a question. `--change`, `--path` and `--question` skip the picker. A session has one subject; run `code-guide` again for another. The status bar names it; a question is named by its guide's title once the guide is written, with the full question on hover.
 
 A change runs from the merge-base of its base and head to its head, or to the working tree when it has no head. Code Guide fetches the base from its remote first, so a stale local copy doesn't pull other people's commits into the change; offline, it uses the local copy. For a pull request it fetches the head commit without creating a branch.
 
@@ -57,19 +58,19 @@ Choosing a subject starts two jobs: the guide and the overview. Every guide goes
 
 A job submits its result through a tool that checks it; errors go back to the agent, which gets 5 submissions to fix them. Two jobs run at a time. The agent can read and search files inside the repository and run single read-only git commands; it can't edit anything. A failed job shows its reason in its panel and dock square, with **Retry**.
 
-While the session runs, the terminal shows the chat's agent (harness, model, how full its context is, and whether it's thinking, writing, in a tool call or idle) and a progress bar for each running job, with the subject and finished and failed jobs logged above.
+While the session runs, the **console** (what Code Guide prints in the terminal) shows the chat's agent (harness, model, how full its context is, and whether it's thinking, writing, in a tool call or idle) and a progress bar for each running job, with the subject and finished and failed jobs logged above. It starts with the version and the commit it was built from (`-dirty` if the build had uncommitted changes), so you can tell whether your install is up to date.
 
 ### Reading a guide
 
 The browser shows a workspace: two slots side by side and a dock along the bottom. A new session opens Guide on the left, showing its progress while it's written, and Chat on the right. Other panels wait in the dock as squares, marked when they have a new result: click one to open it, or drag it up into a slot. Drag a panel's title bar onto the other slot to swap them, or the divider to resize. **New panel** opens any module, or says why it can't yet.
 
 - **Overview**: a short summary of the subject, an intro before the chapters. For a change with a pull request, a second tab shows the pull request's description.
-- **Guide**: one chapter at a time, its prose and file list beside the code. Keys work while focus is in the panel: <kbd>J</kbd>/<kbd>K</kbd> (or <kbd>⌥</kbd><kbd>↓</kbd>/<kbd>↑</kbd>) for chapters, <kbd>[</kbd>/<kbd>]</kbd> for files, <kbd>R</kbd> to mark the chapter Reviewed. Each file can be marked Reviewed too, which collapses it. The status bar counts the chapters you've reviewed.
+- **Guide**: one chapter at a time, its prose and file list beside the code. The prose column widens with the panel, up to a comfortable line length. Keys work while focus is in the panel (hover the chapter arrows for a reminder): <kbd>J</kbd>/<kbd>K</kbd> (or <kbd>⌥</kbd><kbd>↓</kbd>/<kbd>↑</kbd>) for chapters, <kbd>[</kbd>/<kbd>]</kbd> for files, <kbd>R</kbd> to mark the chapter Reviewed. Each file can be marked Reviewed too, which collapses it. The status bar counts the chapters you've reviewed.
 - **Anchors** (accent-coloured links in the prose) scroll the code to their lines and highlight them. **Go back** (or <kbd>Esc</kbd>) jumps back.
 - **Glossary terms**: if the repository has a `GLOSSARY.md` with a Term | Definition table, like [this one](GLOSSARY.md), its terms get a dotted underline in chapter prose and show their definition on hover.
 - **Diff** (for changes): every changed file, like a pull request. **Full diff** shows every line of every file instead of just the changes.
 - **Quiz**: 3–5 multiple-choice questions on the guide. Each answer explains itself and cites the code.
-- **Chat**: ask about the code as you read. It knows the subject and the finished guides and quizzes. **Ask** on a chapter brings it in; so does selecting lines in the Guide or Diff, or prose in the Guide, and choosing **Ask about this** (or <kbd>⌘</kbd><kbd>L</kbd> / <kbd>Ctrl</kbd><kbd>L</kbd>).
+- **Chat**: ask about the code as you read. It knows the subject and the finished guides and quizzes. It follows a reply as it streams in, until you scroll up to reread; scroll back down, or send a message, to follow again. **Ask** on a chapter brings it in; so does selecting lines in the Guide or Diff, or prose in the Guide, and choosing **Ask about this** (or <kbd>⌘</kbd><kbd>L</kbd> / <kbd>Ctrl</kbd><kbd>L</kbd>).
 - **Citations** (`file:line` chips in Chat, Quiz and the Overview) show their lines in the Guide if the current chapter has the file, else in the Diff, else in a file view.
 - **Maximize** a panel to send its neighbor to the dock; restoring it brings the neighbor back.
 
