@@ -128,12 +128,14 @@ export default function ChatPanel({ state, channel }: PanelProps) {
   };
   useEffect(() => {
     const el = scroller.current;
-    if (el && (following.current || last?.from === "reader")) el.scrollTop = el.scrollHeight;
-  }, [messages.length, last?.text]);
+    if (el && following.current) el.scrollTop = el.scrollHeight;
+    // Any reply can still be streaming, not only the last message, so watch the length of them all.
+  }, [messages.length, messages.reduce((n, m) => n + m.text.length, 0)]);
 
   const send = () => {
     if (!text.trim()) return;
     if (channel.send({ type: "chat.send", text: text.trim(), context })) {
+      following.current = true;
       setText("");
       setContext([]);
     }
