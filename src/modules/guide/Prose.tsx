@@ -32,31 +32,41 @@ const MARGIN = 8;
  */
 function GlossaryTerm({ text, term }: { text: string; term: Term }) {
   const [pos, setPos] = useState<{ left: number; top: number; above: boolean } | null>(null);
-  const show = (e: { currentTarget: HTMLElement }) => {
-    const r = e.currentTarget.getBoundingClientRect();
+  // Hover and focus each keep the definition open; it closes when neither holds.
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const place = (el: HTMLElement) => {
+    const r = el.getBoundingClientRect();
     const left = Math.max(MARGIN, Math.min(r.left, window.innerWidth - TOOLTIP_WIDTH - MARGIN));
     // Open upward when the term sits in the bottom third of the window.
     const above = r.bottom > window.innerHeight * (2 / 3);
     setPos({ left, top: above ? r.top - 6 : r.bottom + 6, above });
   };
-  const hide = () => setPos(null);
+  const open = pos && (hovered || focused);
   // A fixed tooltip would drift from its term when any panel scrolls, so close it instead.
   useEffect(() => {
-    if (!pos) return;
-    window.addEventListener("scroll", hide, true);
-    return () => window.removeEventListener("scroll", hide, true);
-  }, [pos]);
+    if (!open) return;
+    const close = () => setPos(null);
+    window.addEventListener("scroll", close, true);
+    return () => window.removeEventListener("scroll", close, true);
+  }, [open]);
   return (
     <span
       tabIndex={0}
-      onMouseEnter={show}
-      onMouseLeave={hide}
-      onFocus={show}
-      onBlur={hide}
+      onMouseEnter={(e) => {
+        setHovered(true);
+        place(e.currentTarget);
+      }}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={(e) => {
+        setFocused(true);
+        place(e.currentTarget);
+      }}
+      onBlur={() => setFocused(false)}
       className="cursor-help underline decoration-fg-3 decoration-dotted underline-offset-4 outline-none focus-visible:bg-surface-3"
     >
       {text}
-      {pos &&
+      {open &&
         createPortal(
           <span
             role="tooltip"
