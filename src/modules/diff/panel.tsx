@@ -182,17 +182,23 @@ function DiffFile({
   }, [scroller]);
   useEffect(() => {
     if (!near || file || failed) return;
+    // A reply that lands after this card is gone (the head moved on) must not register its file.
+    let current = true;
     fetch(`/api/diff/file?path=${encodeURIComponent(path)}`)
       .then(async (r) => (r.ok ? r.json() : Promise.reject(new Error((await r.json()).error))))
       .then(
         (f: ResolvedFile) => {
+          if (!current) return;
           onLoad(f);
           setFile(f);
           setVisible(initialVisible(f));
         },
         // E.g. a working-tree file reverted since the list was made.
-        (e: Error) => setFailed(e.message),
+        (e: Error) => current && setFailed(e.message),
       );
+    return () => {
+      current = false;
+    };
   }, [near, file, failed, path]);
 
   return (
