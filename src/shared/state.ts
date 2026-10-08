@@ -68,6 +68,8 @@ export function reduce(state: SessionState, e: SessionEvent): SessionState {
       break;
     case "session.subject":
       s.subject = e.payload;
+      // A pull request head seen before the subject moved says nothing about the new one: wait for the next look.
+      if (s.remote) s.remote = { ...s.remote, head: undefined };
       break;
     case "session.label":
       if (s.subject) s.subject = { ...s.subject, label: e.payload.label };

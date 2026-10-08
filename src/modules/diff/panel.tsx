@@ -38,12 +38,17 @@ export default function DiffPanel({ state }: PanelProps) {
   useEffect(() => {
     files.current.clear();
     setError(undefined);
+    // A reply for an earlier head that lands late must not replace this one's.
+    let current = true;
     fetch("/api/diff")
       .then(async (r) => (r.ok ? r.json() : Promise.reject(new Error((await r.json()).error))))
       .then(
-        (d: { changed: Changed[] }) => setChanged(d.changed),
-        (e: Error) => setError(e.message),
+        (d: { changed: Changed[] }) => current && setChanged(d.changed),
+        (e: Error) => current && setError(e.message),
       );
+    return () => {
+      current = false;
+    };
   }, [head]);
 
   function jump(path: string) {
