@@ -1,4 +1,5 @@
 import type { SessionState } from "../../shared/state.js";
+import { glossaryNote } from "../../server/glossary.js";
 import { defineModule } from "../types.js";
 import { instructions, prompt } from "./instructions.js";
 import { reviewJob, revisionJob, type Review } from "./review.js";
@@ -23,7 +24,7 @@ export default defineModule({
     kind: "guide",
     label: "Writing the guide",
     instructions,
-    prompt: (ctx) => prompt(ctx.subject),
+    prompt: (ctx) => prompt(ctx.subject) + glossaryNote(ctx.repo),
     submit: submitGuide,
   },
   // Every guide is reviewed by a separate job before the reader sees it; "revise" starts a revision.

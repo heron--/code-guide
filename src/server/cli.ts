@@ -10,6 +10,7 @@ import { showStatus } from "./terminal.js";
 import { repoRoot, revParse } from "./git.js";
 import { createHarness, DEFAULT_HARNESS, harnesses } from "./harness/index.js";
 import { JobRunner } from "./jobs.js";
+import { generateGlossary } from "./glossary.js";
 import { followUps, labelQuestions, requestHandler } from "./requests.js";
 import { watchPullRequest } from "./remote.js";
 import { resolveGuide } from "./resolve.js";
@@ -145,6 +146,7 @@ async function serve(dir: string | undefined, flags: Flags) {
   const runner = new JobRunner(session, (kind) => (kind === "review" ? reviewer : harness));
   followUps(session, runner, modules);
   labelQuestions(session, runner);
+  generateGlossary(session, runner);
   watchPullRequest(session);
   const chat = new Chat(session, harness);
   const onRequest = requestHandler(session, runner, modules, chat);

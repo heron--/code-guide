@@ -46,6 +46,8 @@ code-guide --version               The version and the commit it was built from,
 
 Sessions are kept in `.code-guide/sessions/` in the repository; add it to your `.gitignore` if you like.
 
+Guides use the repository's own terms from its `glossary.md` (at the root, any case), and its terms are underlined in chapters with their definitions on hover. A repository without one gets one: the first session writes `.code-guide/glossary.md` in the background, and later sessions reuse it. Add your own `glossary.md` and Code Guide uses that instead.
+
 ### Settings
 
 `~/.code-guide/settings.json` holds your defaults. A repository's `.code-guide/settings.json` overrides them key by key, and flags override both. Every key is optional:

@@ -2,24 +2,35 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { markTerms, type Term } from "../../shared/glossary";
 import { parseBody, type Inline } from "../../shared/guide";
+import { useSession } from "@/lib/session";
 
 export type AnchorTarget = Extract<Inline, { kind: "anchor" }>;
 
-let glossary: Promise<Term[]> | undefined;
-/** The repository's glossary terms, fetched once. */
+let glossary: { key: string; terms: Promise<Term[]> } | undefined;
+/** The repository's glossary terms: fetched once, and again when the session writes one. */
 function useGlossary(): Term[] {
+  const { state } = useSession();
+  const written = state
+    ? Object.values(state.jobs).filter((j) => j.kind === "glossary" && j.status === "finished").length
+    : 0;
   const [terms, setTerms] = useState<Term[]>([]);
+  // Per session too: a tab can outlive its server and reconnect to another repository's.
+  const key = `${state?.id}:${written}`;
   useEffect(() => {
-    glossary ??= fetch("/api/glossary").then(
-      (r) => (r.ok ? r.json() : []),
-      () => [],
-    );
+    if (glossary?.key !== key)
+      glossary = {
+        key,
+        terms: fetch("/api/glossary").then(
+          (r) => (r.ok ? r.json() : []),
+          () => [],
+        ),
+      };
     let current = true;
-    glossary.then((t) => current && setTerms(t));
+    glossary.terms.then((t) => current && setTerms(t));
     return () => {
       current = false;
     };
-  }, []);
+  }, [key]);
   return terms;
 }
 
