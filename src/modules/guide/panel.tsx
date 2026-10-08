@@ -170,10 +170,10 @@ function GuideView(props: {
     requestAnimationFrame(() => requestAnimationFrame(() => (jumping.current = false)));
   };
 
-  // Open where the reader left off.
+  // Open where the reader left off, and stay there when the layout swaps scrollers (wide ⇄ narrow).
   useLayoutEffect(() => {
     if (chapter > 0) goToChapter(chapter);
-  }, []);
+  }, [narrow]);
 
   /** Smoothly bring an element into the upper third of the scroller, remembering where we were. */
   const jumpTo = (el: Element | null | undefined, offset = 0.3) => {
