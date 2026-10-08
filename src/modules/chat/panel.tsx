@@ -106,6 +106,9 @@ function ContextCard({ c, onRemove }: { c: ChatContext; onRemove?: () => void })
   );
 }
 
+/** How close to the bottom, in px, still counts as at the bottom. */
+const FOLLOW_SLACK = 40;
+
 /** The Chat module: questions as they come up, answered from the code with citations. */
 export default function ChatPanel({ state, channel }: PanelProps) {
   const { context, setContext } = useDraft();
@@ -115,10 +118,17 @@ export default function ChatPanel({ state, channel }: PanelProps) {
   const last = messages.at(-1);
   const waiting = last?.from === "reader" || last?.status === "streaming";
 
-  // Follow the conversation as it grows.
+  // Follow the conversation as it grows, but only while the reader is at the bottom: scrolling up to reread
+  // stops it, and scrolling back down or sending a message resumes it. Only scrolling updates this, so a reply
+  // growing below the fold doesn't count as the reader leaving the bottom.
+  const following = useRef(true);
+  const onScroll = () => {
+    const el = scroller.current;
+    if (el) following.current = el.scrollHeight - el.scrollTop - el.clientHeight < FOLLOW_SLACK;
+  };
   useEffect(() => {
     const el = scroller.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el && (following.current || last?.from === "reader")) el.scrollTop = el.scrollHeight;
   }, [messages.length, last?.text]);
 
   const send = () => {
@@ -131,7 +141,7 @@ export default function ChatPanel({ state, channel }: PanelProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex min-h-full flex-col justify-end gap-[18px] px-4 pt-4 pb-2">
           {messages.length === 0 && (
             <p className="m-auto max-w-[280px] text-center text-[12.5px] leading-normal text-fg-3">
