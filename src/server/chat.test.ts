@@ -213,3 +213,18 @@ test("removed lines are read from the change's base", async () => {
   expect(harness.sent.at(-1)).toContain("a.ts#L3-L3:\n```\n3  line 4\n```");
   await c.stop();
 });
+
+test("after the subject moves to newer commits, the next message says so once", async () => {
+  const pr = { type: "change" as const, base: "main", head: "aaa", pr: 12 };
+  session.append("session.subject", { subject: pr, label: "#12 vs main" });
+  await chat.send("Reply with exactly: one", []);
+  await until(() => replies().length === 1 && replies()[0].status === "done");
+  session.append("session.subject", { subject: { ...pr, head: "bbb" }, label: "#12 vs main" });
+  await chat.send("Reply with exactly: two", []);
+  await chat.send("Reply with exactly: three", []);
+  await until(() => harness.sent.length === 3);
+  expect(harness.starts).toHaveLength(1);
+  expect(harness.sent[1]).toContain("updated the session to newer commits");
+  expect(harness.sent[1]).toContain("main...bbb");
+  expect(harness.sent[2]).not.toContain("updated the session");
+});
