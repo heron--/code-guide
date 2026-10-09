@@ -24,6 +24,11 @@ test("reads this repository's glossary", () => {
   });
 });
 
+test("reads the Trace module's own glossary", () => {
+  const terms = parseGlossary(readFileSync(new URL("../modules/trace/GLOSSARY.md", import.meta.url), "utf8"));
+  expect(terms.map((t) => t.term)).toEqual(["Trace", "Scenario", "Step"]);
+});
+
 test("anything else yields no terms", () => {
   expect(parseGlossary("# Words\n\nJust prose.\n\n| a | b |\n| - | - |\n| x | y |")).toEqual([]);
 });

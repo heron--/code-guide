@@ -19,7 +19,7 @@ There are three parts:
 - **Jobs**: background work by your coding agent, read-only, through a harness: Claude Code (the default, via the Claude Agent SDK) or [pi](https://github.com/badlogic/pi-mono). The guide job follows [these instructions](src/modules/guide/instructions.ts); a separate review job then judges the guide against a quality bar.
 - **Viewer**: a local web app for reading the guide chapter by chapter, with an overview, the diff, a quiz, a trace and a chat beside it.
 
-Terms are defined in the [glossary](GLOSSARY.md).
+Terms are defined in the [glossary](GLOSSARY.md), and a module's own terms in its glossary (Trace's is [here](src/modules/trace/GLOSSARY.md)).
 
 ## Install
 

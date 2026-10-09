@@ -15,7 +15,7 @@ export type JobState = {
   /** Latest progress, while running. */
   activity?: string;
   /** How many progress events it has reported: a rough measure of how far along it is. */
-  reports: number;
+  steps: number;
   /** For a job that writes its result in parts: how many it has written so far. */
   written?: number;
   /** Submissions so far, accepted or not. */
@@ -89,7 +89,7 @@ export function reduce(state: SessionState, e: SessionEvent): SessionState {
       const { job: id, ...rest } = e.payload;
       s.jobs = {
         ...s.jobs,
-        [id]: { id, ...rest, status: "queued", reports: 0, attempts: 0, warnings: [], problems: [] },
+        [id]: { id, ...rest, status: "queued", steps: 0, attempts: 0, warnings: [], problems: [] },
       };
       s.jobOrder = [...s.jobOrder, id];
       break;
@@ -100,7 +100,7 @@ export function reduce(state: SessionState, e: SessionEvent): SessionState {
     case "job.progress":
       job(e.payload.job, {
         activity: e.payload.activity,
-        reports: (s.jobs[e.payload.job]?.reports ?? 0) + 1,
+        steps: (s.jobs[e.payload.job]?.steps ?? 0) + 1,
         ...(e.payload.written !== undefined && { written: e.payload.written }),
       });
       break;

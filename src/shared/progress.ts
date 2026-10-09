@@ -53,7 +53,7 @@ export function runProgress(m: ModuleInfo, state: SessionState): { job: number; 
   const run = jobs.slice(Math.max(start, 0));
   const finished = run.filter((j) => j.status === "finished").length;
   const current = run.find((j) => j.status === "running");
-  const share = current ? 1 - Math.exp(-current.reports / 12) : 0;
+  const share = current ? 1 - Math.exp(-current.steps / 12) : 0;
   const of = Math.max(m.maxJobs ?? 1, finished + 1);
   return { job: finished + 1, of, fraction: (finished + 0.9 * share) / of };
 }
