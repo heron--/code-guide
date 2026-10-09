@@ -79,6 +79,16 @@ test("starts on the first message, and streams the reply into the log", async ()
   expect(types.filter((t) => t === "chat.delta").length).toBeGreaterThan(1);
 });
 
+test("includes the reader's question about a change in the chat context", async () => {
+  session.append("session.subject", {
+    subject: { type: "change", base: "main", head: "feature", question: "Why do retries stop?" },
+    label: "feature vs main",
+  });
+  await chat.send("Reply with exactly: ok", []);
+  expect(harness.starts[0]).toContain("git diff main...feature");
+  expect(harness.starts[0]).toContain("The reader's question: Why do retries stop?");
+});
+
 test("answers messages in order, in one harness session", async () => {
   await Promise.all([chat.send("Reply with exactly: one", []), chat.send("Reply with exactly: two", [])]);
   await until(() => replies().length === 2 && replies().every((r) => r.status === "done"));

@@ -6,7 +6,7 @@ import { readGlossary } from "./glossary.js";
 import type { ModuleInfo } from "../shared/modules.js";
 import type { ViewSettings } from "../shared/settings.js";
 import type { Session } from "./session.js";
-import { parseInput, suggestions } from "./subjects.js";
+import { parseSubjectInputs, suggestions } from "./subjects.js";
 import { changedFiles } from "./git.js";
 import { changeRefs, checkGuide, parseGuide, resolveChangedFile, resolveSubjectFile } from "./resolve.js";
 
@@ -68,11 +68,15 @@ export function startServer(opts: ServeOptions): Promise<{ url: string; close: (
     // The repository's glossary (its own, else the one Code Guide wrote), for highlighting its terms in guides.
     // Read each time: a generated one can appear during the session.
     if (parts[1] === "glossary") return send(res, 200, await readGlossary(repo));
-    // Subjects worth one click, and what typed input would mean.
+    // Subjects worth one click, or validation of the submitted inputs.
     if (parts[1] === "subjects") {
-      const input = url.searchParams.get("input");
+      const submitted = ["source", "target", "question"].some((field) => url.searchParams.has(field));
       try {
-        return send(res, 200, input ? await parseInput(repo, input) : await suggestions(repo));
+        return send(
+          res,
+          200,
+          submitted ? await parseSubjectInputs(repo, Object.fromEntries(url.searchParams)) : await suggestions(repo),
+        );
       } catch (e) {
         return send(res, 400, { error: String((e as Error).message ?? e) });
       }

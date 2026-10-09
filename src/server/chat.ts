@@ -161,7 +161,7 @@ export class Chat {
   private about(): string {
     const { subject } = this.session.state.subject!;
     return subject.type === "change"
-      ? `the change from the merge-base of ${subject.base} to ${subject.head ?? "the working tree"} (see it with \`git diff ${subject.head ? `${subject.base}...${subject.head}` : `--merge-base ${subject.base}`}\`)`
+      ? `the change from the merge-base of ${subject.base} to ${subject.head ?? "the working tree"} (see it with \`git diff ${subject.head ? `${subject.base}...${subject.head}` : `--merge-base ${subject.base}`}\`)${subject.question ? `. The reader's question: ${subject.question}` : ""}`
       : subject.type === "path"
         ? `${subject.path}, in the working tree`
         : `this question about the working tree: ${subject.question}`;

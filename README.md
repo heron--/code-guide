@@ -49,9 +49,15 @@ code-guide --version               The version and the commit it was built from,
 
 ### Choosing a subject
 
-The browser asks what you want to understand and suggests the subjects that apply: uncommitted changes, the current branch against the default branch when it's ahead, and the 10 newest open pull requests (with `gh`). For any other branch, type its name (local or on origin) to see what it changes compared to the default branch; for any other pull request, paste its link or type its number (`#12`). You can also type a commit range (`main...feature`), a path in the repository, or anything else as a question. `--change`, `--branch`, `--pr`, `--path` and `--question` skip the picker. A session has one subject; run `code-guide` again for another. The status bar names it; a question is named by its guide's title once the guide is written, with the full question on hover.
+The browser asks what you want to understand and suggests the subjects that apply: uncommitted changes, the current branch against the default branch when it's ahead, and the 10 newest open pull requests (with `gh`). It also offers three optional inputs, validated when you press **Start**:
 
-A change runs from the merge-base of its base and head to its head, or to the working tree when it has no head. Code Guide fetches the base from its remote first, so a stale local copy doesn't pull other people's commits into the change; offline, it uses the local copy. For a pull request it fetches the head commit without creating a branch.
+- **Source**: the branch to explain, as `branch` or `remote/branch`. Without a remote, Code Guide uses the local branch, falling back to origin if it doesn't exist locally.
+- **Target**: the branch to compare against, shown only when source is filled in. Without a remote, it uses the local branch. Omit it to use the default branch, as usual. A target without a source is rejected.
+- **Question**: focus the explanation of the change, or ask a general question without a source. On its own it also accepts a path, branch, pull request link or number (`#12`), or commit range (`main...feature`).
+
+Leave all three blank to explain the repository. The picker shows progress while checking the inputs and fetching commits, and lets you retry if either fails. `--change`, `--branch`, `--pr`, `--path` and `--question` skip the picker. A session has one subject; run `code-guide` again for another. The status bar names it; a question is named by its guide's title once the guide is written, with the full question on hover.
+
+A change runs from the merge-base of its base and head to its head, or to the working tree when it has no head. Code Guide fetches remote branches first, so a stale local copy doesn't pull other people's commits into the change; offline, it uses the local copy. An explicitly chosen local source or target stays local. For a pull request it fetches the head commit without creating a branch.
 
 When a change comes from a pull request, the status bar links to it (with `gh`). While the subject is the pull request itself, Code Guide checks it every minute; when new commits are pushed, the status bar offers **Update modules**, which moves the session to the latest commit and writes its guide and overview again. A quiz waits for you to start it again, so it isn't built from the old guide.
 

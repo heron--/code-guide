@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { FileStatus, ResolvedFile } from "../../shared/guide";
+import { shortRef } from "../../shared/subjects";
 import { ChangeCount, FileCard, LangTag, Reviewed, splitPath } from "@/code/FileCard";
 import { indexRange, initialVisible } from "@/code/excerpt";
 import type { PanelProps } from "@/lib/panels";
@@ -84,7 +85,8 @@ export default function DiffPanel({ state }: PanelProps) {
           <Reviewed checked={full} onChange={setFull} label="Full diff" />
           {subject?.type === "change" && (
             <span className="truncate font-mono text-[11px] text-fg-3">
-              {subject.pr ? `#${subject.pr}` : (subject.head ?? "working tree")} ← {subject.base}
+              {subject.pr ? `#${subject.pr}` : subject.head ? shortRef(subject.head) : "working tree"} ←{" "}
+              {shortRef(subject.base)}
             </span>
           )}
         </div>
