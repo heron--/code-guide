@@ -94,7 +94,11 @@ export function StepCode({ job, steps, frames, at, current, file, wrap, keys }: 
       (s.notTaken ?? []).flatMap((b) => {
         const [start, end = start] = b.lines.split("-").map(Number);
         const ir = indexRange(file, { start, end });
-        return ir ? [{ from: ir[0], to: ir[1], reason: b.reason }] : [];
+        if (!ir) return [];
+        // Its own lines only: not the removed lines a diff shows just before them.
+        let from = ir[0];
+        while (from < ir[1] && file.lines[from].k === "-") from++;
+        return [{ from, to: ir[1], reason: b.reason }];
       }),
     [s, file],
   );
@@ -223,7 +227,7 @@ export function StepCode({ job, steps, frames, at, current, file, wrap, keys }: 
         const covered = (i: number) => inside.some((b) => i >= b.from && i <= b.to);
         if (!inside.length || Array.from({ length: to - from + 1 }, (_, k) => from + k).some((i) => !covered(i)))
           return undefined;
-        const n = to - from + 1;
+        const n = file.lines.slice(from, to + 1).filter((l) => l.k !== "-").length;
         return (
           <span className="flex min-w-0 items-center gap-2.5">
             <span className="flex flex-none items-center gap-1 border border-border bg-surface px-1.5 text-fg-2">
