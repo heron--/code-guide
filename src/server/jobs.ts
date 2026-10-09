@@ -242,7 +242,10 @@ export class JobRunner {
                   written = next;
                   const activity = parts.activity(written.length);
                   this.session.append("job.progress", { job: id, activity, written: written.length });
-                  return { text: `Written. ${activity} so far.` };
+                  const warnings = problems.filter((p) => p.level === "warning");
+                  return {
+                    text: `Written. ${activity} so far.${warnings.length ? ` Consider fixing these warnings:\n${warnings.map((w) => `- ${w.where}: ${w.message}`).join("\n")}` : ""}`,
+                  };
                 },
               },
             ]

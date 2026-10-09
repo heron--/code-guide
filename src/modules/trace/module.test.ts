@@ -121,6 +121,11 @@ test("submitting checks the count and keeps the scenario with the steps", async 
   expect((await submit(1, [])).problems[0].message).toMatch(/no steps are written/);
   expect((await submit(2, good)).problems[0].message).toBe("3 steps are written, not 2");
   expect(await submit(3, good)).toEqual({ problems: [], result: { scenario: scenarios.scenarios[0], steps: good } });
+  // A long sentence is a warning on the finished trace, not an error.
+  const long = [...good.slice(0, 2), { ...good[2], text: "word ".repeat(40) }];
+  expect((await submit(3, long)).problems).toEqual([
+    { level: "warning", where: "steps[2]", message: "text is 40 words; keep it to 35" },
+  ]);
 });
 
 test("the trace job's prompt names the picked scenario, and fails for one that isn't there", () => {

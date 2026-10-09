@@ -231,7 +231,19 @@ const traceJob: JobKind = {
         };
       const { scenarios } = Object.values(ctx.inputs)[0] as Scenarios;
       const result: Trace = { scenario: scenarios[ctx.pick!], steps: written as Step[] };
-      return { problems: [], result };
+      // Warnings from batches are recorded on the finished job, for the steps as finally written.
+      const problems = (written as Step[]).flatMap((s, i): Problem[] =>
+        words(s.text) > STEP_WORDS
+          ? [
+              {
+                level: "warning",
+                where: `steps[${i}]`,
+                message: `text is ${words(s.text)} words; keep it to ${STEP_WORDS}`,
+              },
+            ]
+          : [],
+      );
+      return { problems, result };
     },
   },
 };
