@@ -107,10 +107,11 @@ export function StepCode({ job, steps, frames, at, current, file, wrap, keys }: 
       ...near.filter((l) => s.line - l > SPAN || l > s.line + 3).map((l) => ({ start: l, end: l })),
     ];
     const vis = initialVisible(file, ranges);
+    // Branches collapse on their own: hidden, with the lines around them shown (unless those are branches too).
+    const skipped = (i: number) => branches.some((b) => i >= b.from && i <= b.to);
     for (const b of branches) {
       for (let i = b.from; i <= b.to; i++) vis[i] = false;
-      if (b.from > 0) vis[b.from - 1] = true;
-      if (b.to + 1 < vis.length) vis[b.to + 1] = true;
+      for (const i of [b.from - 1, b.to + 1]) if (i >= 0 && i < vis.length && !skipped(i)) vis[i] = true;
     }
     return vis;
   }, [file, s, current, at, steps, branches]);
@@ -217,8 +218,11 @@ export function StepCode({ job, steps, frames, at, current, file, wrap, keys }: 
         };
       }}
       gapLabel={(from, to) => {
-        const b = branches.find((b) => b.from === from && b.to === to);
-        if (!b) return undefined;
+        // Branches next to each other collapse together: one row, every reason.
+        const inside = branches.filter((b) => b.from >= from && b.to <= to);
+        const covered = (i: number) => inside.some((b) => i >= b.from && i <= b.to);
+        if (!inside.length || Array.from({ length: to - from + 1 }, (_, k) => from + k).some((i) => !covered(i)))
+          return undefined;
         const n = to - from + 1;
         return (
           <span className="flex min-w-0 items-center gap-2.5">
@@ -228,7 +232,12 @@ export function StepCode({ job, steps, frames, at, current, file, wrap, keys }: 
             </span>
             <span className={cn("min-w-0 text-fg-2 italic", !wrap && "truncate")}>
               <span className="mr-[0.25em] not-italic">{INFERRED}</span>
-              <StepText text={b.reason} />
+              {inside.map((b, k) => (
+                <span key={k}>
+                  {k > 0 && "; "}
+                  <StepText text={b.reason} />
+                </span>
+              ))}
             </span>
             <span className="flex-none">
               {n} line{n === 1 ? "" : "s"}

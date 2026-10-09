@@ -225,19 +225,15 @@ function TraceView(props: ViewProps) {
   const [tab, setTab] = useState<"code" | "stack">("code");
   const last = i === steps.length - 1;
 
-  // Citations from Chat that point at code in this trace jump to the matching step: the nearest to this one.
+  // Citations from Chat that point at lines a step stops at jump to that step: the nearest to this one. Others go
+  // on to a panel that can show those lines.
+  const stopsAt = (c: { path: string; start: number; end: number }) =>
+    steps.flatMap((x, j) => (x.path === c.path && x.line >= c.start && x.line <= c.end ? [j] : []));
   useLineShower("trace", {
-    canShow: (path) => steps.some((x) => x.path === path),
+    canShow: (_, c) => stopsAt(c).length > 0,
     show: (c) => {
-      const near = steps
-        .map((x, j) => ({ x, j }))
-        .filter(({ x }) => x.path === c.path)
-        .sort((a, b) => {
-          const inA = a.x.line >= c.start && a.x.line <= c.end ? 0 : 1;
-          const inB = b.x.line >= c.start && b.x.line <= c.end ? 0 : 1;
-          return inA - inB || Math.abs(a.j - i) - Math.abs(b.j - i);
-        });
-      if (near.length) setStep(near[0].j);
+      const near = stopsAt(c).sort((a, b) => Math.abs(a - i) - Math.abs(b - i));
+      if (near.length) setStep(near[0]);
     },
   });
 

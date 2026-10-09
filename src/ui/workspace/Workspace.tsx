@@ -100,7 +100,7 @@ export function Workspace({ state, modules, panels = DEFAULT_VIEW.modules, chann
         const { layout } = live.current;
         for (const name of layout[layout.recent] === "trace" ? ["trace", "guide"] : ["guide", "trace"]) {
           const shower = showers.current.get(name);
-          if (shower && inSlot(name) && shower.canShow(target.path)) return shower.show(target);
+          if (shower && inSlot(name) && shower.canShow(target.path, target)) return shower.show(target);
         }
         const res = await fetch(`/api/file?path=${encodeURIComponent(target.path)}`);
         if (!res.ok || ticket !== latestCite.current) return;
@@ -111,7 +111,7 @@ export function Workspace({ state, modules, panels = DEFAULT_VIEW.modules, chann
           const shower = showers.current.get("diff");
           if (shower && inSlot("diff")) {
             // A Diff loaded before the file changed doesn't have it; the file view does.
-            if (shower.canShow(target.path)) return shower.show(target);
+            if (shower.canShow(target.path, target)) return shower.show(target);
             return setFileView({ target, file });
           }
           pending.current = { module: "diff", target };
