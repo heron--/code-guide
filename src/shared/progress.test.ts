@@ -62,3 +62,31 @@ test("a guide whose review failed isn't shown, and the failure is", () => {
   ]);
   expect(panelState(guide, s)).toMatchObject({ job: undefined, busy: false, failed: { id: "review-1" } });
 });
+
+const trace: ModuleInfo = {
+  name: "trace",
+  label: "Trace",
+  icon: [],
+  needsJob: true,
+  kind: "scenarios",
+  pickKind: "trace",
+};
+const picked = (job: string, from: string, pick: number) =>
+  ["job.queued", { job, kind: "trace", module: "trace", inputs: [from], pick }] as [string, Record<string, unknown>];
+const failed = (job: string) => ["job.failed", { job, error: "no", problems: [] }] as [string, Record<string, unknown>];
+const scenarios = [
+  ["job.queued", { job: "scenarios-1", kind: "scenarios", module: "trace", inputs: [] }],
+  started("scenarios-1"),
+  finished("scenarios-1"),
+] as [string, Record<string, unknown>][];
+
+test("a job the reader picked isn't a follow-up: its scenarios stay shown while it runs, or after it fails", () => {
+  const writing = session(...scenarios, picked("trace-1", "scenarios-1", 0), started("trace-1"));
+  expect(panelState(trace, writing)).toMatchObject({ busy: true, job: "scenarios-1", result: "scenarios-1" });
+  expect(runProgress(trace, writing)).toMatchObject({ job: 1, of: 1 });
+  const broke = session(...scenarios, picked("trace-1", "scenarios-1", 0), started("trace-1"), failed("trace-1"));
+  expect(panelState(trace, broke)).toMatchObject({ job: "scenarios-1" });
+  // A finished trace is the module's newest result, which marks its dock square.
+  const traced = session(...scenarios, picked("trace-1", "scenarios-1", 0), started("trace-1"), finished("trace-1"));
+  expect(panelState(trace, traced)).toMatchObject({ job: "scenarios-1", result: "trace-1" });
+});

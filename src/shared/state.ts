@@ -9,11 +9,15 @@ export type JobState = {
   label?: string;
   module: string;
   inputs: string[];
+  /** The option the reader picked from its first input, e.g. the scenario a trace follows. */
+  pick?: number;
   status: "queued" | "running" | "finished" | "failed" | "cancelled";
   /** Latest progress, while running. */
   activity?: string;
   /** How many progress events it has reported: a rough measure of how far along it is. */
   steps: number;
+  /** For a job that writes its result in parts: how many it has written so far. */
+  written?: number;
   /** Submissions so far, accepted or not. */
   attempts: number;
   /** File in the session directory, once finished. */
@@ -94,7 +98,11 @@ export function reduce(state: SessionState, e: SessionEvent): SessionState {
       job(e.payload.job, { status: "running" });
       break;
     case "job.progress":
-      job(e.payload.job, { activity: e.payload.activity, steps: (s.jobs[e.payload.job]?.steps ?? 0) + 1 });
+      job(e.payload.job, {
+        activity: e.payload.activity,
+        steps: (s.jobs[e.payload.job]?.steps ?? 0) + 1,
+        ...(e.payload.written !== undefined && { written: e.payload.written }),
+      });
       break;
     case "job.submitted":
       job(e.payload.job, { attempts: e.payload.attempt, problems: e.payload.problems });

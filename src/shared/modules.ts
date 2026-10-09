@@ -11,6 +11,10 @@ export type ModuleInfo = {
   needsJob: boolean;
   /** The kind of job whose result the panel shows, for modules with a job. */
   kind?: string;
+  /** The kind of job the reader starts by picking an option from that result, e.g. a trace of one scenario. */
+  pickKind?: string;
+  /** Its panel shows its own jobs' progress and failures, so it opens as soon as its job starts. */
+  showsProgress?: boolean;
   /** Subject types it works with; omit for all. */
   subjects?: Subject["type"][];
   /** Job kinds that must have a finished result first, e.g. a quiz needs a guide. */
@@ -36,7 +40,8 @@ export function unavailable(m: ModuleInfo, state: SessionState): string | undefi
 /**
  * The newest done job of a kind: finished, and so are all the follow-ups its module ran on it (today, a guide's
  * review and any revision). Readers never see an unfinished result, whatever job is left: a failed job shows
- * instead, with its reason and a retry.
+ * instead, with its reason and a retry. A job the reader started by picking from a result (a trace of one of its
+ * scenarios) isn't a follow-up: the result stays done while it runs.
  */
 export function latestDone(state: SessionState, kind: string): string | undefined {
   return state.jobOrder.findLast((id) => state.jobs[id].kind === kind && done(state, id));
@@ -48,7 +53,13 @@ function done(state: SessionState, id: string): boolean {
     job.status === "finished" &&
     state.jobOrder.every((f) => {
       const next = state.jobs[f];
-      return next.module !== job.module || next.inputs[0] !== id || retried(state, f) || done(state, f);
+      return (
+        next.module !== job.module ||
+        next.inputs[0] !== id ||
+        next.pick !== undefined ||
+        retried(state, f) ||
+        done(state, f)
+      );
     })
   );
 }
@@ -60,6 +71,15 @@ function retried(state: SessionState, id: string): boolean {
   const same = (o: typeof job) =>
     o.kind === job.kind && o.module === job.module && o.inputs.join() === job.inputs.join();
   return state.jobOrder.slice(state.jobOrder.indexOf(id) + 1).some((o) => same(state.jobs[o]));
+}
+
+/**
+ * The newest result a module has to show, of the kind its panel opens with or the kind the reader picks (a trace,
+ * after its scenarios). A newer one than its panel last showed marks its dock square ready.
+ */
+export function latestResult(m: ModuleInfo, state: SessionState): string | undefined {
+  const done = [m.kind, m.pickKind].flatMap((k) => (k ? [latestDone(state, k)] : [])).filter((j) => j !== undefined);
+  return done.sort((a, b) => state.jobOrder.indexOf(a) - state.jobOrder.indexOf(b)).at(-1);
 }
 
 /** Whether any of a module's jobs (its own, or its follow-ups) is still queued or running. */

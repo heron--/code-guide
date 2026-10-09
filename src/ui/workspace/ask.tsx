@@ -17,6 +17,8 @@ export function useAskSelection(
     file: (path: string) => ResolvedFile | undefined;
     /** `block` is the selection's `[data-prose]` element, for a panel that shows more than one. */
     prose?: (text: string, block: HTMLElement) => ChatContext | undefined;
+    /** What selected code is seen in, attached before it (e.g. the trace step it's shown for). */
+    around?: () => ChatContext | undefined;
   },
 ) {
   const { ask } = useActions();
@@ -61,11 +63,13 @@ export function useAskSelection(
       };
       const now = deleted ? undefined : range(rows.map((l) => l.n));
       const before = range(rows.filter((l) => deleted || l.k === "-").map((l) => l.o));
-      const contexts: ChatContext[] = [
+      const code: ChatContext[] = [
         ...(now ? [{ kind: "code" as const, path, ...now }] : []),
         ...(before ? [{ kind: "code" as const, path, ...before, side: "old" as const }] : []),
       ];
-      if (!contexts.length) return setSelection(undefined);
+      if (!code.length) return setSelection(undefined);
+      const around = opts.around?.();
+      const contexts = around ? [around, ...code] : code;
       const { start, end } = now ?? before!;
       const lines = start === end ? `line ${start}` : `lines ${start}–${end}`;
       return setSelection({

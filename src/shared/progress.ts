@@ -1,4 +1,4 @@
-import { latestDone, moduleBusy, type ModuleInfo } from "./modules.js";
+import { latestDone, latestResult, moduleBusy, type ModuleInfo } from "./modules.js";
 import type { JobState, SessionState } from "./state.js";
 
 export type PanelState = {
@@ -10,6 +10,8 @@ export type PanelState = {
   stage?: string;
   /** The job whose result the panel shows. */
   job?: string;
+  /** Its newest result of any kind it shows (a trace, after its scenarios): a new one marks its dock square. */
+  result?: string;
   /** The module's latest job failed, and nothing is running. */
   failed?: JobState;
 };
@@ -24,6 +26,7 @@ export function panelState(m: ModuleInfo, state: SessionState): PanelState {
     activity: running?.activity,
     stage: running && stageLabel(m, state, running),
     job: m.kind ? latestDone(state, m.kind) : undefined,
+    result: latestResult(m, state),
     failed: !busy && last?.status === "failed" ? last : undefined,
   };
 }
@@ -45,8 +48,8 @@ function stageLabel(m: ModuleInfo, state: SessionState, j: JobState): string {
  */
 export function runProgress(m: ModuleInfo, state: SessionState): { job: number; of: number; fraction: number } {
   const jobs = state.jobOrder.map((id) => state.jobs[id]).filter((j) => j.module === m.name);
-  // A run starts with a job that doesn't follow up another of the module's jobs.
-  const start = jobs.findLastIndex((j) => !jobs.some((p) => p.id === j.inputs[0]));
+  // A run starts with a job that doesn't follow up another of the module's jobs, or that the reader picked.
+  const start = jobs.findLastIndex((j) => j.pick !== undefined || !jobs.some((p) => p.id === j.inputs[0]));
   const run = jobs.slice(Math.max(start, 0));
   const finished = run.filter((j) => j.status === "finished").length;
   const current = run.find((j) => j.status === "running");

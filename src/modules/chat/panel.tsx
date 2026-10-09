@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Guide, ResolvedFile } from "../../shared/guide";
 import type { ChatContext } from "../../shared/protocol";
 import type { ChatMessage } from "../../shared/state";
+import { shortPackage, type Trace } from "../trace/trace";
 import { RichText } from "@/components/RichText";
 import type { PanelProps } from "@/lib/panels";
 import { cn } from "@/lib/utils";
@@ -11,33 +12,39 @@ import { Icon, icons } from "@/workspace/Icon";
 const chatIcon = ["M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"];
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** Finished guides, fetched once, for naming chapters in context labels. */
-const guides = new Map<string, Promise<Guide>>();
-function useGuide(job?: string): Guide | undefined {
-  const [g, setG] = useState<Guide>();
+/** Finished guides and traces, fetched once, for naming chapters and steps in context labels. */
+const results = new Map<string, Promise<unknown>>();
+/** The session `results` belong to: a restarted server numbers its jobs from 1 again while this tab stays open. */
+let resultsFor: string | undefined;
+function useResult<T>(job?: string): T | undefined {
+  const [r, setR] = useState<T>();
   useEffect(() => {
     if (!job) return;
-    if (!guides.has(job))
-      guides.set(
+    if (!results.has(job))
+      results.set(
         job,
         fetch(`/api/results/${encodeURIComponent(job)}`).then((r) => r.json()),
       );
     let current = true;
-    guides.get(job)!.then((x) => current && setG(x));
+    results.get(job)!.then((x) => current && setR(x as T));
     return () => {
       current = false;
     };
   }, [job]);
-  return g;
+  return r;
 }
 
 function ContextLabel({ c }: { c: ChatContext }) {
-  const guide = useGuide(c.kind === "code" ? undefined : c.job);
+  const result = useResult<Guide & Trace>(c.kind === "code" ? undefined : c.job);
   if (c.kind === "code")
     return (
       <>{`${c.path.split("/").pop()} ${c.start === c.end ? c.start : `${c.start}–${c.end}`}${c.side === "old" ? " (removed)" : ""}`}</>
     );
-  const title = guide?.chapters[c.chapter]?.title;
+  if (c.kind === "step") {
+    const s = result?.steps?.[c.step];
+    return <>{`About Trace · step ${c.step + 1}${s ? ` · ${shortPackage(s)} ${s.function}` : ""}`}</>;
+  }
+  const title = result?.chapters?.[c.chapter]?.title;
   return <>{`${c.kind === "prose" ? "From" : "About"} ${pad(c.chapter + 1)}${title ? ` · ${title}` : ""}`}</>;
 }
 
@@ -111,6 +118,10 @@ const FOLLOW_SLACK = 40;
 
 /** The Chat module: questions as they come up, answered from the code with citations. */
 export default function ChatPanel({ state, channel }: PanelProps) {
+  if (resultsFor !== state.id) {
+    results.clear();
+    resultsFor = state.id;
+  }
   const { context, setContext } = useDraft();
   const [text, setText] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
@@ -147,8 +158,8 @@ export default function ChatPanel({ state, channel }: PanelProps) {
         <div className="flex min-h-full flex-col justify-end gap-[18px] px-4 pt-4 pb-2">
           {messages.length === 0 && (
             <p className="m-auto max-w-[280px] text-center text-[12.5px] leading-normal text-fg-3">
-              Ask anything about the code. Select lines in the Guide or Diff, or prose in the Guide, or use its Ask
-              button, to attach them.
+              Ask anything about the code. Select lines in the Guide, Trace or Diff, or prose in the Guide, or use an
+              Ask button, to attach them.
             </p>
           )}
           {messages.map((m) => (
@@ -180,7 +191,7 @@ export default function ChatPanel({ state, channel }: PanelProps) {
           />
           <div className="flex items-center gap-2">
             <span className="font-mono text-[10.5px] text-fg-3">
-              {waiting ? "Answering…" : "Select code in the Guide or Diff to attach it"}
+              {waiting ? "Answering…" : "Select code in the Guide or Trace to attach it"}
             </span>
             <span className="flex-1" />
             <button
@@ -208,8 +219,11 @@ function Message({ m }: { m: ChatMessage }) {
       </div>
       {m.from === "reader" ? (
         <div className="flex flex-col gap-2">
-          {m.context.some((c) => c.kind !== "chapter") &&
-            m.context.filter((c) => c.kind !== "chapter").map((c, i) => <ContextCard key={i} c={c} />)}
+          {m.context
+            .filter((c) => c.kind !== "chapter" && c.kind !== "step")
+            .map((c, i) => (
+              <ContextCard key={i} c={c} />
+            ))}
           <div className="border border-border-subtle bg-surface-3 px-3 py-[9px] text-[13.5px] leading-normal whitespace-pre-wrap">
             {m.text}
           </div>

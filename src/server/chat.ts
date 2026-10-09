@@ -1,4 +1,5 @@
 import type { Guide } from "../shared/guide.js";
+import { INFERRED, packageOf, type Trace } from "../modules/trace/trace.js";
 import type { ChatContext } from "../shared/protocol.js";
 import { fileAt, splitLines } from "./git.js";
 import { changeRefs } from "./resolve.js";
@@ -9,11 +10,12 @@ const instructions = `You answer a reader's questions about code they're studyin
 
 - Answer the question asked, briefly: a few sentences unless more is needed. Read the code before answering; don't guess from names.
 - Cite code as Markdown links to exact lines: [the retry check](src/retry.ts#L31-L33). Use repository-relative paths. Every claim about code gets a citation.
-- When a message comes with context (a chapter, a passage of prose, or lines of code), it's what the reader is looking at: answer about that first.
+- When a message comes with context (a chapter, a passage of prose, a step of a trace, or lines of code), it's what the reader is looking at: answer about that first.
+- A trace follows one scenario through the code step by step, without running it. Its values are read from the code or inferred for the scenario (marked ${INFERRED}). Asked "what if" about a step, reason from that scenario: say what would change on the path and which values would differ, citing the lines that decide it.
 - You can read files, search, and run read-only git commands. You can't edit anything.`;
 
-/** Finished results the chat is told about: guides and quizzes. */
-const SEEDED = ["guide", "quiz"];
+/** Finished results the chat is told about: guides, quizzes and traces. */
+const SEEDED = ["guide", "quiz", "trace"];
 
 /** What the chat's agent is doing, for the terminal. */
 export type AgentStatus = {
@@ -136,6 +138,16 @@ export class Chat {
       return `The reader selected ${c.path}#L${c.start}-L${c.end}${where}:\n\`\`\`\n${lines.map((l, i) => `${c.start + i}  ${l}`).join("\n")}\n\`\`\``;
     }
     const job = this.session.state.jobs[c.job];
+    if (c.kind === "step") {
+      const trace = job?.result ? ((await this.session.readResult(job.result)) as Trace) : undefined;
+      const s = trace?.steps[c.step];
+      if (!trace || !s) return "";
+      const values = (s.values ?? []).map(
+        (v) =>
+          `\n- ${v.name} = ${v.from === "inferred" ? `${INFERRED}${v.value} (inferred${v.reason ? `: ${v.reason}` : ""})` : `${v.value} (from the code, ${v.at})`}`,
+      );
+      return `The reader is on step ${c.step + 1} of ${trace.steps.length} of ${c.job}, the trace of the scenario "${trace.scenario.title}": ${trace.scenario.summary}\nAt this step they're in ${packageOf(s) === "." ? "" : `${packageOf(s)} `}${s.function}, at ${s.path}#L${s.line}: ${s.text}${values.length ? `\nValues here:${values.join("")}` : ""}`;
+    }
     const guide = job?.result ? ((await this.session.readResult(job.result)) as Guide) : undefined;
     const chapter = guide?.chapters[c.chapter];
     if (!chapter) return "";

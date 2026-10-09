@@ -6,8 +6,8 @@ export type LinesTarget = { path: string; start: number; end: number };
 
 /** What a panel can show when a citation is clicked. Registered while the panel is mounted. */
 export type LineShower = {
-  /** Whether it can show this file right now (e.g. the Guide's current chapter has it). */
-  canShow: (path: string) => boolean;
+  /** Whether it can show these lines right now (e.g. the Guide's current chapter has the file). */
+  canShow: (path: string, lines: LinesTarget) => boolean;
   show: (t: LinesTarget) => void;
 };
 
@@ -34,7 +34,7 @@ export function useLineShower(module: string, shower: LineShower) {
   const ref = useRef(shower);
   ref.current = shower;
   useEffect(
-    () => register(module, { canShow: (p) => ref.current.canShow(p), show: (t) => ref.current.show(t) }),
+    () => register(module, { canShow: (p, t) => ref.current.canShow(p, t), show: (t) => ref.current.show(t) }),
     [module, register],
   );
 }

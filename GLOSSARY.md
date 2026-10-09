@@ -4,6 +4,8 @@ Use these words, and only these words, for these ideas: in the spec, the skill, 
 
 "Code Guide" is the product, and is always written in full. "guide" alone means the Guide term below.
 
+A module can have its own glossary, `src/modules/<name>/GLOSSARY.md`, in the same format, for terms that name only that module's ideas, wherever those come up (its code and panel, and e.g. Chat asking about a trace step). The same rules apply there.
+
 **Adding, removing or redefining a term requires the project owner's approval.** Propose the change (in an issue or PR comment) and wait for a yes before editing this file or using a new term in the spec, skill or viewer.
 
 | Term | Definition | Not to be confused with |

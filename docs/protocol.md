@@ -18,7 +18,7 @@ Every event has the same envelope. `seq` counts up from 1 within a session. A ta
 
 ```json
 {
-  "v": 3,
+  "v": 4,
   "seq": 1,
   "at": "2026-10-07T09:12:03.120Z",
   "session": "2026-10-07-091203-k3f9",
@@ -64,6 +64,12 @@ A job is queued, starts when the concurrency limit allows, reports progress, and
 `inputs` names the finished results the job reads, never their transcripts. `label` is what the job does, as the reader sees it.
 
 ```json
+{ "type": "job.queued", "payload": { "job": "trace-1", "kind": "trace", "label": "Writing the trace", "module": "trace", "inputs": ["scenarios-1"], "pick": 0 } }
+```
+
+`pick` is the option the reader picked from the job's first input: here, the first of the scenarios a trace can follow.
+
+```json
 { "type": "job.started", "payload": { "job": "guide-1" } }
 ```
 
@@ -72,6 +78,12 @@ A job is queued, starts when the concurrency limit allows, reports progress, and
 ```
 
 Progress says what the agent is doing, not what it has written so far. A result arrives whole, once it passes validation.
+
+```json
+{ "type": "job.progress", "payload": { "job": "trace-1", "activity": "9 steps written", "written": 9 } }
+```
+
+A job that writes its result in parts (a trace's steps, checked as they're written) also says how many it has written, never what they say.
 
 ```json
 { "type": "job.submitted", "payload": { "job": "guide-1", "attempt": 1, "accepted": false, "problems": [{ "level": "error", "where": "chapters[1] \"Retry only safe requests\"", "message": "range \"40-90\" is past the end of the file (72 lines)" }] } }
@@ -120,7 +132,7 @@ Replies stream as text deltas, appended in order.
 ## Requests
 
 ```json
-{ "type": "hello", "v": 3, "session": "2026-10-07-091203-k3f9", "after": 41 }
+{ "type": "hello", "v": 4, "session": "2026-10-07-091203-k3f9", "after": 41 }
 ```
 
 The first message on every connection. A tab that reconnects sends its session and the last `seq` it saw, and gets only what came after. A fresh tab omits both, and so does a tab whose session isn't the server's any more: either gets the whole session.
@@ -144,6 +156,12 @@ Moves a pull request subject to the pull request's latest commit: cancels runnin
 ```
 
 ```json
+{ "type": "job.start", "module": "trace", "pick": 0 }
+```
+
+Starts the job a module runs for an option the reader picked from its latest result: here, a trace of its first scenario.
+
+```json
 { "type": "job.cancel", "job": "quiz-1" }
 ```
 
@@ -151,12 +169,16 @@ Moves a pull request subject to the pull request's latest commit: cancels runnin
 { "type": "chat.send", "text": "What calls this?", "context": [{ "kind": "code", "path": "src/retry/policy.ts", "start": 31, "end": 33 }] }
 ```
 
-A chat message's context can be a `chapter`, a selected range of chapter `prose`, or a selected range of `code`.
+```json
+{ "type": "chat.send", "text": "Would a 503 with Retry-After change this path?", "context": [{ "kind": "step", "job": "trace-1", "step": 7 }] }
+```
+
+A chat message's context can be a `chapter`, a selected range of chapter `prose`, a `step` of a trace (by index), or a selected range of `code`.
 
 ## Notices
 
 ```json
-{ "type": "welcome", "v": 3, "session": "2026-10-07-091203-k3f9", "modules": [{ "name": "diff", "label": "Diff", "icon": ["M3 2.5h10v11H3z", "M8 5v4M6 7h4M6 11h4"], "needsJob": false, "subjects": ["change"] }], "view": { "modules": ["guide", "chat"], "theme": "system" } }
+{ "type": "welcome", "v": 4, "session": "2026-10-07-091203-k3f9", "modules": [{ "name": "diff", "label": "Diff", "icon": ["M3 2.5h10v11H3z", "M8 5v4M6 7h4M6 11h4"], "needsJob": false, "subjects": ["change"] }], "view": { "modules": ["guide", "chat"], "theme": "system" } }
 ```
 
 `welcome` lists the modules this server offers, so the browser can show them without knowing any by name. `view` carries the settings the browser applies: its theme, and the modules a new session opens.

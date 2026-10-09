@@ -46,6 +46,24 @@
   --mark: #c6d1f6;
   /* The one hard-edged shadow, for the active panel */
   --active-shadow: 2px 2px 0 #1d1c19;
+  /*
+   * Packages in a trace's call stack: fill and line for the six with the most steps, apart in lightness as well
+   * as hue, then one neutral for the rest.
+   */
+  --pkg-1: #ffebc4;
+  --pkg-1-line: #9b7d3b;
+  --pkg-2: #a49bc2;
+  --pkg-2-line: #3b3573;
+  --pkg-3: #93d2c9;
+  --pkg-3-line: #006e63;
+  --pkg-4: #abe2fd;
+  --pkg-4-line: #007ca9;
+  --pkg-5: #dba89a;
+  --pkg-5-line: #813726;
+  --pkg-6: #799675;
+  --pkg-6-line: #003801;
+  --pkg-0: #e2e2e2;
+  --pkg-0-line: #868686;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -78,6 +96,20 @@
     --del-bg-strong: #45201f;
     --mark: #334079;
     --active-shadow: 2px 2px 0 #000000;
+    --pkg-1: #706146;
+    --pkg-1-line: #e5c27c;
+    --pkg-2: #36314c;
+    --pkg-2-line: #998dd3;
+    --pkg-3: #23534d;
+    --pkg-3-line: #38c4b6;
+    --pkg-4: #315c70;
+    --pkg-4-line: #49ccfd;
+    --pkg-5: #59372f;
+    --pkg-5-line: #e38d77;
+    --pkg-6: #1a2f19;
+    --pkg-6-line: #5f965a;
+    --pkg-0: #3b3b3b;
+    --pkg-0-line: #8b8b8b;
   }
 }
 :root[data-theme="dark"] {
@@ -109,4 +141,18 @@
   --del-bg-strong: #45201f;
   --mark: #334079;
   --active-shadow: 2px 2px 0 #000000;
+  --pkg-1: #706146;
+  --pkg-1-line: #e5c27c;
+  --pkg-2: #36314c;
+  --pkg-2-line: #998dd3;
+  --pkg-3: #23534d;
+  --pkg-3-line: #38c4b6;
+  --pkg-4: #315c70;
+  --pkg-4-line: #49ccfd;
+  --pkg-5: #59372f;
+  --pkg-5-line: #e38d77;
+  --pkg-6: #1a2f19;
+  --pkg-6-line: #5f965a;
+  --pkg-0: #3b3b3b;
+  --pkg-0-line: #8b8b8b;
 }

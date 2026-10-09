@@ -1,5 +1,5 @@
 import { memo, type ReactNode } from "react";
-import type { Line, ResolvedFile } from "../../shared/guide";
+import type { Line, ResolvedFile, Token } from "../../shared/guide";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/workspace/Icon";
 import { EXPAND_STEP, enclosingLine } from "./excerpt";
@@ -29,10 +29,47 @@ export function ChangeCount({ file }: { file: Pick<ResolvedFile, "additions" | "
   );
 }
 
-const Code = memo(function Code({ line }: { line: Line }) {
+/** What a panel adds to one line: a class, a gutter sign in place of the diff's, and something after the code. */
+export type LineDecoration = { className?: string; sign?: ReactNode; after?: ReactNode };
+
+/**
+ * A line's tokens cut into rows of at most `cols` characters, at a space or punctuation where one is near the end.
+ * Rows after the first keep the line's indent, plus two, so a wrapped line still reads as one.
+ */
+export function wrapTokens(tokens: Token[], cols: number): Token[][] {
+  const flat = tokens.map(([t, l, d]): Token => [t.replace(/\t/g, "    "), l, d]);
+  const text = flat.map((t) => t[0]).join("");
+  if (text.length <= cols) return [tokens];
+  const indent = " ".repeat(Math.min(text.match(/^\s*/)![0].length + 2, Math.floor(cols / 2)));
+  const cuts: number[] = [];
+  for (let at = 0, room = cols; text.length - at > room; room = cols - indent.length) {
+    const row = text.slice(at, at + room);
+    const soft = Math.max(...[" ", "(", ",", "."].map((c) => row.lastIndexOf(c)));
+    at += soft > room / 2 ? soft + 1 : room;
+    cuts.push(at);
+  }
+  const rows: Token[][] = [[]];
+  let pos = 0;
+  for (const [t, l, d] of flat) {
+    for (let rest = t; rest.length;) {
+      const next = cuts[rows.length - 1] ?? Infinity;
+      if (pos === next) {
+        rows.push([[indent]]);
+        continue;
+      }
+      const piece = rest.slice(0, next - pos);
+      rows.at(-1)!.push([piece, l, d]);
+      pos += piece.length;
+      rest = rest.slice(piece.length);
+    }
+  }
+  return rows;
+}
+
+const Code = memo(function Code({ tokens }: { tokens: Token[] }) {
   return (
     <>
-      {line.t.map(([text, l, d], i) =>
+      {tokens.map(([text, l, d], i) =>
         l ? (
           <span key={i} className="tok" style={{ "--l": l, "--d": d } as React.CSSProperties}>
             {text}
@@ -45,24 +82,20 @@ const Code = memo(function Code({ line }: { line: Line }) {
   );
 });
 
-function Row({ line, idx, marked, deleted }: { line: Line; idx: number; marked: boolean; deleted: boolean }) {
-  return (
-    <div
-      data-idx={idx}
-      className={cn(
-        "flex h-5 min-w-max leading-5",
-        line.k === "+" && "bg-add-bg",
-        line.k === "-" && "bg-del-bg",
-        marked && "line-marked",
-      )}
-    >
-      <span
-        className={cn(
-          "w-[42px] flex-none pr-2.5 text-right text-[11px] text-fg-3 select-none",
-          line.k === "+" ? "bg-add-bg-strong" : line.k === "-" ? "bg-del-bg-strong" : "bg-surface-2",
-        )}
-      >
-        {deleted ? line.o : line.k === "-" ? line.o : line.n}
+function Row(props: {
+  line: Line;
+  idx: number;
+  marked: boolean;
+  deleted: boolean;
+  decoration?: LineDecoration;
+  wrap?: number;
+}) {
+  const { line, idx, marked, deleted, decoration: dec, wrap } = props;
+  const bg = line.k === "+" ? "bg-add-bg-strong" : line.k === "-" ? "bg-del-bg-strong" : "bg-surface-2";
+  const gutter = (first: boolean) => (
+    <>
+      <span className={cn("w-[42px] flex-none pr-2.5 text-right text-[11px] text-fg-3 select-none", bg)}>
+        {!first ? "↳" : deleted ? line.o : line.k === "-" ? line.o : line.n}
       </span>
       <span
         className={cn(
@@ -70,11 +103,40 @@ function Row({ line, idx, marked, deleted }: { line: Line; idx: number; marked: 
           line.k === "+" ? "text-add" : line.k === "-" ? "text-del" : "text-fg-3",
         )}
       >
-        {line.k === " " ? "" : line.k === "-" ? "−" : "+"}
+        {first && (dec?.sign ?? (line.k === " " ? "" : line.k === "-" ? "−" : "+"))}
       </span>
-      <span className="pr-4 whitespace-pre">
-        <Code line={line} />
-      </span>
+    </>
+  );
+  const rows = wrap ? wrapTokens(line.t, wrap) : [line.t];
+  return (
+    <div
+      data-idx={idx}
+      className={cn(
+        "flex min-w-max flex-col leading-5",
+        wrap && "min-w-0",
+        line.k === "+" && "bg-add-bg",
+        line.k === "-" && "bg-del-bg",
+        marked && "line-marked",
+        dec?.className,
+      )}
+    >
+      {rows.map((tokens, r) => (
+        <div key={r} className="flex h-5">
+          {gutter(r === 0)}
+          <span className="pr-4 whitespace-pre">
+            <span data-code="">
+              <Code tokens={tokens} />
+            </span>
+            {!wrap && r === rows.length - 1 && dec?.after}
+          </span>
+        </div>
+      ))}
+      {wrap && dec?.after && (
+        <div className="flex min-h-5">
+          {gutter(false)}
+          <span className="min-w-0 pr-4">{dec.after}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -89,6 +151,7 @@ function Gap(props: {
   from: number;
   to: number;
   onReveal: (from: number, to: number) => void;
+  label?: ReactNode;
 }) {
   const { lines, isDiff, visible, from, to, onReveal } = props;
   const count = to - from + 1;
@@ -128,10 +191,12 @@ function Gap(props: {
         onClick={() => onReveal(from, to)}
         title="Show all"
       >
-        <span>
-          {count} {label} line{count === 1 ? "" : "s"}
-        </span>
-        {scope && <span className="truncate text-fg-4">{scope.trim()}</span>}
+        {props.label ?? (
+          <span>
+            {count} {label} line{count === 1 ? "" : "s"}
+          </span>
+        )}
+        {!props.label && scope && <span className="truncate text-fg-4">{scope.trim()}</span>}
       </button>
     </div>
   );
@@ -147,6 +212,12 @@ export function FileCard(props: {
   /** Controls at the end of the header, e.g. a Reviewed toggle. */
   actions?: ReactNode;
   collapsed?: boolean;
+  /** What a panel adds to each line, by index. */
+  decorate?: (idx: number) => LineDecoration | undefined;
+  /** A collapsed stretch's own label, in place of its line count (e.g. a branch a trace doesn't take). */
+  gapLabel?: (from: number, to: number) => ReactNode | undefined;
+  /** Wrap lines longer than this many characters, marking each continuation ↳. */
+  wrap?: number;
 }) {
   const { id, file, visible, marked, onReveal } = props;
   const { name, dir } = splitPath(file.path);
@@ -160,6 +231,8 @@ export function FileCard(props: {
           line={file.lines[i]}
           deleted={file.status === "deleted"}
           marked={!!marked && i >= marked[0] && i <= marked[1]}
+          decoration={props.decorate?.(i)}
+          wrap={props.wrap}
         />,
       );
       i++;
@@ -175,6 +248,7 @@ export function FileCard(props: {
           from={i}
           to={j}
           onReveal={onReveal}
+          label={props.gapLabel?.(i, j)}
         />,
       );
       i = j + 1;
@@ -201,7 +275,7 @@ export function FileCard(props: {
         {props.actions}
       </header>
       {!props.collapsed && (
-        <div className="overflow-x-auto font-mono text-xs">
+        <div className={cn("font-mono text-xs", props.wrap ? "overflow-x-hidden" : "overflow-x-auto")}>
           {file.lines.length ? rows : <div className="px-3 py-2 font-sans text-sm text-fg-3">No text content.</div>}
         </div>
       )}
