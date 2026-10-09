@@ -228,3 +228,29 @@ test("after the subject moves to newer commits, the next message says so once", 
   expect(harness.sent[1]).toContain("main...bbb");
   expect(harness.sent[2]).not.toContain("updated the session");
 });
+
+test("a trace step's context names the scenario, the step, and its values, and the trace itself is told once", async () => {
+  await finish("trace-1", "trace", {
+    scenario: { title: "Retries once", summary: "Attempt 1 fails; attempt 2 works.", packages: ["."], steps: 2 },
+    steps: [
+      { path: "a.ts", line: 1, function: "main", depth: 0, call: "Runs it.", text: "Starts." },
+      {
+        path: "a.ts",
+        line: 2,
+        function: "main",
+        depth: 0,
+        text: "Attempt `≈1` fails.",
+        values: [
+          { name: "line", value: "2", from: "code", at: "a.ts#L2" },
+          { name: "n", value: "1", from: "inferred", reason: "The first attempt." },
+        ],
+      },
+    ],
+  });
+  await chat.send("Would a 503 change this?", [{ kind: "step", job: "trace-1", step: 1 }]);
+  expect(harness.sent[0]).toContain("A trace finished (trace-1)");
+  expect(harness.sent[0]).toContain(
+    'The reader is on step 2 of 2 of trace-1, the trace of the scenario "Retries once": Attempt 1 fails; attempt 2 works.\nAt this step they\'re in main, at a.ts#L2: Attempt `≈1` fails.\nValues here:\n- line = 2 (from the code, a.ts#L2)\n- n = ≈1 (inferred: The first attempt.)',
+  );
+  expect(harness.starts[0]).toContain('Asked "what if" about a step');
+});

@@ -146,7 +146,7 @@ export class Chat {
         (v) =>
           `\n- ${v.name} = ${v.from === "inferred" ? `${INFERRED}${v.value} (inferred${v.reason ? `: ${v.reason}` : ""})` : `${v.value} (from the code, ${v.at})`}`,
       );
-      return `The reader is on step ${c.step + 1} of ${trace.steps.length} of ${c.job}, the trace of the scenario "${trace.scenario.title}": ${trace.scenario.summary}\nAt this step they're in ${packageOf(s)} ${s.function}, at ${s.path}#L${s.line}: ${s.text}${values.length ? `\nValues here:${values.join("")}` : ""}`;
+      return `The reader is on step ${c.step + 1} of ${trace.steps.length} of ${c.job}, the trace of the scenario "${trace.scenario.title}": ${trace.scenario.summary}\nAt this step they're in ${packageOf(s) === "." ? "" : `${packageOf(s)} `}${s.function}, at ${s.path}#L${s.line}: ${s.text}${values.length ? `\nValues here:${values.join("")}` : ""}`;
     }
     const guide = job?.result ? ((await this.session.readResult(job.result)) as Guide) : undefined;
     const chapter = guide?.chapters[c.chapter];

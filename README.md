@@ -17,7 +17,7 @@ There are three parts:
 
 - **[Spec](docs/spec.md)**: the guide format and its rules. `code-guide check` enforces them, and so does every guide job.
 - **Jobs**: background work by your coding agent, read-only, through a harness: Claude Code (the default, via the Claude Agent SDK) or [pi](https://github.com/badlogic/pi-mono). The guide job follows [these instructions](src/modules/guide/instructions.ts); a separate review job then judges the guide against a quality bar.
-- **Viewer**: a local web app for reading the guide chapter by chapter, with an overview, the diff, a quiz and a chat beside it.
+- **Viewer**: a local web app for reading the guide chapter by chapter, with an overview, the diff, a quiz, a trace and a chat beside it.
 
 Terms are defined in the [glossary](GLOSSARY.md).
 
@@ -57,7 +57,7 @@ When a change comes from a pull request, the status bar links to it (with `gh`).
 
 ### Jobs
 
-Choosing a subject starts two jobs: the guide and the overview. Every guide goes to a review job that sees only the guide and the code. If the review asks for changes, one revision is written and reviewed again, and you see the latest guide that passed the spec. The quiz job starts when you open Quiz, once the guide is done.
+Choosing a subject starts two jobs: the guide and the overview. Every guide goes to a review job that sees only the guide and the code. If the review asks for changes, one revision is written and reviewed again, and you see the latest guide that passed the spec. The quiz job starts when you open Quiz, once the guide is done. Opening Trace starts a quick job that proposes scenarios; picking one starts the job that writes its trace, step by step, each batch checked against the code as it's written.
 
 A job submits its result through a tool that checks it; errors go back to the agent, which gets 5 submissions to fix them. Two jobs run at a time. The agent can read and search files inside the repository and run single read-only git commands; it can't edit anything. A failed job shows its reason in its panel and dock square, with **Retry**.
 
@@ -73,8 +73,9 @@ The browser shows a workspace: two slots side by side and a dock along the botto
 - **Glossary terms**: guides use the repository's own terms from its `glossary.md` (at the root, any case; a Term | Definition table, like [this one](GLOSSARY.md)). Its terms get a dotted underline in chapter prose and show their definition on hover. A repository without one gets one: the first session writes `.code-guide/glossary.md` in the background, and later sessions reuse it. Add your own `glossary.md` and Code Guide uses that instead.
 - **Diff** (for changes): every changed file, like a pull request. **Full diff** shows every line of every file instead of just the changes.
 - **Quiz**: 3–5 multiple-choice questions on the guide. Each answer explains itself and cites the code.
-- **Chat**: ask about the code as you read. It knows the subject and the finished guides and quizzes. It follows a reply as it streams in, until you scroll up to reread; scroll back down, or send a message, to follow again. **Ask** on a chapter brings it in; so does selecting lines in the Guide or Diff, or prose in the Guide, and choosing **Ask about this** (or <kbd>⌘</kbd><kbd>L</kbd> / <kbd>Ctrl</kbd><kbd>L</kbd>).
-- **Citations** (`file:line` chips in Chat, Quiz and the Overview) show their lines in the Guide if the current chapter has the file, else in the Diff, else in a file view.
+- **Trace**: a debugger-style walk through one scenario's path, hop by hop across files, without running anything. Pick a scenario (<kbd>1</kbd>–<kbd>3</kbd>), then step over, into and out of calls (<kbd>F10</kbd>, <kbd>F11</kbd>, <kbd>⇧</kbd><kbd>F11</kbd>, or <kbd>N</kbd>, <kbd>I</kbd>, <kbd>O</kbd>; <kbd>P</kbd> goes back). Values show inline on the lines just run and on hover elsewhere; inferred ones are marked ≈, values read from the code are plain, and a note at the top says they may not be exactly right. Branches the scenario doesn't take are collapsed with the reason. The call stack builds up as you step, with returned calls left faded; click any block to jump to its step. In a narrow slot, Code and Stack become tabs.
+- **Chat**: ask about the code as you read. It knows the subject and the finished guides, quizzes and traces. It follows a reply as it streams in, until you scroll up to reread; scroll back down, or send a message, to follow again. **Ask** on a chapter or a trace step brings it in; so does selecting lines in the Guide, Trace or Diff, or prose in the Guide, and choosing **Ask about this** (or <kbd>⌘</kbd><kbd>L</kbd> / <kbd>Ctrl</kbd><kbd>L</kbd>).
+- **Citations** (`file:line` chips in Chat, Quiz and the Overview) jump an open Trace to the step at those lines, or show them in the Guide if the current chapter has the file (whichever panel you used last first), else in the Diff, else in a file view.
 - **Maximize** a panel to send its neighbor to the dock; restoring it brings the neighbor back.
 
 The layout, Reviewed marks and the Full diff toggle are saved in your browser, per session.
@@ -99,7 +100,7 @@ Each session is a folder in `.code-guide/sessions/` in the repository: `events.j
 }
 ```
 
-`modules` are the panels a new session opens, left slot first; a third and later wait in the dock. Choose from `overview`, `guide`, `quiz`, `diff` and `chat`. `theme` is `light`, `dark` or `system`. `reviewModel` defaults to `model`, and `model` to `claude-opus-5-5` with Claude Code. An invalid settings file stops `code-guide` with the file and the problem named.
+`modules` are the panels a new session opens, left slot first; a third and later wait in the dock. Choose from `overview`, `guide`, `quiz`, `trace`, `diff` and `chat`. `theme` is `light`, `dark` or `system`. `reviewModel` defaults to `model`, and `model` to `claude-opus-5-5` with Claude Code. An invalid settings file stops `code-guide` with the file and the problem named.
 
 ## Develop
 
