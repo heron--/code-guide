@@ -15,27 +15,31 @@ import { callFrames, packageOf, stepTargets, type Scenario, type Scenarios, type
 /** Narrower than this, Code and Stack become tabs. */
 const NARROW = 640;
 
-/** A finished result, fetched once per job. */
+/**
+ * A finished result, fetched once per job of a session. Keyed by session too: a restarted server numbers its jobs
+ * from 1 again while this tab stays open.
+ */
 const results = new Map<string, Promise<unknown>>();
-function useResult<T>(job?: string): T | undefined {
-  const [r, setR] = useState<{ job: string; value: T }>();
+function useResult<T>(session: string, job?: string): T | undefined {
+  const key = job && `${session}:${job}`;
+  const [r, setR] = useState<{ key: string; value: T }>();
   useEffect(() => {
-    if (!job) return;
-    if (!results.has(job))
+    if (!key) return;
+    if (!results.has(key))
       results.set(
-        job,
-        fetch(`/api/results/${encodeURIComponent(job)}`).then((r) => (r.ok ? r.json() : Promise.reject())),
+        key,
+        fetch(`/api/results/${encodeURIComponent(job!)}`).then((r) => (r.ok ? r.json() : Promise.reject())),
       );
     let current = true;
-    results.get(job)!.then(
-      (value) => current && setR({ job, value: value as T }),
-      () => results.delete(job),
+    results.get(key)!.then(
+      (value) => current && setR({ key, value: value as T }),
+      () => results.delete(key),
     );
     return () => {
       current = false;
     };
-  }, [job]);
-  return r && r.job === job ? r.value : undefined;
+  }, [key]);
+  return r && r.key === key ? r.value : undefined;
 }
 
 /** A file as the subject shows it, fetched once per path for each trace (the subject can move to new commits). */
@@ -78,7 +82,7 @@ export default function TracePanel({ module: m, state, channel, job }: PanelProp
   const proposing = latest && (latest.status === "queued" || latest.status === "running") ? latest : undefined;
   // Scenarios being proposed again replace the old ones.
   const from = proposing ? undefined : job;
-  const scenarios = useResult<Scenarios>(from);
+  const scenarios = useResult<Scenarios>(state.id, from);
   const traces = jobs.filter((j) => j.kind === m.pickKind && j.inputs[0] === from);
   const writing = traces.find((j) => j.status === "queued" || j.status === "running");
   const [open, setOpen] = usePersistent<number | null>(`cg:${state.id}:${from}:open`, null);
@@ -86,7 +90,7 @@ export default function TracePanel({ module: m, state, channel, job }: PanelProp
   const done = (n: number) => ofPick(n).findLast((j) => j.status === "finished");
   const lastOpen = open === null ? undefined : ofPick(open).at(-1);
   const shown = open === null || lastOpen?.status !== "finished" ? undefined : lastOpen.id;
-  const trace = useResult<Trace>(shown);
+  const trace = useResult<Trace>(state.id, shown);
 
   const pick = (n: number) => {
     if (writing) return;
