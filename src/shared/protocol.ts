@@ -9,7 +9,7 @@ import type { ViewSettings } from "./settings.js";
  * session's log and streamed to every connected tab. The browser never changes state itself: it sends a
  * request, and renders whatever events come back.
  */
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 // ---- Shared payload shapes ----
 
@@ -22,6 +22,8 @@ export const subjectSchema = z.discriminatedUnion("type", [
     head: z.string().min(1).optional(),
     /** A pull request number, when the change came from one. */
     pr: z.number().int().positive().optional(),
+    /** The reader's question about this change, when they want a more focused answer. */
+    question: z.string().min(1).optional(),
   }),
   /** A directory, package or service, relative to the repository root. */
   z.object({ type: z.literal("path"), path: z.string().min(1) }),

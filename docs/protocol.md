@@ -18,7 +18,7 @@ Every event has the same envelope. `seq` counts up from 1 within a session. A ta
 
 ```json
 {
-  "v": 4,
+  "v": 5,
   "seq": 1,
   "at": "2026-10-07T09:12:03.120Z",
   "session": "2026-10-07-091203-k3f9",
@@ -35,7 +35,7 @@ The examples below show only `type` and `payload`.
 { "type": "session.subject", "payload": { "subject": { "type": "change", "base": "main", "head": "feat/retry-policy" }, "label": "feat/retry-policy vs main" } }
 ```
 
-A subject is a `change` (`base`, optional `head`, optional `pr`), a `path`, or a `question`. It comes again when the reader updates a pull request subject to new commits (`subject.update`).
+A subject is a `change` (`base`, optional `head`, optional `pr`, optional `question`), a `path`, or a `question`. A change's `question` focuses the jobs and chat on what the reader wants to understand. Branch inputs use qualified refs (`refs/heads/feature`, `refs/remotes/origin/main`) to distinguish local and remote branches; labels omit those prefixes. The subject comes again when the reader updates a pull request subject to new commits (`subject.update`).
 
 ```json
 { "type": "session.label", "payload": { "label": "How retries are scheduled" } }
@@ -132,7 +132,7 @@ Replies stream as text deltas, appended in order.
 ## Requests
 
 ```json
-{ "type": "hello", "v": 4, "session": "2026-10-07-091203-k3f9", "after": 41 }
+{ "type": "hello", "v": 5, "session": "2026-10-07-091203-k3f9", "after": 41 }
 ```
 
 The first message on every connection. A tab that reconnects sends its session and the last `seq` it saw, and gets only what came after. A fresh tab omits both, and so does a tab whose session isn't the server's any more: either gets the whole session.
@@ -178,7 +178,7 @@ A chat message's context can be a `chapter`, a selected range of chapter `prose`
 ## Notices
 
 ```json
-{ "type": "welcome", "v": 4, "session": "2026-10-07-091203-k3f9", "modules": [{ "name": "diff", "label": "Diff", "icon": ["M3 2.5h10v11H3z", "M8 5v4M6 7h4M6 11h4"], "needsJob": false, "subjects": ["change"] }], "view": { "modules": ["guide", "chat"], "theme": "system" } }
+{ "type": "welcome", "v": 5, "session": "2026-10-07-091203-k3f9", "modules": [{ "name": "diff", "label": "Diff", "icon": ["M3 2.5h10v11H3z", "M8 5v4M6 7h4M6 11h4"], "needsJob": false, "subjects": ["change"] }], "view": { "modules": ["guide", "chat"], "theme": "system" } }
 ```
 
 `welcome` lists the modules this server offers, so the browser can show them without knowing any by name. `view` carries the settings the browser applies: its theme, and the modules a new session opens.
@@ -186,6 +186,12 @@ A chat message's context can be a `chapter`, a selected range of chapter `prose`
 ```json
 { "type": "error", "message": "This tab speaks protocol v2; the server speaks v1. Reload the page.", "fatal": true }
 ```
+
+## Subject inputs
+
+`GET /api/subjects` returns suggestions. With any of the query parameters `source`, `target`, or `question`, it validates the submitted inputs and returns a subject for `subject.choose`, or a 400 response with an `error` message. All three are optional and trimmed. A nonblank `target` without a nonblank `source` is rejected. Blank inputs return the repository root as a path subject.
+
+Source and target accept `branch` or `remote/branch`. Source checks the local branch first when no remote is named, then origin. An explicit target without a remote stays local. An omitted target uses the default branch. A question with a source is carried on the change; without a source it is interpreted as a pull request, range, path, branch, or general question.
 
 ## Channel
 

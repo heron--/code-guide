@@ -1,6 +1,7 @@
 import { stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 import type { Subject } from "../shared/protocol.js";
+import { shortRef, subjectInputsSchema } from "../shared/subjects.js";
 import { revParse } from "./git.js";
 import { run } from "./run.js";
 
@@ -122,6 +123,43 @@ export async function parseInput(repo: string, input: string): Promise<Subject> 
   return { type: "question", question: text };
 }
 
+/** Resolve a branch input without mistaking a tag or revision expression for a branch. */
+async function inputBranch(repo: string, name: string, field: "Source" | "Target"): Promise<string> {
+  const valid = await quiet(sh(repo, "git", ["check-ref-format", "--branch", name]));
+  if (valid !== name) throw new Error(`${field} must be a branch or remote/branch`);
+  const remotes = (await sh(repo, "git", ["remote"])).split("\n").filter(Boolean);
+  const explicit = remotes.find((r) => name.startsWith(`${r}/`));
+  if (!explicit && (await revParse(repo, `refs/heads/${name}`))) return `refs/heads/${name}`;
+
+  const remote = explicit ?? (field === "Source" && remotes.includes("origin") ? "origin" : undefined);
+  if (remote) {
+    const branch = explicit ? name.slice(explicit.length + 1) : name;
+    const ref = `refs/remotes/${remote}/${branch}`;
+    if (await revParse(repo, ref)) return ref;
+    const found = await quiet(
+      run("git", ["ls-remote", "--exit-code", "--heads", remote, `refs/heads/${branch}`], {
+        cwd: repo,
+        env: { GIT_TERMINAL_PROMPT: "0" },
+      }),
+    );
+    if (found) return ref;
+  }
+  throw new Error(`${field} branch "${name}" not found`);
+}
+
+/** Validate a submitted source, target and question; blank inputs explain the repository. */
+export async function parseSubjectInputs(repo: string, input: unknown): Promise<Subject> {
+  const parsed = subjectInputsSchema.safeParse(input);
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+  const { source, target, question } = parsed.data;
+  if (!source) return question ? parseInput(repo, question) : { type: "path", path: "." };
+
+  const head = await inputBranch(repo, source, "Source");
+  const base = target ? await inputBranch(repo, target, "Target") : await defaultBranch(repo);
+  if (!base) throw new Error("No default branch found; specify a target");
+  return { type: "change", base, head, ...(question && { question }) };
+}
+
 /**
  * Make a pull request's commits available locally, without creating branches: fetch its head commit and pin
  * the subject to it, comparing against the base as it is on origin.
@@ -140,7 +178,7 @@ export async function preparePullRequest(repo: string, subject: Subject & { type
     pr.headRefOid,
     `+refs/heads/${pr.baseRefName}:refs/remotes/${base}`,
   ]);
-  return { type: "change", base, head: pr.headRefOid, pr: subject.pr };
+  return { ...subject, base, head: pr.headRefOid };
 }
 
 /** A pull request's description, as the Overview shows it. */
@@ -152,6 +190,8 @@ export type PullRequest = { number: number; title: string; url: string; body: st
  */
 async function branchName(repo: string, head: string): Promise<string | undefined> {
   if (head === "HEAD") return quiet(sh(repo, "git", ["branch", "--show-current"]));
+  if (head.startsWith("refs/heads/")) return shortRef(head);
+  head = shortRef(head);
   if (await revParse(repo, `refs/remotes/${head}`)) return head.slice(head.indexOf("/") + 1);
   return head;
 }
@@ -174,6 +214,7 @@ export async function pullRequestFor(repo: string, subject: Subject): Promise<Pu
  * merge-base back, and the change then includes everyone's commits to the base since the last fetch.
  *
  * - A remote-tracking base (`origin/main`) is fetched from its remote, and so is a remote-tracking head.
+ * - A qualified local branch (`refs/heads/main`) stays local, even when it has an upstream.
  * - A local branch (`main`) with an upstream fetches the upstream, and is compared as the upstream when it's
  *   only behind it. A local branch with commits of its own stays as it is.
  *
@@ -185,12 +226,15 @@ export async function prepareChange(repo: string, subject: Subject & { type: "ch
     quiet(sh(repo, "git", ["fetch", "--quiet", remote, `+refs/heads/${branch}:refs/remotes/${remote}/${branch}`]));
 
   // A branch only the remote has (one typed by name) is fetched so it resolves, and so it's current.
-  const headRemote = subject.head && remotes.find((r) => subject.head!.startsWith(`${r}/`));
-  if (headRemote) await fetch(headRemote, subject.head!.slice(headRemote.length + 1));
+  const head = subject.head && !subject.head.startsWith("refs/heads/") ? shortRef(subject.head) : undefined;
+  const headRemote = head && remotes.find((r) => head.startsWith(`${r}/`));
+  if (headRemote) await fetch(headRemote, head!.slice(headRemote.length + 1));
 
-  const remote = remotes.find((r) => subject.base.startsWith(`${r}/`));
+  if (subject.base.startsWith("refs/heads/")) return subject;
+  const base = shortRef(subject.base);
+  const remote = remotes.find((r) => base.startsWith(`${r}/`));
   if (remote) {
-    await fetch(remote, subject.base.slice(remote.length + 1));
+    await fetch(remote, base.slice(remote.length + 1));
     return subject;
   }
 

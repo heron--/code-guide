@@ -74,7 +74,7 @@ export function prompt(subject: Subject): string {
       const diff = subject.head
         ? `\`git diff ${subject.base}...${subject.head}\``
         : `\`git diff --merge-base ${subject.base}\` and \`git ls-files --others --exclude-standard -- . ':!.code-guide'\``;
-      return `Write a guide to ${from}the change from the merge-base of \`${subject.base}\` to ${head}. See it with ${diff}. Use the question "What does this change do, and why?".`;
+      return `Write a guide to ${from}the change from the merge-base of \`${subject.base}\` to ${head}. See it with ${diff}. Use the question ${JSON.stringify(subject.question ?? "What does this change do, and why?")}.`;
     }
     case "path":
       return `Write a guide to \`${subject.path}\` as it is in the working tree. Use the question "How does ${subject.path} work?".`;

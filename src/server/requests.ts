@@ -1,5 +1,6 @@
 import { latestDone, unavailable } from "../shared/modules.js";
 import type { Subject } from "../shared/protocol.js";
+import { shortRef } from "../shared/subjects.js";
 import { hasNewCommits } from "../shared/state.js";
 import { moduleInfo, type Module } from "../modules/types.js";
 import type { RequestHandler } from "./channel.js";
@@ -13,7 +14,7 @@ import { prepareChange, preparePullRequest } from "./subjects.js";
 export function subjectLabel(s: Subject): string {
   switch (s.type) {
     case "change":
-      return s.pr ? `#${s.pr} vs ${s.base}` : `${s.head ?? "working tree"} vs ${s.base}`;
+      return `${s.pr ? `#${s.pr}` : s.head ? shortRef(s.head) : "working tree"} vs ${shortRef(s.base)}`;
     case "path":
       return s.path;
     case "question":
