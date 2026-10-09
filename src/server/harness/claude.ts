@@ -94,7 +94,10 @@ export class ClaudeHarness implements Harness {
 
   async check(): Promise<{ ok: true } | { ok: false; reason: string }> {
     // Starting the CLI and reading the account doesn't send a message, so it costs nothing.
-    const q = query({ prompt: (async function* () {})(), options: { settingSources: [], tools: [] } });
+    const q = query({
+      prompt: (async function* () {})(),
+      options: { settingSources: [], tools: [], persistSession: false },
+    });
     try {
       const info = await Promise.race([
         q.accountInfo(),
@@ -156,6 +159,9 @@ export class ClaudeHarness implements Harness {
         permissionMode: "default",
         // Don't load the user's or project's settings: their permission rules could allow edits.
         settingSources: [],
+        // Sessions are never resumed. Not writing a transcript to ~/.claude/projects also keeps tools that
+        // watch those transcripts (terminal multiplexers, usage trackers) from treating each turn as the user's agent.
+        persistSession: false,
         includePartialMessages: true,
         env: { ...process.env, CLAUDE_AGENT_SDK_CLIENT_APP: "code-guide" },
       },
