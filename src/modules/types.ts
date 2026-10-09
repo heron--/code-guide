@@ -13,6 +13,13 @@ import type { JobKind } from "../server/jobs.js";
 export type Module = Omit<ModuleInfo, "needsJob"> & {
   /** Modules that need a job supply its kind. Its inputs are the latest finished result of each of `results`. */
   job?: JobKind;
+  /** Kinds whose latest finished result its job also reads, when there is one (a trace reads the guide if any). */
+  reads?: string[];
+  /**
+   * A job the reader starts by picking one option from its job's latest result, e.g. the scenario a trace
+   * follows. Its input is that result, and `ctx.pick` says which option.
+   */
+  pick?: JobKind;
   /** Start its job as soon as the session has a subject. */
   startsWithSession?: boolean;
   /**
@@ -28,6 +35,6 @@ export function defineModule(m: Module): Module {
   return m;
 }
 
-export function moduleInfo({ job, startsWithSession: _, next: __, ...m }: Module): ModuleInfo {
-  return { ...m, needsJob: !!job, ...(job && { kind: job.kind }) };
+export function moduleInfo({ job, pick, reads: _, startsWithSession: __, next: ___, ...m }: Module): ModuleInfo {
+  return { ...m, needsJob: !!job, ...(job && { kind: job.kind }), ...(pick && { pickKind: pick.kind }) };
 }

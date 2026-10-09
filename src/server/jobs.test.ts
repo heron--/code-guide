@@ -191,3 +191,43 @@ test("a harness that dies after an accepted submission still frees its slot", as
   const b = runner.start(says("guide", "b"), "guide");
   await until(() => status(b) === "finished");
 });
+
+test("a result written in parts: each write is checked, progress counts them, and submit sees them all", async () => {
+  const kind: JobKind = {
+    kind: "trace",
+    instructions: "",
+    prompt: (ctx) =>
+      `Call the \`write_parts\` tool with {"from":0,"parts":["a","bad"]}. ` +
+      `Call the \`write_parts\` tool with {"from":0,"parts":["a","b"]}. ` +
+      `Call the \`write_parts\` tool with {"from":2,"parts":["c"]}. ` +
+      `Call the \`submit_trace\` tool with {"pick":${ctx.pick}}.`,
+    submit: {
+      tool: "submit_trace",
+      description: "",
+      input: z.object({ pick: z.number() }),
+      validate: async (input, _ctx, written) => ({ problems: [], result: { ...(input as object), parts: written } }),
+    },
+    parts: {
+      tool: "write_parts",
+      description: "",
+      input: z.object({ from: z.number(), parts: z.array(z.string()) }),
+      activity: (n) => `${n} parts written`,
+      write: async (input, written) => {
+        const { from, parts } = input as { from: number; parts: string[] };
+        if (parts.includes("bad")) return { problems: [{ level: "error", where: "parts", message: "bad" }] };
+        return { problems: [], written: [...written.slice(0, from), ...parts] };
+      },
+    },
+  };
+  const runner = new JobRunner(session, new FakeHarness());
+  const id = runner.start(kind, "trace", [], 1);
+  await until(() => status(id) === "finished");
+  expect(await session.readResult(session.state.jobs[id].result!)).toEqual({ pick: 1, parts: ["a", "b", "c"] });
+  expect(session.state.jobs[id]).toMatchObject({ pick: 1, written: 3 });
+  const written = session.eventsAfter(0).flatMap((e) => (e.type === "job.progress" && e.payload.written) || []);
+  expect(written).toEqual([2, 3]);
+  // A retry keeps the reader's pick.
+  await runner.cancel(runner.start(kind, "trace", [], 2)).catch(() => {});
+  const again = runner.retry("trace-2");
+  expect(session.state.jobs[again].pick).toBe(2);
+});

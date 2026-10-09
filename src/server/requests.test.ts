@@ -10,24 +10,30 @@ import { JobRunner } from "./jobs";
 import { labelQuestions, requestHandler, subjectLabel } from "./requests";
 import { Session } from "./session";
 
+/** A job the fake harness does: it submits which results it read, and the option the reader picked. */
+const says = (kind: string) => ({
+  kind,
+  instructions: "",
+  prompt: (ctx: { inputs: Record<string, unknown>; pick?: number }) =>
+    `Call the \`submit_${kind}\` tool with {"text":"read ${Object.keys(ctx.inputs).join(",")}${ctx.pick === undefined ? "" : ` pick ${ctx.pick}`}"}.`,
+  submit: {
+    tool: `submit_${kind}`,
+    description: "",
+    input: z.object({ text: z.string() }),
+    validate: async () => ({ problems: [] }),
+  },
+});
+
 /** A fifth module, defined entirely here: the registry and runner need nothing else to run it. */
-const echo = (name: string, results?: string[]) =>
+const echo = (name: string, results?: string[], more: { reads?: string[]; pick?: string } = {}) =>
   defineModule({
     name,
     label: name[0].toUpperCase() + name.slice(1),
     icon: ["M3 3h10v10H3z"],
     results,
-    job: {
-      kind: name,
-      instructions: "",
-      prompt: (ctx) => `Call the \`submit_${name}\` tool with {"text":"read ${Object.keys(ctx.inputs).join(",")}"}.`,
-      submit: {
-        tool: `submit_${name}`,
-        description: "",
-        input: z.object({ text: z.string() }),
-        validate: async () => ({ problems: [] }),
-      },
-    },
+    reads: more.reads,
+    job: says(name),
+    ...(more.pick && { pick: says(more.pick) }),
   });
 
 let repo: string;
@@ -44,7 +50,12 @@ beforeEach(async () => {
   repo = mkdtempSync(join(tmpdir(), "cg-requests-"));
   session = await Session.create(repo);
   runner = new JobRunner(session, new FakeHarness());
-  handle = requestHandler(session, runner, [...modules, echo("echo"), echo("recap", ["echo"])]);
+  handle = requestHandler(session, runner, [
+    ...modules,
+    echo("echo"),
+    echo("recap", ["echo"]),
+    echo("options", [], { reads: ["echo"], pick: "chosen" }),
+  ]);
 });
 afterEach(async () => {
   for (const id of session.state.jobOrder)
@@ -127,4 +138,21 @@ test("cancels and retries jobs", async () => {
 test("updating a subject needs new commits on its pull request", async () => {
   await handle({ type: "subject.choose", subject: { type: "question", question: "Q?" } });
   await expect(handle({ type: "subject.update" })).rejects.toThrow("No new commits");
+});
+
+test("a module reads optional results when there are any, and starts its pick job from its latest result", async () => {
+  await handle({ type: "subject.choose", subject: { type: "path", path: "src" } });
+  await expect(handle({ type: "job.start", module: "options", pick: 0 })).rejects.toThrow(/nothing to pick from/);
+  await handle({ type: "job.start", module: "options" });
+  await until(() => session.state.jobs["options-1"]?.status === "finished");
+  expect(session.state.jobs["options-1"].inputs).toEqual([]);
+  await handle({ type: "job.start", module: "echo" });
+  await until(() => session.state.jobs["echo-1"]?.status === "finished");
+  await handle({ type: "job.start", module: "options" });
+  await until(() => session.state.jobs["options-2"]?.status === "finished");
+  expect(session.state.jobs["options-2"].inputs).toEqual(["echo-1"]);
+  await handle({ type: "job.start", module: "options", pick: 1 });
+  await until(() => session.state.jobs["chosen-1"]?.status === "finished");
+  expect(session.state.jobs["chosen-1"]).toMatchObject({ module: "options", inputs: ["options-2"], pick: 1 });
+  expect(await session.readResult(session.state.jobs["chosen-1"].result!)).toEqual({ text: "read options-2 pick 1" });
 });

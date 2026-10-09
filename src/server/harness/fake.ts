@@ -4,7 +4,7 @@ import type { Harness, HarnessSession, HarnessSessionOptions } from "./types.js"
  * An in-memory harness for tests and UI work. Its "agent" follows a few literal instructions, phrased so a
  * real model follows them too; that's what lets one set of contract tests run against every adapter:
  *
- * - Call the `<tool>` tool with <json>. → calls it; replies with what it returned
+ * - Call the `<tool>` tool with <json>. → calls it; replies with what it returned. Several are called in order.
  * - Reply with exactly: <text> → streams <text>, a word at a time
  * - Count from 1 to <n>, one number per line. → streams the numbers, one every few milliseconds
  *
@@ -35,15 +35,18 @@ export class FakeHarness implements Harness {
     };
 
     const answer = async (text: string) => {
-      const call = text.match(/Call the `([^`]+)` tool with (\{.*?\})\./s);
+      const calls = [...text.matchAll(/Call the `([^`]+)` tool with (\{.*?\})\./gs)];
       const reply = text.match(/Reply with exactly: (.+)$/s);
       const count = text.match(/Count from 1 to (\d+)/);
-      if (call) {
-        const t = opts.tools.find((t) => t.name === call[1]);
-        if (!t) return stream([`I have no tool named ${call[1]}.`], "");
-        emit({ type: "activity", activity: `Using ${t.name}` });
-        const parsed = t.input.safeParse(JSON.parse(call[2]));
-        const result = parsed.success ? await t.run(parsed.data) : { text: parsed.error.message, isError: true };
+      if (calls.length) {
+        let result = { text: "" };
+        for (const call of calls) {
+          const t = opts.tools.find((t) => t.name === call[1]);
+          if (!t) return stream([`I have no tool named ${call[1]}.`], "");
+          emit({ type: "activity", activity: `Using ${t.name}` });
+          const parsed = t.input.safeParse(JSON.parse(call[2]));
+          result = parsed.success ? await t.run(parsed.data) : { text: parsed.error.message, isError: true };
+        }
         return stream(result.text.split(" "), " ");
       }
       if (reply) return stream(reply[1].trim().split(" "), " ");

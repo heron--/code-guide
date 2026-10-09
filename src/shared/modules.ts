@@ -11,6 +11,10 @@ export type ModuleInfo = {
   needsJob: boolean;
   /** The kind of job whose result the panel shows, for modules with a job. */
   kind?: string;
+  /** The kind of job the reader starts by picking an option from that result, e.g. a trace of one scenario. */
+  pickKind?: string;
+  /** Its panel shows its own jobs' progress and failures, so it opens as soon as its job starts. */
+  showsProgress?: boolean;
   /** Subject types it works with; omit for all. */
   subjects?: Subject["type"][];
   /** Job kinds that must have a finished result first, e.g. a quiz needs a guide. */
@@ -60,6 +64,15 @@ function retried(state: SessionState, id: string): boolean {
   const same = (o: typeof job) =>
     o.kind === job.kind && o.module === job.module && o.inputs.join() === job.inputs.join();
   return state.jobOrder.slice(state.jobOrder.indexOf(id) + 1).some((o) => same(state.jobs[o]));
+}
+
+/**
+ * The newest result a module has to show, of the kind its panel opens with or the kind the reader picks (a trace,
+ * after its scenarios). A newer one than its panel last showed marks its dock square ready.
+ */
+export function latestResult(m: ModuleInfo, state: SessionState): string | undefined {
+  const done = [m.kind, m.pickKind].flatMap((k) => (k ? [latestDone(state, k)] : [])).filter((j) => j !== undefined);
+  return done.sort((a, b) => state.jobOrder.indexOf(a) - state.jobOrder.indexOf(b)).at(-1);
 }
 
 /** Whether any of a module's jobs (its own, or its follow-ups) is still queued or running. */

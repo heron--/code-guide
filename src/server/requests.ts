@@ -67,11 +67,17 @@ export function requestHandler(session: Session, runner: JobRunner, modules: Mod
         }
         const why = unavailable(moduleInfo(m), session.state);
         if (why) throw new Error(why);
-        runner.start(
-          m.job,
-          m.name,
-          (m.results ?? []).map((kind) => latestDone(session.state, kind)!),
-        );
+        if (req.pick !== undefined) {
+          // The reader picked an option (a scenario) from the module's latest result.
+          const from = latestDone(session.state, m.job.kind);
+          if (!m.pick || !from) throw new Error(`${m.label} has nothing to pick from`);
+          runner.start(m.pick, m.name, [from], req.pick);
+          return;
+        }
+        runner.start(m.job, m.name, [
+          ...(m.results ?? []).map((kind) => latestDone(session.state, kind)!),
+          ...(m.reads ?? []).flatMap((kind) => latestDone(session.state, kind) ?? []),
+        ]);
         return;
       }
       case "job.cancel":

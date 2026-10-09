@@ -13,6 +13,8 @@ export type JobContext = {
   label: string;
   /** Finished results this job reads, by the job that produced them. */
   inputs: Record<string, unknown>;
+  /** The option the reader picked from the first input, e.g. the scenario a trace follows. */
+  pick?: number;
 };
 
 /** One kind of job (guide, quiz, review): what the agent is told, and how its result is submitted and checked. */
@@ -30,9 +32,24 @@ export type JobKind = {
     input: z.ZodObject;
     /**
      * Errors reject the submission; warnings are recorded but don't. `result` is what's stored when it's
-     * accepted; it defaults to the input.
+     * accepted; it defaults to the input. `written` holds the parts written so far, for a job with `parts`.
      */
-    validate(input: unknown, ctx: JobContext): Promise<{ problems: Problem[]; result?: unknown }>;
+    validate(input: unknown, ctx: JobContext, written?: unknown[]): Promise<{ problems: Problem[]; result?: unknown }>;
+  };
+  /**
+   * For a result written in parts (a trace's steps): a tool that writes some at a time, each checked as it's
+   * written, so a long result isn't one huge submission and progress can say how many are written. `submit` then
+   * checks the whole.
+   */
+  parts?: {
+    /** e.g. "write_steps" */
+    tool: string;
+    description: string;
+    input: z.ZodObject;
+    /** Progress as the reader sees it, e.g. "9 steps written". */
+    activity(written: number): string;
+    /** Check new parts against the ones written so far. Errors reject them; otherwise `written` is the new whole. */
+    write(input: unknown, written: unknown[], ctx: JobContext): Promise<{ problems: Problem[]; written?: unknown[] }>;
   };
 };
 
@@ -45,7 +62,7 @@ export type JobRunnerOptions = {
   maxNudges?: number;
 };
 
-type Running = { kind: JobKind; module: string; inputs: string[]; harness?: HarnessSession };
+type Running = { kind: JobKind; module: string; inputs: string[]; pick?: number; harness?: HarnessSession };
 
 /**
  * Runs jobs in the background, each in its own harness session with one goal. A job ends when a submission
@@ -76,16 +93,26 @@ export class JobRunner {
     return () => (this.finished = this.finished.filter((f) => f !== fn));
   }
 
-  /** Queue a job. `inputs` are finished jobs whose results it reads. Returns the job's id. */
-  start(kind: JobKind, module: string, inputs: string[] = []): string {
+  /**
+   * Queue a job. `inputs` are finished jobs whose results it reads; `pick` is the option the reader picked from
+   * the first. Returns the job's id.
+   */
+  start(kind: JobKind, module: string, inputs: string[] = [], pick?: number): string {
     const state = this.session.state;
     if (!state.subject) throw new Error("Choose a subject first");
     for (const i of inputs) if (state.jobs[i]?.status !== "finished") throw new Error(`${i} isn't a finished result`);
     const n = state.jobOrder.filter((id) => state.jobs[id].kind === kind.kind).length + 1;
     const id = `${kind.kind}-${n}`;
-    this.jobs.set(id, { kind, module, inputs });
+    this.jobs.set(id, { kind, module, inputs, pick });
     const label = kind.label ?? `Writing the ${kind.kind}`;
-    this.session.append("job.queued", { job: id, kind: kind.kind, label, module, inputs });
+    this.session.append("job.queued", {
+      job: id,
+      kind: kind.kind,
+      label,
+      module,
+      inputs,
+      ...(pick !== undefined && { pick }),
+    });
     this.queue.push(id);
     this.pump();
     return id;
@@ -96,7 +123,7 @@ export class JobRunner {
     const job = this.jobs.get(id);
     const status = this.session.state.jobs[id]?.status;
     if (!job || (status !== "failed" && status !== "cancelled")) throw new Error(`${id} can't be retried`);
-    return this.start(job.kind, job.module, job.inputs);
+    return this.start(job.kind, job.module, job.inputs, job.pick);
   }
 
   async cancel(id: string): Promise<void> {
@@ -145,8 +172,10 @@ export class JobRunner {
       subject: state.subject!.subject,
       label: state.subject!.label,
       inputs,
+      ...(job.pick !== undefined && { pick: job.pick }),
     };
-    const { submit } = job.kind;
+    const { submit, parts } = job.kind;
+    let written: unknown[] = [];
     let attempts = 0;
     let nudges = 0;
     let submitting = false;
@@ -169,7 +198,7 @@ export class JobRunner {
             submitting = true;
             try {
               attempts++;
-              const { problems, result: accepted = input } = await submit.validate(input, ctx);
+              const { problems, result: accepted = input } = await submit.validate(input, ctx, written);
               // Each await is a chance for the job to be cancelled or to fail.
               if (this.isOver(id)) return over;
               const errors = problems.filter((p) => p.level === "error");
@@ -194,6 +223,30 @@ export class JobRunner {
             }
           },
         },
+        ...(parts
+          ? [
+              {
+                name: parts.tool,
+                description: parts.description,
+                input: parts.input,
+                run: async (input: unknown) => {
+                  if (this.isOver(id)) return { text: "This job has already ended.", isError: true };
+                  const { problems, written: next } = await parts.write(input, written, ctx);
+                  if (this.isOver(id)) return { text: "This job has already ended.", isError: true };
+                  const errors = problems.filter((p) => p.level === "error");
+                  if (errors.length || !next)
+                    return {
+                      text: `Rejected; nothing was written. Fix these errors and write them again:\n${errors.map((e) => `- ${e.where}: ${e.message}`).join("\n")}`,
+                      isError: true,
+                    };
+                  written = next;
+                  const activity = parts.activity(written.length);
+                  this.session.append("job.progress", { job: id, activity, written: written.length });
+                  return { text: `Written. ${activity} so far.` };
+                },
+              },
+            ]
+          : []),
       ],
       onEvent: (e) => {
         if (this.isOver(id)) {
