@@ -66,14 +66,14 @@ export function Workspace({ state, modules, panels = DEFAULT_VIEW.modules, chann
     }
     for (const s of ["left", "right"] as const) {
       const m = byName(next[s]);
-      const job = m && panelState(m, state).job;
-      if (m && job) next = markSeen(next, m.name, job);
+      const result = m && panelState(m, state).result;
+      if (m && result) next = markSeen(next, m.name, result);
     }
     if (next !== layout) setLayout(next);
   });
 
-  // Citations: show lines in the Guide if its chapter has the file, else in the Diff (for changed files),
-  // else in a plain file view over the workspace.
+  // Citations: show lines in a Trace or Guide that has the file (the one in the slot used last first), else in the
+  // Diff (for changed files), else in a plain file view over the workspace.
   const showers = useRef(new Map<string, LineShower>());
   const pending = useRef<{ module: string; target: LinesTarget }>(undefined);
   const latestCite = useRef(0);
@@ -97,8 +97,11 @@ export function Workspace({ state, modules, panels = DEFAULT_VIEW.modules, chann
       async showLines(target) {
         // Only the latest citation clicked may move the workspace.
         const ticket = ++latestCite.current;
-        const guide = showers.current.get("guide");
-        if (guide && inSlot("guide") && guide.canShow(target.path)) return guide.show(target);
+        const { layout } = live.current;
+        for (const name of layout[layout.recent] === "trace" ? ["trace", "guide"] : ["guide", "trace"]) {
+          const shower = showers.current.get(name);
+          if (shower && inSlot(name) && shower.canShow(target.path)) return shower.show(target);
+        }
         const res = await fetch(`/api/file?path=${encodeURIComponent(target.path)}`);
         if (!res.ok || ticket !== latestCite.current) return;
         const file = (await res.json()) as ResolvedFile;
@@ -127,7 +130,8 @@ export function Workspace({ state, modules, panels = DEFAULT_VIEW.modules, chann
 
   const startModule = (m: ModuleInfo) => {
     if (m.needsJob) channel.send({ type: "job.start", module: m.name });
-    else setLayout(open(layout, m.name));
+    // A panel that shows its own job's progress opens at once; others wait in the dock until ready.
+    if (!m.needsJob || m.showsProgress) setLayout(open(layout, m.name));
   };
 
   // Dragging: a dock square into the workspace, or a panel's title bar onto the other slot.
@@ -409,6 +413,12 @@ function PanelBody({
   const { job, busy, activity, stage, failed } = panelState(m, state);
   const progress = runProgress(m, state);
   const retry = () => failed && channel.send({ type: "job.start", module: m.name, retry: failed.id });
+  if (m.showsProgress && Panel)
+    return (
+      <Suspense fallback={<Centered title="Loading…" />}>
+        <Panel module={m} state={state} channel={channel} job={job} />
+      </Suspense>
+    );
   // A failed job shows here as well as in the dock, with its retry, when the panel is in a slot.
   if (m.needsJob && failed && !job)
     return (
@@ -674,7 +684,12 @@ function NewPanel({
                   <span className="flex min-w-0 flex-col">
                     <span className={cn("text-[12.5px]", why && "text-fg-3")}>{m.label}</span>
                     <span className="text-[11px] text-fg-3">
-                      {why ?? (m.needsJob ? "Runs a job, then waits in the dock" : "Opens now")}
+                      {why ??
+                        (m.showsProgress
+                          ? "Opens now, and runs a job"
+                          : m.needsJob
+                            ? "Runs a job, then waits in the dock"
+                            : "Opens now")}
                     </span>
                   </span>
                 </button>

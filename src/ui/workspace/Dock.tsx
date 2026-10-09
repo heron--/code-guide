@@ -33,7 +33,7 @@ export function Dock({ state, modules, layout, dragging, onDragStart, onOpen, on
             />
           );
         const s = panelState(m, state);
-        const ready = !s.busy && !!s.job && layout.seen[panel] !== s.job;
+        const ready = !s.busy && !!s.result && layout.seen[panel] !== s.result;
         const status = s.failed
           ? `failed: ${s.failed.error}`
           : s.busy

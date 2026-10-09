@@ -40,7 +40,8 @@ export function unavailable(m: ModuleInfo, state: SessionState): string | undefi
 /**
  * The newest done job of a kind: finished, and so are all the follow-ups its module ran on it (today, a guide's
  * review and any revision). Readers never see an unfinished result, whatever job is left: a failed job shows
- * instead, with its reason and a retry.
+ * instead, with its reason and a retry. A job the reader started by picking from a result (a trace of one of its
+ * scenarios) isn't a follow-up: the result stays done while it runs.
  */
 export function latestDone(state: SessionState, kind: string): string | undefined {
   return state.jobOrder.findLast((id) => state.jobs[id].kind === kind && done(state, id));
@@ -52,7 +53,13 @@ function done(state: SessionState, id: string): boolean {
     job.status === "finished" &&
     state.jobOrder.every((f) => {
       const next = state.jobs[f];
-      return next.module !== job.module || next.inputs[0] !== id || retried(state, f) || done(state, f);
+      return (
+        next.module !== job.module ||
+        next.inputs[0] !== id ||
+        next.pick !== undefined ||
+        retried(state, f) ||
+        done(state, f)
+      );
     })
   );
 }
