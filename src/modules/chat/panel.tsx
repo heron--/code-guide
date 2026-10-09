@@ -14,6 +14,8 @@ const pad = (n: number) => String(n).padStart(2, "0");
 
 /** Finished guides and traces, fetched once, for naming chapters and steps in context labels. */
 const results = new Map<string, Promise<unknown>>();
+/** The session `results` belong to: a restarted server numbers its jobs from 1 again while this tab stays open. */
+let resultsFor: string | undefined;
 function useResult<T>(job?: string): T | undefined {
   const [r, setR] = useState<T>();
   useEffect(() => {
@@ -116,6 +118,10 @@ const FOLLOW_SLACK = 40;
 
 /** The Chat module: questions as they come up, answered from the code with citations. */
 export default function ChatPanel({ state, channel }: PanelProps) {
+  if (resultsFor !== state.id) {
+    results.clear();
+    resultsFor = state.id;
+  }
   const { context, setContext } = useDraft();
   const [text, setText] = useState("");
   const scroller = useRef<HTMLDivElement>(null);

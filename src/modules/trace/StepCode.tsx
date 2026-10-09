@@ -127,10 +127,10 @@ export function StepCode({ job, steps, frames, at, current, file, wrap, keys }: 
     return by;
   }, [s, file]);
 
-  /** An identifier's value at this step: the latest given for it in this call, in this file. */
+  /** An identifier's value at this step: the latest given for it in this call, never in one it made. */
   const valueOf = (name: string): { value: Value; step: number } | undefined => {
     for (let j = current; j >= frame.start; j--) {
-      if (steps[j].path !== s.path) continue;
+      if (at[j] !== at[current]) continue;
       const v = steps[j].values?.find((v) => v.name === name);
       if (v) return { value: v, step: j };
     }

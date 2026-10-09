@@ -76,7 +76,12 @@ export function requestHandler(session: Session, runner: JobRunner, modules: Mod
         }
         runner.start(m.job, m.name, [
           ...(m.results ?? []).map((kind) => latestDone(session.state, kind)!),
-          ...(m.reads ?? []).flatMap((kind) => latestDone(session.state, kind) ?? []),
+          // An optional result only while it's the newest of its kind: not an old guide whose replacement is running.
+          ...(m.reads ?? []).flatMap((kind) => {
+            const done = latestDone(session.state, kind);
+            const newest = session.state.jobOrder.findLast((id) => session.state.jobs[id].kind === kind);
+            return done && done === newest ? [done] : [];
+          }),
         ]);
         return;
       }

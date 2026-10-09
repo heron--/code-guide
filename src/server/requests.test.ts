@@ -151,8 +151,14 @@ test("a module reads optional results when there are any, and starts its pick jo
   await handle({ type: "job.start", module: "options" });
   await until(() => session.state.jobs["options-2"]?.status === "finished");
   expect(session.state.jobs["options-2"].inputs).toEqual(["echo-1"]);
+  // While a newer echo is being written, the older one isn't read.
+  await handle({ type: "job.start", module: "echo" });
+  await handle({ type: "job.start", module: "options" });
+  expect(session.state.jobs["options-3"].inputs).toEqual([]);
+  await until(() => session.state.jobs["options-3"]?.status === "finished");
+  await until(() => session.state.jobs["echo-2"]?.status === "finished");
   await handle({ type: "job.start", module: "options", pick: 1 });
   await until(() => session.state.jobs["chosen-1"]?.status === "finished");
-  expect(session.state.jobs["chosen-1"]).toMatchObject({ module: "options", inputs: ["options-2"], pick: 1 });
-  expect(await session.readResult(session.state.jobs["chosen-1"].result!)).toEqual({ text: "read options-2 pick 1" });
+  expect(session.state.jobs["chosen-1"]).toMatchObject({ module: "options", inputs: ["options-3"], pick: 1 });
+  expect(await session.readResult(session.state.jobs["chosen-1"].result!)).toEqual({ text: "read options-3 pick 1" });
 });
