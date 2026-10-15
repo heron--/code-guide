@@ -57,14 +57,6 @@ export function logLine(e: SessionEvent, state: SessionState): string | undefine
   return undefined;
 }
 
-type Out = {
-  write(s: string): unknown;
-  isTTY?: boolean;
-  columns?: number;
-  on?(event: "resize", fn: () => void): unknown;
-  off?(event: "resize", fn: () => void): unknown;
-};
-
 /** Text from the repository or a model, made safe to print: no escape sequences or other control characters. */
 export function printable(s: string): string {
   return s.replace(/\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(\x07|\x1b\\)?|[\x00-\x1f\x7f-\x9f]+/g, " ");
@@ -72,74 +64,51 @@ export function printable(s: string): string {
 
 /** Columns a character takes in a terminal, by Unicode's East Asian Width (wide CJK and emoji take two). */
 const cells = (ch: string) => eastAsianWidth(ch.codePointAt(0)!);
-const widthOf = (s: string) => [...s].reduce((n, ch) => n + cells(ch), 0);
+export const widthOf = (s: string) => [...s].reduce((n, ch) => n + cells(ch), 0);
+
+/** A line made printable and cut to fit `max` columns, ending in "…" when cut. */
+export function clipLine(line: string, max: number): string {
+  const l = printable(line);
+  if (widthOf(l) <= max) return l;
+  let cut = "";
+  for (const ch of l) {
+    if (widthOf(cut) + cells(ch) > max - 1) break;
+    cut += ch;
+  }
+  return cut + "…";
+}
+
+/** What a session process reports to the console that started it, in place of drawing on the terminal. */
+export type StatusReport = { log: string } | { live: string[] };
 
 /**
- * The console: shows the session in the terminal while it runs: a log of finished and failed jobs, and on a terminal, a live
- * block below it with the chat's agent and each running job, redrawn in place. Returns a function that stops.
+ * Reports the console's content (the log of finished and failed jobs, and the live block) as messages, for a
+ * session process whose console is drawn by another process. Returns a function that stops.
  */
-export function showStatus(
+export function reportStatus(
   session: Session,
   modules: ModuleInfo[],
   agent: { harness: string; model: string; status: () => AgentStatus; onStatus: (fn: () => void) => () => void },
-  out: Out = process.stdout,
+  send: (report: StatusReport) => void,
 ): () => void {
-  /** Display widths of the lines last drawn, to know how many rows they take now (a resize reflows them). */
-  let drawn: number[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
-  // One row per line when drawn, or the redraw would move up too few rows: printable, and clipped by display width.
-  const clip = (line: string) => {
-    const l = printable(line);
-    const max = (out.columns ?? Infinity) - 1;
-    if (widthOf(l) <= max) return l;
-    let cut = "";
-    for (const ch of l) {
-      if (widthOf(cut) + cells(ch) > max - widthOf("…")) break;
-      cut += ch;
-    }
-    return cut + "…";
-  };
-  const clear = () => {
-    const cols = out.columns ?? Infinity;
-    const rows = drawn.reduce((n, w) => n + Math.max(1, Math.ceil(w / cols)), 0);
-    if (rows) out.write(`\x1b[${rows}A\x1b[0J`);
-    drawn = [];
-  };
-  const draw = () => {
+  const live = () => {
     timer = undefined;
-    if (!out.isTTY) return;
-    const lines = statusLines(session.state, modules, {
-      harness: agent.harness,
-      model: agent.model,
-      status: agent.status(),
-    }).map(clip);
-    clear();
-    out.write(lines.join("\n") + "\n");
-    drawn = lines.map(widthOf);
+    send({ live: statusLines(session.state, modules, { ...agent, status: agent.status() }) });
   };
-  // Redraws are batched: progress can come many times a second.
-  const later = () => (timer ??= setTimeout(draw, 100));
-
-  const stopSession = session.subscribe((e) => {
+  const later = () => (timer ??= setTimeout(live, 100));
+  const log = (e: SessionEvent) => {
     const line = logLine(e, session.state);
-    if (line) {
-      if (out.isTTY) clear();
-      out.write(printable(line) + "\n");
-      if (out.isTTY) draw();
-    } else later();
+    if (line) send({ log: line });
+  };
+  session.eventsAfter(0).forEach(log);
+  const stopSession = session.subscribe((e) => {
+    log(e);
+    later();
   });
   const stopAgent = agent.onStatus(later);
-  // What happened before this started (a subject chosen with --change, jobs already done) is logged now.
-  for (const e of session.eventsAfter(0)) {
-    const line = logLine(e, session.state);
-    if (line) out.write(printable(line) + "\n");
-  }
-  // A narrower terminal reflows what's drawn; redraw at the new width.
-  const resized = () => draw();
-  out.on?.("resize", resized);
-  draw();
+  live();
   return () => {
-    out.off?.("resize", resized);
     stopSession();
     stopAgent();
     clearTimeout(timer);

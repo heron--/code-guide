@@ -138,6 +138,19 @@ test("cancels and retries jobs", async () => {
   await until(() => session.state.jobs["echo-2"]?.status === "finished");
 });
 
+test("updating a managed checkout stops old jobs before changing its files", async () => {
+  const subject = { type: "change" as const, base: "main", head: "old", pr: 7 };
+  session.append("session.subject", { subject, label: "PR" });
+  session.append("subject.remote", { number: 7, url: "https://github.com/acme/app/pull/7", head: "new" });
+  session.append("job.queued", { job: "old-job", kind: "guide", module: "guide", inputs: [] });
+  const update = requestHandler(session, runner, [], undefined, async (_repo, current) => {
+    expect(session.state.jobs["old-job"].status).toBe("cancelled");
+    return { ...current, head: "new" };
+  });
+  await update({ type: "subject.update" });
+  expect(session.state.subject?.subject).toEqual({ ...subject, head: "new" });
+});
+
 test("updating a subject needs new commits on its pull request", async () => {
   await handle({ type: "subject.choose", subject: { type: "question", question: "Q?" } });
   await expect(handle({ type: "subject.update" })).rejects.toThrow("No new commits");

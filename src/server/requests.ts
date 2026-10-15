@@ -23,7 +23,13 @@ export function subjectLabel(s: Subject): string {
 }
 
 /** Turns the browser's requests into jobs and events. Modules are looked up by name; none is special. */
-export function requestHandler(session: Session, runner: JobRunner, modules: Module[], chat?: Chat): RequestHandler {
+export function requestHandler(
+  session: Session,
+  runner: JobRunner,
+  modules: Module[],
+  chat?: Chat,
+  preparePR: typeof preparePullRequest = preparePullRequest,
+): RequestHandler {
   return async (req) => {
     switch (req.type) {
       case "subject.choose":
@@ -32,7 +38,7 @@ export function requestHandler(session: Session, runner: JobRunner, modules: Mod
           req.subject.type !== "change"
             ? req.subject
             : req.subject.pr
-              ? await preparePullRequest(session.state.repo!, req.subject)
+              ? await preparePR(session.state.repo!, req.subject)
               : await prepareChange(session.state.repo!, req.subject);
         // A ref that doesn't resolve (a typo, or HEAD in a repository with no commits) would fail every job.
         if (subject.type === "change")
@@ -45,12 +51,14 @@ export function requestHandler(session: Session, runner: JobRunner, modules: Mod
       case "subject.update": {
         const current = session.state.subject?.subject;
         if (current?.type !== "change" || !hasNewCommits(session.state)) throw new Error("No new commits to update to");
-        const subject = await preparePullRequest(session.state.repo!, { ...current, head: undefined });
+        if (chat && chat.status.state !== "idle")
+          throw new Error("Wait for Chat to finish before updating the subject");
         // The old head's jobs would finish with results about code the session no longer shows. A job finishing
         // meanwhile can start a follow-up, so keep going until none is left.
         const active = () =>
           session.state.jobOrder.find((id) => ["queued", "running"].includes(session.state.jobs[id].status));
         for (let id = active(); id; id = active()) await runner.cancel(id);
+        const subject = await preparePR(session.state.repo!, { ...current, head: undefined });
         session.append("session.subject", { subject, label: subjectLabel(subject) });
         // Every module that has run starts over. One that reads another's result (a quiz reads the guide) waits
         // for the reader, so it isn't built from the old guide.

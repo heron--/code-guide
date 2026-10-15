@@ -7,7 +7,6 @@ import type { Subject } from "../shared/protocol";
 import { FakeHarness } from "./harness/fake";
 import { JobRunner } from "./jobs";
 import { requestHandler } from "./requests";
-import { startServer } from "./server";
 import { Session } from "./session";
 import {
   branchChange,
@@ -17,7 +16,6 @@ import {
   preparePullRequest,
   pullRequestFor,
   pullRequestNumber,
-  suggestions,
 } from "./subjects";
 
 let dir: string;
@@ -84,17 +82,6 @@ else if (kind === "pr" && cmd === "view") console.log(JSON.stringify({ number: 8
   process.env.PATH = `${bin}${delimiter}${process.env.PATH}`;
 });
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
-
-test("suggests uncommitted work, the branch, and open pull requests", async () => {
-  const s = await suggestions(repo);
-  expect(s.map((x) => [x.title, x.detail])).toEqual([
-    ["Uncommitted changes", "1 file changed in the working tree"],
-    ["feature vs origin/main", "2 commits ahead"],
-    ["#7 Fix retries", "Pull request by sam into main"],
-  ]);
-  expect(s[0].subject).toEqual({ type: "change", base: "HEAD" });
-  expect(s[1].subject).toEqual({ type: "change", base: "origin/main", head: "feature" });
-});
 
 test("reads typed input as a range, a path, or a question", async () => {
   expect(await parseInput(repo, "main...feature")).toEqual({ type: "change", base: "main", head: "feature" });
@@ -269,54 +256,13 @@ test("numbers work without repository lookup, but links require a verified repos
   }
 });
 
-test("the subject API rejects a mismatched pull request link without choosing a subject", async () => {
+test("a submitted change becomes the session's subject, labelled by its branches", async () => {
+  const subject = await parseSubjectInputs(repo, { source: "feature", target: "main", question: "Why?" });
+  expect(subject).toEqual({ type: "change", base: "refs/heads/main", head: "refs/heads/feature", question: "Why?" });
   const session = await Session.create(repo);
-  const server = await startServer({ session, onRequest: async () => {}, uiDir: repo, port: 0 });
-  try {
-    const response = await fetch(
-      `${server.url}/api/subjects?question=${encodeURIComponent("https://github.com/other/app/pull/7")}`,
-    );
-    expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "Pull request link must belong to github.com/acme/app" });
-    expect(session.state.subject).toBeUndefined();
-    const valid = await fetch(`${server.url}/api/subjects?question=%237`);
-    expect(valid.status).toBe(200);
-    expect(await valid.json()).toEqual({ type: "change", base: "origin/main", pr: 7 });
-  } finally {
-    server.close();
-  }
-});
-
-test("the subject API validates submitted inputs, including target without source", async () => {
-  const session = await Session.create(repo);
-  const server = await startServer({ session, onRequest: async () => {}, uiDir: repo, port: 0 });
-  try {
-    for (const query of ["target=main", "source=+&target=main&question=Why%3F"]) {
-      const response = await fetch(`${server.url}/api/subjects?${query}`);
-      expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({ error: "Target requires a source" });
-    }
-    const invalid = await fetch(`${server.url}/api/subjects?source=no-such-branch`);
-    expect(invalid.status).toBe(400);
-    expect(await invalid.json()).toEqual({ error: 'Source branch "no-such-branch" not found' });
-    const blank = await fetch(`${server.url}/api/subjects?source=&target=&question=`);
-    expect(await blank.json()).toEqual({ type: "path", path: "." });
-    const valid = await fetch(`${server.url}/api/subjects?source=feature&target=main&question=Why%3F`);
-    expect(valid.status).toBe(200);
-    const subject = (await valid.json()) as Subject;
-    expect(subject).toEqual({
-      type: "change",
-      base: "refs/heads/main",
-      head: "refs/heads/feature",
-      question: "Why?",
-    });
-    expect(session.state.subject).toBeUndefined();
-    const handle = requestHandler(session, new JobRunner(session, new FakeHarness()), []);
-    await handle({ type: "subject.choose", subject });
-    expect(session.state.subject).toEqual({ subject, label: "feature vs main" });
-  } finally {
-    server.close();
-  }
+  const handle = requestHandler(session, new JobRunner(session, new FakeHarness()), []);
+  await handle({ type: "subject.choose", subject });
+  expect(session.state.subject).toEqual({ subject, label: "feature vs main" });
 });
 
 test("a pull request is fetched and pinned to its head commit", async () => {
@@ -346,16 +292,6 @@ test("a pull request's base is kept even when the clone only tracks another bran
   const s = await preparePullRequest(other, { type: "change", base: "main", pr: 7 });
   expect(s).toMatchObject({ base: "origin/main", head: prCommit });
   expect(git(other, "rev-parse", "--verify", "origin/main")).toBe(git(origin, "rev-parse", "main"));
-});
-
-test("suggests unpushed commits on the default branch itself", async () => {
-  const own = join(dir, "own");
-  git(dir, "clone", "-q", origin, own);
-  git(own, "config", "user.email", "t@t");
-  git(own, "config", "user.name", "t");
-  commit(own, "d.ts", "local");
-  const s = await suggestions(own);
-  expect(s.find((x) => x.title === "main vs origin/main")?.detail).toBe("1 commit ahead");
 });
 
 test("a change ending at HEAD finds the pull request for the current branch", async () => {

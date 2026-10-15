@@ -2,11 +2,11 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { attachChannel, type RequestHandler } from "./channel.js";
+import { sameOrigin } from "./http.js";
 import { readGlossary } from "./glossary.js";
 import type { ModuleInfo } from "../shared/modules.js";
 import type { ViewSettings } from "../shared/settings.js";
 import type { Session } from "./session.js";
-import { parseSubjectInputs, suggestions } from "./subjects.js";
 import { changedFiles } from "./git.js";
 import { changeRefs, checkGuide, parseGuide, resolveChangedFile, resolveSubjectFile } from "./resolve.js";
 
@@ -30,14 +30,16 @@ export type ServeOptions = {
   modules?: ModuleInfo[];
   /** Settings the browser applies: theme, and the modules a new session opens. */
   view?: ViewSettings;
+  launcherUrl?: string;
+  onEnd?: () => void;
 };
 
-function send(res: ServerResponse, status: number, body: unknown) {
+export function send(res: ServerResponse, status: number, body: unknown) {
   res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
   res.end(JSON.stringify(body));
 }
 
-async function serveStatic(uiDir: string, urlPath: string, res: ServerResponse) {
+export async function serveStatic(uiDir: string, urlPath: string, res: ServerResponse) {
   const rel = normalize(decodeURIComponent(urlPath)).replace(/^(\.\.[/\\])+/, "");
   let file = join(uiDir, rel);
   if (
@@ -63,24 +65,18 @@ export function startServer(opts: ServeOptions): Promise<{ url: string; close: (
     const parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
     if (parts[0] !== "api") return serveStatic(opts.uiDir, url.pathname, res);
 
+    if (parts[1] === "launcher") return send(res, 200, { mode: "session", launcherUrl: opts.launcherUrl });
+    if (parts[1] === "end" && opts.onEnd) {
+      if (req.method !== "POST" || !sameOrigin(req)) return send(res, 403, { error: "Forbidden" });
+      send(res, 200, { url: opts.launcherUrl });
+      opts.onEnd();
+      return;
+    }
     const { session } = opts;
     const repo = session.state.repo!;
     // The repository's glossary (its own, else the one Code Guide wrote), for highlighting its terms in guides.
     // Read each time: a generated one can appear during the session.
     if (parts[1] === "glossary") return send(res, 200, await readGlossary(repo));
-    // Subjects worth one click, or validation of the submitted inputs.
-    if (parts[1] === "subjects") {
-      const submitted = ["source", "target", "question"].some((field) => url.searchParams.has(field));
-      try {
-        return send(
-          res,
-          200,
-          submitted ? await parseSubjectInputs(repo, Object.fromEntries(url.searchParams)) : await suggestions(repo),
-        );
-      } catch (e) {
-        return send(res, 400, { error: String((e as Error).message ?? e) });
-      }
-    }
     // The session's change, for the Diff module: every changed file, then one file at a time.
     if (parts[1] === "diff") {
       const subject = session.state.subject?.subject;
