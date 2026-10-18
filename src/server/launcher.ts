@@ -118,25 +118,27 @@ export async function startLauncher(options: {
       );
       active = child;
       let ready = false;
-      cleanup = child.stopped.then(async () => {
-        active = undefined;
-        sessionUrl = undefined;
-        events.session(undefined);
-        // A session that stops cleanly exits with 0. After a crash, keep its checkout for a look at what happened.
-        const crashed = ready && child.child.exitCode !== 0;
-        if (crashed) events.log("The session process stopped unexpectedly.");
-        // If settings become unreadable, retaining data is safer than deleting it.
-        const keep = managed && ready && (crashed || (await preferences.keepClones().catch(() => true)));
-        if (managed) {
-          await checkouts.release(repo!, keep);
-          events.log(keep ? `Kept PR checkout: ${repo}` : "Discarded the PR checkout.");
-        }
-        if (ready && child.id)
-          await preferences
-            .recordSession(child.id, { endedAt: new Date().toISOString(), ...(managed && { kept: keep }) })
-            .catch((e) => events.log(`Couldn't save session history: ${(e as Error).message}`));
-      });
-      void cleanup.catch((e) => events.log(`Checkout cleanup failed: ${(e as Error).message}`));
+      cleanup = child.stopped
+        .then(async () => {
+          active = undefined;
+          sessionUrl = undefined;
+          events.session(undefined);
+          // A session that stops cleanly exits with 0. After a crash, keep its checkout for a look at what happened.
+          const crashed = ready && child.child.exitCode !== 0;
+          if (crashed) events.log("The session process stopped unexpectedly.");
+          // If settings become unreadable, retaining data is safer than deleting it.
+          const keep = managed && ready && (crashed || (await preferences.keepClones().catch(() => true)));
+          if (managed) {
+            await checkouts.release(repo!, keep);
+            events.log(keep ? `Kept PR checkout: ${repo}` : "Discarded the PR checkout.");
+          }
+          if (ready && child.id)
+            await preferences
+              .recordSession(child.id, { endedAt: new Date().toISOString(), ...(managed && { kept: keep }) })
+              .catch((e) => events.log(`Couldn't save session history: ${(e as Error).message}`));
+        })
+        // Reported here rather than kept as a rejection, which would block every later session from starting.
+        .catch((e) => events.log(`Checkout cleanup failed: ${(e as Error).message}`));
       sessionUrl = await child.ready;
       if (choice.mode === "pr") await preferences.remember(github.host, choice.repo);
       const label = choice.mode === "pr" ? `${choice.repo}#${choice.number}` : repo;
