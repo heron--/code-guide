@@ -231,11 +231,17 @@ export class LauncherConsole {
         this.busy = true;
         this.notice = "Ending the session…";
         this.render();
-        void this.actions.endSession().finally(() => {
-          this.busy = false;
-          this.notice = undefined;
-          this.render();
-        });
+        void this.actions
+          .endSession()
+          .then(
+            () => undefined,
+            (e) => `Couldn't end the session: ${(e as Error).message}`,
+          )
+          .then((notice) => {
+            this.busy = false;
+            this.notice = notice;
+            this.render();
+          });
         return;
       case "q":
         return this.quit();

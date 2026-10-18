@@ -257,6 +257,22 @@ test("keys open the browser, end the session, and quit", async () => {
   c.stop();
 });
 
+test("a session that fails to end shows why and keeps the console open", async () => {
+  const t = terminal();
+  const a = actions();
+  a.endSession = vi.fn(async () => {
+    throw new Error("permission denied");
+  });
+  const c = new LauncherConsole("1.0", a, t.input, t.output);
+  c.start();
+  c.setSession({ url: "u", label: "l" });
+  t.press("e");
+  await settle();
+  expect(t.screen()).toContain("Couldn't end the session: permission denied");
+  expect(a.quit).not.toHaveBeenCalled();
+  c.stop();
+});
+
 test("without a terminal it prints lines and never touches the screen or stdin", () => {
   const t = terminal({ tty: false });
   const c = new LauncherConsole("1.0", actions(), t.input, t.output);
