@@ -152,6 +152,8 @@ export async function startLauncher(options: {
             checkout: repo,
           })
           .catch((e) => events.log(`Couldn't save session history: ${(e as Error).message}`));
+      // It may have exited during the writes above, and its stopped handler has already run.
+      if (active !== child) throw new Error("Session process stopped right after starting");
       ready = true;
       events.session({ url: sessionUrl, label });
       return sessionUrl;
