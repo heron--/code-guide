@@ -24,10 +24,13 @@ beforeEach(async () => {
   writeFileSync(join(dir, "index.html"), "Code Guide launcher");
   writeFileSync(
     join(dir, "child.cjs"),
+    // Like a real session process: stays up until asked to stop, then exits cleanly.
     `process.once('message', start => {
     require('node:fs').writeFileSync('started.json', JSON.stringify(start));
     process.send({url:'http://localhost:12345', session:'s-1'});
-  });`,
+  });
+  setInterval(() => {}, 1000);
+  process.once('SIGTERM', () => process.exit(0));`,
   );
   github = new GitHub(dir);
   vi.spyOn(github, "status").mockResolvedValue({ ok: false, error: "Run gh auth login" });

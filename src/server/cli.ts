@@ -145,7 +145,7 @@ async function serve(child: SessionStart) {
   const runner = new JobRunner(session, (kind) => (kind === "review" ? reviewer : harness));
   const stopFollowUps = followUps(session, runner, modules);
   const stopLabels = labelQuestions(session, runner);
-  generateGlossary(session, runner);
+  const stopGlossary = generateGlossary(session, runner);
   const stopWatch = watchPullRequest(session);
   const chat = new Chat(session, harness);
   const onRequest = requestHandler(
@@ -166,6 +166,8 @@ async function serve(child: SessionStart) {
     stopping = true;
     stopFollowUps();
     stopLabels();
+    // Cancelling jobs below would otherwise let it start a glossary job nothing waits for.
+    stopGlossary();
     stopWatch();
     stopStatus?.();
     closeServer?.();

@@ -122,8 +122,11 @@ export async function startLauncher(options: {
         active = undefined;
         sessionUrl = undefined;
         events.session(undefined);
+        // A session that stops cleanly exits with 0. After a crash, keep its checkout for a look at what happened.
+        const crashed = ready && child.child.exitCode !== 0;
+        if (crashed) events.log("The session process stopped unexpectedly.");
         // If settings become unreadable, retaining data is safer than deleting it.
-        const keep = managed && ready && (await preferences.keepClones().catch(() => true));
+        const keep = managed && ready && (crashed || (await preferences.keepClones().catch(() => true)));
         if (managed) {
           await checkouts.release(repo!, keep);
           events.log(keep ? `Kept PR checkout: ${repo}` : "Discarded the PR checkout.");

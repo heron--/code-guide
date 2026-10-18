@@ -70,8 +70,12 @@ export class SessionProcess {
     });
   }
 
+  /** Asks the session to shut down, and kills it if it hasn't within a few seconds. */
   async stop(): Promise<void> {
-    if (this.child.exitCode === null && this.child.signalCode === null) this.child.kill("SIGTERM");
+    if (this.child.exitCode !== null || this.child.signalCode !== null) return this.stopped;
+    this.child.kill("SIGTERM");
+    const timer = setTimeout(() => this.child.kill("SIGKILL"), 5_000);
     await this.stopped;
+    clearTimeout(timer);
   }
 }
