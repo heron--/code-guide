@@ -529,6 +529,9 @@ function StatusBar({
 }) {
   const subject = state.subject?.subject;
   const { remote } = state;
+  // A pull request subject reads as its number and title once GitHub reports the title.
+  const label =
+    subject?.type === "change" && subject.pr && remote?.title ? `#${subject.pr} ${remote.title}` : state.subject?.label;
   const activity = sessionActivity(state);
   const guide = modules.find((m) => m.name === "guide");
   const guideJob = guide && panelState(guide, state).job;
@@ -542,8 +545,8 @@ function StatusBar({
         <Sep />
         <span className="flex min-w-0 items-center gap-1.5 font-mono text-[11.5px]">
           {subject?.type === "change" && <Icon paths={icons.branch} size={12} className="text-fg-2" />}
-          <span className="truncate" title={subject?.type === "question" ? subject.question : state.subject?.label}>
-            {state.subject?.label}
+          <span className="truncate" title={subject?.type === "question" ? subject.question : label}>
+            {label}
           </span>
           {remote && (
             <a

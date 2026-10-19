@@ -15,7 +15,7 @@ import { resolveGuide } from "./resolve.js";
 import { startServer } from "./server.js";
 import { Session } from "./session.js";
 import { run } from "./run.js";
-import type { Selection } from "../shared/launcher.js";
+import { parsePullRequestLink, type Selection } from "../shared/launcher.js";
 import { loadSettings, projectSettingsPath, userSettingsPath } from "./settings.js";
 import { Preferences } from "./preferences.js";
 import { DEFAULT_VIEW } from "../shared/settings.js";
@@ -216,13 +216,13 @@ async function launch(dir: string | undefined, flags: Flags) {
   const settings = await loadSettings();
   let selection: Selection | undefined;
   if (flags.pr) {
-    const link = flags.pr.match(/^https:\/\/([^/]+)\/([^/]+\/[^/]+)\/pull\/(\d+)\/?(?:[?#].*)?$/);
-    if (link && link[1].toLowerCase() !== (process.env.GH_HOST || "github.com").toLowerCase())
+    const link = parsePullRequestLink(flags.pr);
+    if (link && link.host !== (process.env.GH_HOST || "github.com").toLowerCase())
       throw new Error("The PR link must belong to GH_HOST (github.com by default)");
-    const number = Number(link?.[3] ?? flags.pr.replace(/^#/, ""));
+    const number = link?.number ?? Number(flags.pr.replace(/^#/, ""));
     if (!Number.isSafeInteger(number) || number <= 0) throw new Error("--pr needs a PR number or link");
     const repo =
-      link?.[2] ??
+      link?.repo ??
       JSON.parse(await run("gh", ["repo", "view", "--json", "nameWithOwner"], { cwd: resolve(dir ?? ".") }))
         .nameWithOwner;
     selection = { mode: "pr", repo, number };

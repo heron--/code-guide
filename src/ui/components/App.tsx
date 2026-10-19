@@ -1,7 +1,10 @@
+import { QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import type { LauncherState } from "../../shared/launcher";
-import { Launcher, launcherRequest } from "./Launcher";
+import { Launcher, launcherQueries, launcherRequest } from "./Launcher";
 import { SessionHome } from "./SessionHome";
+
+const queries = launcherQueries();
 
 type Home = (LauncherState & { sessionUrl?: string }) | { mode: "session"; launcherUrl?: string };
 
@@ -26,7 +29,12 @@ export function App() {
         {error && <button onClick={refresh}>Retry</button>}
       </div>
     );
-  if (home.mode === "launcher") return <Launcher initial={home} refresh={refresh} />;
+  if (home.mode === "launcher")
+    return (
+      <QueryClientProvider client={queries}>
+        <Launcher initial={home} refresh={refresh} />
+      </QueryClientProvider>
+    );
   return (
     <div className="flex h-full flex-col">
       {home.launcherUrl && (

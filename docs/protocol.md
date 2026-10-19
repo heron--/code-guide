@@ -48,10 +48,10 @@ A shorter label for the subject, replacing the one in `session.subject`. A quest
 ```
 
 ```json
-{ "type": "subject.remote", "payload": { "number": 12, "url": "https://github.com/acme/payments/pull/12", "head": "9d1e0c4b7a2f" } }
+{ "type": "subject.remote", "payload": { "number": 12, "url": "https://github.com/acme/payments/pull/12", "title": "Retry failed payouts", "head": "9d1e0c4b7a2f" } }
 ```
 
-The pull request a change subject comes from, reported when the subject is chosen and again whenever it changes (checked every minute with `gh`). `head`, its latest commit, is there only when the subject is the pull request itself; when it differs from the subject's `head`, the pull request has new commits.
+The pull request a change subject comes from, reported when the subject is chosen and again whenever it changes (checked every minute with `gh`). The status bar names a pull request subject by its `title`. `head`, its latest commit, is there only when the subject is the pull request itself; when it differs from the subject's `head`, the pull request has new commits.
 
 ### Jobs
 

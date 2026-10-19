@@ -190,11 +190,16 @@ export async function startLauncher(options: {
   };
 
   const server = createServer((req, res) => {
+    // A browser that stops waiting (typing on, or a new page) closes the request; its gh calls stop with it.
+    const abort = new AbortController();
+    const { signal } = abort;
+    res.on("close", () => !res.writableFinished && abort.abort());
     const handle = async () => {
       if (!sameOrigin(req)) return send(res, 403, { error: "Forbidden" });
       const request = new URL(req.url ?? "/", "http://localhost");
       const path = request.pathname;
       const param = (name: string) => request.searchParams.get(name) ?? "";
+      const page = Math.max(1, Math.floor(Number(param("page"))) || 1);
       if (!path.startsWith("/api/")) return serveStatic(options.uiDir, path, res);
       if (req.method === "GET" && path === "/api/launcher") {
         const state: LauncherState & { sessionUrl?: string } = {
@@ -210,13 +215,18 @@ export async function startLauncher(options: {
       if (req.method === "GET" && path === "/api/directories")
         return send(res, 200, await listDirectory(expandHome(param("path") || options.cwd, options.cwd)));
       if (req.method === "GET" && path === "/api/repositories")
-        return send(res, 200, await github.repositories(await preferences.recent(github.host)));
+        return send(res, 200, await github.repositories(await preferences.recent(github.host), page, signal));
       if (req.method === "GET" && path === "/api/repositories/search")
-        return send(res, 200, await github.searchRepositories(param("q"), param("scope") === "all" ? "all" : "mine"));
-      if (req.method === "GET" && path === "/api/authors") return send(res, 200, await github.authors(param("repo")));
+        return send(
+          res,
+          200,
+          await github.searchRepositories(param("q"), param("scope") === "all" ? "all" : "mine", page, signal),
+        );
+      if (req.method === "GET" && path === "/api/authors")
+        return send(res, 200, await github.authors(param("repo"), signal));
       if (req.method === "GET" && path === "/api/pull-requests") {
         const repo = param("repo");
-        const prs = await github.pullRequests(repo, Object.fromEntries(request.searchParams));
+        const prs = await github.pullRequests(repo, { ...Object.fromEntries(request.searchParams), page }, signal);
         await preferences.remember(github.host, repo);
         return send(res, 200, prs);
       }
@@ -236,7 +246,7 @@ export async function startLauncher(options: {
       }
       return send(res, 404, { error: "Not found" });
     };
-    void handle().catch((e) => send(res, 400, { error: (e as Error).message }));
+    void handle().catch((e) => !signal.aborted && send(res, 400, { error: (e as Error).message }));
   });
   url = await listenLocal(server, options.port);
   void githubStatus();
