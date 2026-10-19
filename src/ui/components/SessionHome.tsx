@@ -1,9 +1,8 @@
 import { useEffect } from "react";
 import { sessionChannel, useSession } from "@/lib/session";
 import { Workspace } from "@/workspace/Workspace";
-import { SubjectPicker } from "./SubjectPicker";
 
-/** The session: the subject picker until it has a subject, then the workspace. */
+/** The session's workspace. A session process chooses its subject before it serves the browser. */
 export function SessionHome() {
   const { status, state, modules, view, error, fatal } = useSession();
   // "system" follows the OS; the tokens read data-theme otherwise.
@@ -12,7 +11,7 @@ export function SessionHome() {
     else document.documentElement.dataset.theme = view.theme;
   }, [view.theme]);
   if (!state) return <Message title={status === "closed" ? "Not connected" : "Connecting…"}>{error}</Message>;
-  if (!state.subject) return <SubjectPicker />;
+  if (!state.subject) return <Message title="Starting the session…" />;
   return (
     // Keyed by session: a new session loads its own layout, so its job ids don't meet the last one's.
     <Workspace

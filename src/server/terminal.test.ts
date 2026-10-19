@@ -2,7 +2,8 @@ import { expect, test } from "vitest";
 import type { ModuleInfo } from "../shared/modules";
 import { PROTOCOL_VERSION, type SessionEvent } from "../shared/protocol";
 import { emptyState, reduce, type SessionState } from "../shared/state";
-import { logLine, printable, showStatus, statusLines } from "./terminal";
+import type { Session } from "./session";
+import { clipLine, logLine, printable, reportStatus, statusLines, widthOf, type StatusReport } from "./terminal";
 
 const guide: ModuleInfo = { name: "guide", label: "Guide", icon: [], needsJob: true, kind: "guide", maxJobs: 4 };
 const quiz: ModuleInfo = { name: "quiz", label: "Quiz", icon: [], needsJob: true, kind: "quiz" };
@@ -50,126 +51,48 @@ test("finished and failed jobs go to the log", () => {
   expect(logLine(ev(3, "job.progress", { job: "guide-1", activity: "x" }), running)).toBeUndefined();
 });
 
-test("off a terminal, only the log is written", () => {
+test("a session process reports what happened before, then its log and live block as they change", async () => {
   let listener: ((e: SessionEvent) => void) | undefined;
+  const before = [ev(1, "session.subject", { subject: { type: "path", path: "src" }, label: "src" })];
   const fake = {
     state: running,
-    subscribe: (fn: (e: SessionEvent) => void) => ((listener = fn), () => {}),
-    eventsAfter: () => [],
-  } as unknown as Parameters<typeof showStatus>[0];
-  let written = "";
-  const stop = showStatus(
-    fake,
-    [guide],
-    { harness: "h", model: "m", status: () => ({ state: "idle" }), onStatus: () => () => {} },
-    { write: (s: string) => (written += s), isTTY: false },
-  );
-  listener!(ev(7, "job.finished", { job: "guide-1", result: "r", warnings: [] }));
-  listener!(ev(8, "job.progress", { job: "guide-1", activity: "x" }));
-  stop();
-  expect(written).toBe("✓ Writing the guide (guide-1)\n");
-});
-
-test("what happened before the status started is logged first", () => {
-  const before = [
-    ev(1, "session.subject", { subject: { type: "path", path: "src" }, label: "src" }),
-    ev(7, "job.finished", { job: "guide-1", result: "r", warnings: [] }),
-  ];
-  const fake = {
-    state: before.reduce(reduce, running),
-    subscribe: () => () => {},
+    subscribe: (fn: (e: SessionEvent) => void) => ((listener = fn), () => (listener = undefined)),
     eventsAfter: () => before,
-  } as unknown as Parameters<typeof showStatus>[0];
-  let written = "";
-  showStatus(
+  } as unknown as Session;
+  const reports: StatusReport[] = [];
+  const stop = reportStatus(
     fake,
-    [guide],
+    [guide, quiz],
     { harness: "h", model: "m", status: () => ({ state: "idle" }), onStatus: () => () => {} },
-    { write: (s: string) => (written += s), isTTY: false },
-  )();
-  expect(written).toBe("Subject: src\n✓ Writing the guide (guide-1)\n");
-});
-
-test("on a terminal, each live line takes one row", () => {
-  const failed = session(
-    ["job.queued", { job: "quiz-1", kind: "quiz", module: "quiz", inputs: [] }],
-    ["job.started", { job: "quiz-1" }],
-    ["job.failed", { job: "quiz-1", error: "first\nsecond", problems: [] }],
+    (r) => reports.push(r),
   );
-  const fake = { state: failed, subscribe: () => () => {}, eventsAfter: () => [] } as unknown as Parameters<
-    typeof showStatus
-  >[0];
-  let written = "";
-  showStatus(
-    fake,
-    [quiz],
-    { harness: "h", model: "m", status: () => ({ state: "idle" }), onStatus: () => () => {} },
-    { write: (s: string) => (written += s), isTTY: true, columns: 200 },
-  )();
-  expect(written.split("\n")).toEqual(["Agent  h · m · context empty · idle", "Quiz  failed: first second", ""]);
+  expect(reports[0]).toEqual({ log: "Subject: src" });
+  expect(reports[1]).toEqual({
+    live: [
+      "Agent  h · m · context empty · idle",
+      "Guide  [░░░░░░░░░░░░░░░░] Writing the guide · job 1 of up to 4 · Reading a.ts",
+      "Quiz   failed: no luck",
+    ],
+  });
+  listener!(ev(6, "job.failed", { job: "quiz-1", error: "no luck", problems: [] }));
+  expect(reports[2]).toEqual({ log: "✗ Writing the quiz (quiz-1) failed: no luck" });
+  // Live updates are batched.
+  await new Promise((r) => setTimeout(r, 150));
+  expect(reports).toHaveLength(4);
+  stop();
+  expect(listener).toBeUndefined();
 });
 
 test("text from the repository can't send the terminal escape sequences", () => {
   expect(printable("a\x1b[2Jb\x1b]0;title\x07c\rd")).toBe("a b c d");
 });
 
-test("lines are clipped by display width, and a resize redraws for the reflowed rows", () => {
-  const wide = session(
-    ["job.queued", { job: "quiz-1", kind: "quiz", module: "quiz", inputs: [] }],
-    ["job.started", { job: "quiz-1" }],
-    ["job.failed", { job: "quiz-1", error: "错误".repeat(20), problems: [] }],
-  );
-  const fake = { state: wide, subscribe: () => () => {}, eventsAfter: () => [] } as unknown as Parameters<
-    typeof showStatus
-  >[0];
-  let written = "";
-  let onResize = () => {};
-  const out = {
-    write: (s: string) => (written += s),
-    isTTY: true,
-    columns: 40,
-    on: (_: "resize", fn: () => void) => (onResize = fn),
-  };
-  showStatus(
-    fake,
-    [quiz],
-    { harness: "h", model: "m", status: () => ({ state: "idle" }), onStatus: () => () => {} },
-    out,
-  );
-  const [, failed] = written.split("\n");
+test("lines are clipped by display width, counting wide characters as two columns", () => {
   // "Quiz  failed: " is 14 columns, each wide character 2, "…" 1: 12 wide characters make 39, within 40.
-  expect(failed).toBe("Quiz  failed: " + "错误".repeat(6) + "…");
-  // Both lines were drawn under 40 columns; at 20, each now takes two rows.
-  written = "";
-  out.columns = 20;
-  onResize();
-  expect(written.startsWith("\x1b[4A\x1b[0J")).toBe(true);
-});
-
-test("progress bars count as one column, and every kind of wide character as two", () => {
-  const rocket = session(
-    ["job.queued", { job: "quiz-1", kind: "quiz", module: "quiz", inputs: [] }],
-    ["job.started", { job: "quiz-1" }],
-    ["job.failed", { job: "quiz-1", error: "🚀".repeat(20), problems: [] }],
-  );
-  let clipped = "";
-  showStatus(
-    { state: rocket, subscribe: () => () => {}, eventsAfter: () => [] } as unknown as Parameters<typeof showStatus>[0],
-    [quiz],
-    { harness: "h", model: "m", status: () => ({ state: "idle" }), onStatus: () => () => {} },
-    { write: (s: string) => (clipped += s), isTTY: true, columns: 40 },
-  )();
-  expect(clipped.split("\n")[1]).toBe("Quiz  failed: " + "🚀".repeat(12) + "…");
-
-  let written = "";
-  const fake = { state: running, subscribe: () => () => {}, eventsAfter: () => [] } as unknown as Parameters<
-    typeof showStatus
-  >[0];
-  showStatus(
-    fake,
-    [guide],
-    { harness: "h", model: "m", status: () => ({ state: "idle" }), onStatus: () => () => {} },
-    { write: (s: string) => (written += s), isTTY: true, columns: 80 },
-  )();
-  expect(written).toContain("Guide  [░░░░░░░░░░░░░░░░] Writing the guide · job 1 of up to 4 · Reading a.ts\n");
+  expect(clipLine("Quiz  failed: " + "错误".repeat(20), 39)).toBe("Quiz  failed: " + "错误".repeat(6) + "…");
+  expect(clipLine("Quiz  failed: " + "🚀".repeat(20), 39)).toBe("Quiz  failed: " + "🚀".repeat(12) + "…");
+  // Progress bars count as one column each.
+  expect(widthOf("[████░░░░]")).toBe(10);
+  expect(clipLine("fits", 4)).toBe("fits");
+  expect(clipLine("a\x1b[2Jb", 10)).toBe("a b");
 });

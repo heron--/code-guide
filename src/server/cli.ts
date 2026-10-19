@@ -1,13 +1,11 @@
-import { stat } from "node:fs/promises";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import open from "open";
 import { modules } from "../modules/index.js";
 import { moduleInfo } from "../modules/types.js";
-import type { Subject } from "../shared/protocol.js";
 import { Chat } from "./chat.js";
-import { showStatus } from "./terminal.js";
-import { repoRoot, revParse } from "./git.js";
+import { reportStatus } from "./terminal.js";
+import { LauncherConsole } from "./screen.js";
 import { createHarness, DEFAULT_HARNESS, harnesses } from "./harness/index.js";
 import { JobRunner } from "./jobs.js";
 import { generateGlossary } from "./glossary.js";
@@ -16,9 +14,15 @@ import { watchPullRequest } from "./remote.js";
 import { resolveGuide } from "./resolve.js";
 import { startServer } from "./server.js";
 import { Session } from "./session.js";
-import { branchChange, pullRequestChange, pullRequestNumber } from "./subjects.js";
+import { run } from "./run.js";
+import type { Selection } from "../shared/launcher.js";
 import { loadSettings, projectSettingsPath, userSettingsPath } from "./settings.js";
+import { Preferences } from "./preferences.js";
 import { DEFAULT_VIEW } from "../shared/settings.js";
+import { startLauncher } from "./launcher.js";
+import { refreshCheckout } from "./checkout.js";
+import type { SessionStart } from "./session-process.js";
+import type { Harness } from "./harness/types.js";
 
 declare const __VERSION__: string | undefined;
 declare const __COMMIT__: string | undefined;
@@ -34,17 +38,11 @@ const pkgRoot = resolve(here, "..");
 const HELP = `code-guide: understand code through a guide, a quiz, and questions
 
 Usage
-  code-guide [dir]                   Start a session in the repo containing dir (default: .)
+  code-guide [dir]                   Open the console and the browser to choose a subject; dir starts Local there
   code-guide check <guide.json>…     Validate guides against the spec. Exits 1 on errors.
 
-Subject (optional; otherwise pick one in the browser)
-  --change <base>[...<head>]   A change: from the merge-base of base to head (default: the working tree)
-  --branch <name>              A branch, local or on origin: what it changes compared to the default branch
-  --pr <number|link>           A pull request, by number or link
-  --path <path>                A directory, package or service
-  --question <text>            A question about the code
-
 Options
+  --pr <number|link>    Start a session on this pull request (a number uses the repository in dir, or .)
   --harness <name>      Agent harness: ${Object.keys(harnesses).join(", ")} (default ${DEFAULT_HARNESS})
   --model <model>       Model for jobs and chat
   --review-model <m>    Model for reviews (default: --model)
@@ -54,11 +52,13 @@ Options
   -h, --help            Show this help
 
 Settings
-  ${userSettingsPath()}, overridden key by key by <repo>/.code-guide/settings.json, overridden by flags:
+  ${userSettingsPath()}, overridden key by key by <repo>/.code-guide/settings.json (Local sessions only),
+  overridden by flags:
   { "harness", "model", "reviewModel", "port", "open", "theme": "light" | "dark" | "system",
-    "modules": ["guide", "chat"] (open when a session starts, left to right) }
+    "modules": ["guide", "chat"] (open when a session starts, left to right),
+    "keepClones": false (retain temporary PR checkouts when true; editable in the console's settings) }
 
-Sessions are kept in <repo>/.code-guide/sessions/. Guide spec: ${join(pkgRoot, "docs/spec.md")}`;
+Sessions are kept in <repo>/.code-guide/sessions/; their history is in ~/.code-guide/history.json. Guide spec: ${join(pkgRoot, "docs/spec.md")}`;
 
 async function check(files: string[]) {
   if (files.length === 0) {
@@ -84,34 +84,20 @@ type Flags = {
   harness?: string;
   model?: string;
   reviewModel?: string;
-  subject?: Subject;
-  /** A branch or pull request: what it means depends on the repository, so it's read once that's known. */
-  branch?: string;
+  /** A pull request, by number or link, started as soon as the launcher is up. */
   pr?: string;
 };
 
-function parseSubject(flag: string, value: string | undefined): Subject {
-  if (!value) throw new Error(`${flag} needs a value`);
-  if (flag === "--path") return { type: "path", path: value };
-  if (flag === "--question") return { type: "question", question: value };
-  const [base, head] = value.split("...");
-  return { type: "change", base, ...(head && { head }) };
-}
-
-async function serve(dir: string | undefined, flags: Flags) {
-  const target = resolve(dir ?? ".");
-  if (!(await stat(target).catch(() => undefined))) {
-    console.error(`No such directory: ${target}`);
-    return 1;
-  }
-  const root = await repoRoot(target);
-  if (!root) {
-    console.error(`${target} isn't inside a git repository. Run code-guide from inside one.`);
-    return 1;
-  }
+/**
+ * A session process: one session on the subject the launcher chose, in the repository it chose. Its console is
+ * the launcher's; it reports there instead of writing to the terminal.
+ */
+async function serve(child: SessionStart) {
+  const root = child.repo;
+  const flags = { ...child.flags, subject: child.subject };
   let settings;
   try {
-    settings = await loadSettings(root);
+    settings = await loadSettings(child.managed ? undefined : root);
   } catch (e) {
     console.error(`Bad settings: ${(e as Error).message}`);
     return 1;
@@ -129,73 +115,189 @@ async function serve(dir: string | undefined, flags: Flags) {
     harness: flags.harness ?? settings.harness,
     model: flags.model ?? settings.model,
     reviewModel: flags.reviewModel ?? settings.reviewModel,
-    port: flags.port ?? settings.port ?? 4646,
-    open: flags.open ?? settings.open ?? true,
   };
-  if (flags.branch) {
-    flags.subject = await branchChange(root, flags.branch);
-    if (!flags.subject) {
-      console.error(`--branch: no branch "${flags.branch}" here or on origin`);
-      return 1;
-    }
-  }
-  if (flags.pr) {
-    const pr = await pullRequestNumber(root, /^\d+$/.test(flags.pr) ? `#${flags.pr}` : flags.pr);
-    if (!pr) {
-      console.error(`--pr: "${flags.pr}" isn't a pull request number or link`);
-      return 1;
-    }
-    flags.subject = await pullRequestChange(root, pr);
-  }
-  // A ref that doesn't resolve would fail every submission; say so now instead.
-  if (flags.subject?.type === "change" && !flags.branch && !flags.pr)
-    for (const ref of [flags.subject.base, flags.subject.head])
-      if (ref && !(await revParse(root, ref))) {
-        console.error(`--change: unknown ref "${ref}"`);
-        return 1;
-      }
-  const harness = createHarness(opts.harness, opts.model);
+  const makeHarness = (model?: string): Harness => {
+    const harness = createHarness(opts.harness, model);
+    if (!child.managed) return harness;
+    return {
+      name: harness.name,
+      model: harness.model,
+      check: () => harness.check(),
+      start: (options) =>
+        harness.start({
+          ...options,
+          instructions:
+            options.instructions +
+            "\n\nThis is a shallow, sparse PR checkout. The working tree contains changed files and root context only. Use git ls-files to discover other paths and git show HEAD:path to read them on demand. Missing working-tree files are not necessarily deleted. History is limited to the PR comparison.",
+        }),
+    };
+  };
+  const harness = makeHarness(opts.model);
   const ok = await harness.check();
   if (!ok.ok) {
     console.error(`Can't use ${harness.name}: ${ok.reason}`);
     return 1;
   }
-  const reviewer = opts.reviewModel ? createHarness(opts.harness, opts.reviewModel) : harness;
+  const reviewer = opts.reviewModel ? makeHarness(opts.reviewModel) : harness;
 
   const session = await Session.create(root);
   session.append("harness.status", { harness: harness.name, model: harness.model, state: "ready" });
   const runner = new JobRunner(session, (kind) => (kind === "review" ? reviewer : harness));
-  followUps(session, runner, modules);
-  labelQuestions(session, runner);
-  generateGlossary(session, runner);
-  watchPullRequest(session);
+  const stopFollowUps = followUps(session, runner, modules);
+  const stopLabels = labelQuestions(session, runner);
+  const stopGlossary = generateGlossary(session, runner);
+  const stopWatch = watchPullRequest(session);
   const chat = new Chat(session, harness);
-  const onRequest = requestHandler(session, runner, modules, chat);
-  if (flags.subject) await onRequest({ type: "subject.choose", subject: flags.subject });
+  const onRequest = requestHandler(
+    session,
+    runner,
+    modules,
+    chat,
+    child.managed
+      ? async (repo, subject) =>
+          subject.head ? subject : { ...subject, ...(await refreshCheckout(repo, subject.pr!)) }
+      : undefined,
+  );
+  let stopping = false;
+  let stopStatus: (() => void) | undefined;
+  let closeServer: (() => void) | undefined;
+  const stop = async () => {
+    if (stopping) return;
+    stopping = true;
+    stopFollowUps();
+    stopLabels();
+    // Cancelling jobs below would otherwise let it start a glossary job nothing waits for.
+    stopGlossary();
+    stopWatch();
+    stopStatus?.();
+    closeServer?.();
+    await Promise.all([
+      chat.stop(),
+      ...session.state.jobOrder
+        .filter((id) => ["queued", "running"].includes(session.state.jobs[id].status))
+        .map((id) => runner.cancel(id)),
+    ]);
+    process.exit(0);
+  };
+  const shutdown = () => {
+    void stop().catch((e) => {
+      console.error(e);
+      process.exit(1);
+    });
+  };
+  process.once("SIGTERM", shutdown);
+  process.once("SIGINT", shutdown);
+  process.once("disconnect", shutdown);
+  await onRequest({ type: "subject.choose", subject: flags.subject });
 
-  const { url } = await startServer({
+  const { url, close } = await startServer({
     session,
     onRequest,
     modules: modules.map(moduleInfo),
     uiDir: join(here, "ui"),
-    port: opts.port,
+    port: 0,
+    launcherUrl: child.launcherUrl,
+    onEnd: shutdown,
     view: { modules: settings.modules ?? DEFAULT_VIEW.modules, theme: settings.theme ?? DEFAULT_VIEW.theme },
   });
-  console.log(`Running version ${VERSION}`);
-  console.log(`Code Guide for ${relative(process.cwd(), root) || "."} at ${url}`);
-  console.log(`Session ${session.id}. Press Ctrl+C to stop.\n`);
-  if (opts.open) await open(url).catch(() => console.log("(Couldn't open a browser; visit the URL above.)"));
-  // After the browser opens, so a failure to open prints above the live block, not into it.
-  showStatus(session, modules.map(moduleInfo), {
+  closeServer = close;
+  const agent = {
     harness: harness.name,
     model: harness.model,
     status: () => chat.status,
-    onStatus: (fn) => chat.onStatus(fn),
+    onStatus: (fn: () => void) => chat.onStatus(fn),
+  };
+  stopStatus = reportStatus(session, modules.map(moduleInfo), agent, (report) => process.send?.(report));
+  process.send?.({ url, session: session.id });
+  return new Promise<number>(() => {});
+}
+
+async function launch(dir: string | undefined, flags: Flags) {
+  const settings = await loadSettings();
+  let selection: Selection | undefined;
+  if (flags.pr) {
+    const link = flags.pr.match(/^https:\/\/([^/]+)\/([^/]+\/[^/]+)\/pull\/(\d+)\/?(?:[?#].*)?$/);
+    if (link && link[1].toLowerCase() !== (process.env.GH_HOST || "github.com").toLowerCase())
+      throw new Error("The PR link must belong to GH_HOST (github.com by default)");
+    const number = Number(link?.[3] ?? flags.pr.replace(/^#/, ""));
+    if (!Number.isSafeInteger(number) || number <= 0) throw new Error("--pr needs a PR number or link");
+    const repo =
+      link?.[2] ??
+      JSON.parse(await run("gh", ["repo", "view", "--json", "nameWithOwner"], { cwd: resolve(dir ?? ".") }))
+        .nameWithOwner;
+    selection = { mode: "pr", repo, number };
+  }
+  // The console exists before the launcher, so the launcher can report to it from its first request.
+  let launcher: Awaited<ReturnType<typeof startLauncher>> | undefined;
+  let stopping = false;
+  const browse = (url: string) => void open(url).catch(() => screen.log(`Couldn't open a browser; visit ${url}.`));
+  const screen = new LauncherConsole(VERSION, {
+    keepClones: () => (launcher?.preferences ?? new Preferences()).keepClones(),
+    setKeepClones: (keep) => (launcher?.preferences ?? new Preferences()).setKeepClones(keep),
+    history: async () => (launcher ? launcher.history() : []),
+    openBrowser: () => launcher && browse(launcher.sessionUrl ?? launcher.url),
+    endSession: async () => launcher?.end(),
+    quit: () => stop(),
   });
+  // Whatever ends the process, the terminal is left as it was found.
+  process.once("exit", () => screen.stop());
+  process.once("uncaughtException", (e) => {
+    screen.stop();
+    console.error(e);
+    process.exit(1);
+  });
+  const stop = () => {
+    if (stopping) return;
+    stopping = true;
+    void (launcher?.close() ?? Promise.resolve()).then(
+      () => {
+        screen.stop();
+        process.exit(0);
+      },
+      (e) => {
+        screen.stop();
+        console.error(e);
+        process.exit(1);
+      },
+    );
+  };
+  process.once("SIGINT", stop);
+  process.once("SIGTERM", stop);
+  screen.start();
+  try {
+    launcher = await startLauncher({
+      cwd: process.cwd(),
+      uiDir: join(here, "ui"),
+      entry: fileURLToPath(import.meta.url),
+      port: flags.port ?? settings.port ?? 4646,
+      localPath: dir ? resolve(dir) : undefined,
+      flags,
+      events: {
+        github: (status) => screen.setGitHub(status),
+        session: (session) => screen.setSession(session),
+        live: (lines) => screen.setLive(lines),
+        log: (line) => screen.log(line),
+      },
+    });
+    screen.setUrl(launcher.url);
+    const browserUrl = selection ? await launcher.select(selection) : launcher.url;
+    if (flags.open ?? settings.open ?? true) browse(browserUrl);
+  } catch (e) {
+    await launcher?.close();
+    screen.stop();
+    throw e;
+  }
   return new Promise<number>(() => {});
 }
 
 async function main(argv: string[]) {
+  if (argv[0] === "--session-process") {
+    if (!process.send) throw new Error("Session processes must be started by Code Guide");
+    const start = await new Promise<SessionStart>((resolve) =>
+      process.once("message", (message) => resolve(message as SessionStart)),
+    );
+    return serve(start);
+  }
   const args: string[] = [];
   const flags: Flags = {};
   for (let i = 0; i < argv.length; i++) {
@@ -208,15 +310,14 @@ async function main(argv: string[]) {
     else if (a === "--harness") flags.harness = argv[++i];
     else if (a === "--model") flags.model = argv[++i];
     else if (a === "--review-model") flags.reviewModel = argv[++i];
-    else if (a === "--change" || a === "--path" || a === "--question") flags.subject = parseSubject(a, argv[++i]);
-    else if (a === "--branch" || a === "--pr") {
-      const value = argv[++i];
-      if (!value) throw new Error(`${a} needs a value`);
-      flags[a === "--branch" ? "branch" : "pr"] = value;
-    } else args.push(a);
+    else if (a === "--pr") {
+      flags.pr = argv[++i];
+      if (!flags.pr) throw new Error("--pr needs a value");
+    } else if (a.startsWith("-")) throw new Error(`Unknown option ${a}. See code-guide --help.`);
+    else args.push(a);
   }
   if (args[0] === "check") return check(args.slice(1));
-  return serve(args[0], flags);
+  return launch(args[0], flags);
 }
 
 main(process.argv.slice(2)).then(

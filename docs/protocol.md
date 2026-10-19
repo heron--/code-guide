@@ -189,7 +189,7 @@ A chat message's context can be a `chapter`, a selected range of chapter `prose`
 
 ## Subject inputs
 
-`GET /api/subjects` returns suggestions. With any of the query parameters `source`, `target`, or `question`, it validates the submitted inputs and returns a subject for `subject.choose`, or a 400 response with an `error` message. All three are optional and trimmed. A nonblank `target` without a nonblank `source` is rejected. Blank inputs return the repository root as a path subject.
+The launcher validates Local subject inputs when `POST /api/start` receives `{ "mode": "local", "path", "inputs": { "source", "target", "question" } }`, and refuses invalid ones with a 400 response and an `error` message. The session process then sends `subject.choose` with the resulting subject itself. All three inputs are optional and trimmed. A nonblank `target` without a nonblank `source` is rejected. Blank inputs return the repository root as a path subject.
 
 Source and target accept `branch` or `remote/branch`. Source checks the local branch first when no remote is named, then origin. An explicit target without a remote stays local. An omitted target uses the default branch. A question with a source is carried on the change; without a source it is interpreted as a pull request, range, path, branch, or general question.
 

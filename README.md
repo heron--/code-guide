@@ -25,7 +25,7 @@ Terms are defined in the [glossary](GLOSSARY.md), and a module's own terms in it
 
 Requires Node 22.12+, git, and Claude Code signed in (run `claude` once). To use pi instead, sign in to a model in `pi` and run `code-guide --harness pi`, with `--model provider/id` to choose one (otherwise pi's default model).
 
-The [GitHub CLI](https://cli.github.com/) (`gh`), signed in, is optional. With it, open pull requests are offered as subjects and the Overview shows a pull request's description.
+The default PR selection requires the [GitHub CLI](https://cli.github.com/) (`gh`), signed in with `gh auth login`. Code Guide shows its authenticated account in the browser and console; authentication errors are visible rather than an empty PR list. Local analysis does not require GitHub authentication.
 
 ```sh
 npm install -g github:heron--/code-guide   # or: git clone … && npm install && npm link
@@ -33,29 +33,42 @@ npm install -g github:heron--/code-guide   # or: git clone … && npm install &&
 
 ## Use
 
-Run `code-guide` anywhere inside a git repository. It starts a session, serves the viewer on `127.0.0.1`, and opens your browser.
+Run `code-guide` from any directory. It opens the console in the terminal and a browser on `127.0.0.1` for choosing a subject, without starting a session or agent work. Choosing one starts a separate session process.
 
 ```
-code-guide [dir]                   Start a session in the repo containing dir (default: .)
+code-guide [dir]                   Open the console and the browser; dir opens Local's file browser there
 code-guide check <guide.json>…     Validate guides against the spec; exits 1 on errors
 code-guide --version               The version and the commit it was built from, e.g. 0.1.0#a1b2c
 
-  --change <base>[...<head>]   --branch <name>   --pr <number|link>
-  --path <path>   --question <text>                                choose the subject up front
+  --pr <number|link>           start a session on this pull request at once
   --harness <claude|pi|fake>   --model <m>   --review-model <m>    reviews default to --model
   --port <n>                   default 4646, or the next free port after it
   --open / --no-open           open a browser, or don't (default: open)
 ```
 
-### Choosing a subject
+### Pull requests and Local
 
-The browser asks what you want to understand and suggests the subjects that apply: uncommitted changes, the current branch against the default branch when it's ahead, and the 10 newest open pull requests (with `gh`). It also offers three optional inputs, validated when you press **Start**:
+**Pull requests** is the default. Recently accessed repositories appear first, then your repositories: ones you own or collaborate on, and your organizations' (up to 1000, most recently pushed first). Typing filters them by any part of the name at once. **Only my repositories** (on by default) keeps the list to these; turned off, GitHub-wide search results follow your matches. GitHub's search matches whole words, so it is also used, limited to you and your organizations, when you have more repositories than the list holds. The list shows when it's loading and searching. You can also enter `owner/repository` and press **Use repository**. Selecting a repository populates its PRs in a scrolling list; click a PR to select it, then **Start session** (or double-click it). PR search accepts GitHub search syntax; **Author** defaults to `me` (the authenticated account), can name another author, or can be cleared for anyone. It suggests the repository's contributors and the authors of PRs already listed. **State** defaults to all, including open, closed, and merged PRs. Up to 100 results are shown; narrow the search when needed. `GH_HOST` selects a GitHub Enterprise host.
+
+A PR session uses an isolated temporary checkout, not your current directory. Code Guide fetches the PR's commits with blob filtering and shallow history, deepening only as needed to find the merge-base (up to 4096 commits). Changed files and root-level context are materialized; other code is available to the agent with `git show HEAD:path`. Git LFS content is not downloaded. Repository settings from PR checkouts are not applied. PRs requiring more history can be analyzed with **Local**.
+
+**Local** has a file browser: click a directory to open it, or `../` to go up; files are listed but can't be chosen. The directory can also be typed, with `~` for your home directory. **Start session** is available once the directory shown is inside a git repository. Local also takes an optional source branch, target branch, and question or path. A source without a target compares against the default branch. Leave the subject blank to explain the repository. Local sessions use the existing checkout and never delete it. GitHub authentication is not required.
+
+**End session** returns to PR selection after stopping agent work. Temporary PR checkouts are discarded by default after the session process stops. To retain them, enable **Keep PR checkouts** in the browser's Settings or the console's. Quitting also stops the session and applies this setting; closing the browser alone does not end it.
+
+**Session history** (in the browser below the selection, and the console's history view) lists your sessions, newest first, with whether each PR checkout was kept and is still on disk, and where. It's saved in `~/.code-guide/history.json` (the last 100 sessions). A session the launcher couldn't end cleanly (it was killed) shows as ended unexpectedly; its checkout is left in place.
+
+`--pr <link>` starts a PR session as soon as the console is up, from any directory. `--pr <number>` identifies the repository through `gh` in the supplied directory (or the current one).
+
+### Local subjects
+
+Local offers three optional subject inputs, validated when you press **Start session**:
 
 - **Source**: the branch to explain, as `branch` or `remote/branch`. Without a remote, Code Guide uses the local branch, falling back to origin if it doesn't exist locally.
 - **Target**: the branch to compare against, shown only when source is filled in. Without a remote, it uses the local branch. Omit it to use the default branch, as usual. A target without a source is rejected.
 - **Question**: focus the explanation of the change, or ask a general question without a source. On its own it also accepts a path, branch, pull request link or number (`#12`), or commit range (`main...feature`).
 
-Leave all three blank to explain the repository. The picker shows progress while checking the inputs and fetching commits, and lets you retry if either fails. `--change`, `--branch`, `--pr`, `--path` and `--question` skip the picker. A session has one subject; run `code-guide` again for another. The status bar names it; a question is named by its guide's title once the guide is written, with the full question on hover.
+Leave all three blank to explain the repository. The browser shows progress while checking the inputs and fetching commits, and lets you retry if either fails. A session has one subject; **End session** returns to selection. The status bar names it; a question is named by its guide's title once the guide is written, with the full question on hover.
 
 A change runs from the merge-base of its base and head to its head, or to the working tree when it has no head. Code Guide fetches remote branches first, so a stale local copy doesn't pull other people's commits into the change; offline, it uses the local copy. An explicitly chosen local source or target stays local. For a pull request it fetches the head commit without creating a branch.
 
@@ -67,7 +80,11 @@ Choosing a subject starts two jobs: the guide and the overview. Every guide goes
 
 A job submits its result through a tool that checks it; errors go back to the agent, which gets 5 submissions to fix them. Two jobs run at a time. The agent can read and search files inside the repository and run single read-only git commands; it can't edit anything. A failed job shows its reason in its panel and dock square, with **Retry**.
 
-While the session runs, the **console** (what Code Guide prints in the terminal) shows the chat's agent (harness, model, how full its context is, and whether it's thinking, writing, in a tool call or idle) and a progress bar for each running job, with the subject and finished and failed jobs logged above. It starts with the version and the commit it was built from (`-dirty` if the build had uncommitted changes), so you can tell whether your install is up to date.
+### Console
+
+When `code-guide` runs on a terminal, the **console** takes over the screen. Its home view shows the version and the commit it was built from (`-dirty` if the build had uncommitted changes, so you can tell whether your install is up to date), the browser URL, the `gh` account and its status, the running session, and the checkout setting. While a session runs it shows its progress: the chat's agent (harness, model, how full its context is, and whether it's thinking, writing, in a tool call or idle) and a progress bar for each running job. Below is a log of the subject and finished and failed jobs. Color marks what each line means: green for done and authenticated, red for failures, cyan for links and progress. Set `NO_COLOR` to turn it off.
+
+Keys: <kbd>s</kbd> settings, <kbd>h</kbd> session history, <kbd>o</kbd> open the browser (on the running session, if there is one), <kbd>e</kbd> end the session, <kbd>q</kbd> or <kbd>Ctrl</kbd><kbd>C</kbd> quit. In settings, <kbd>↑</kbd>/<kbd>↓</kbd> select and <kbd>Space</kbd> changes and saves the selected setting; <kbd>Esc</kbd> (or **Back**) returns to the previous screen. Quitting stops the session and restores the terminal as it was before `code-guide` started. With output redirected (not a terminal), the console prints status changes and log lines instead and reads no keys.
 
 ### Reading a guide
 
@@ -88,11 +105,11 @@ The layout, Reviewed marks and the Full diff toggle are saved in your browser, p
 
 ### Sessions
 
-Each session is a folder in `.code-guide/sessions/` in the repository: `events.jsonl`, the session's complete record (see the [event protocol](docs/protocol.md)), and the finished results in `results/`. Code Guide never edits `.gitignore`; add `.code-guide/` to it if you like.
+Each session is a folder in `.code-guide/sessions/` in its repository (the temporary checkout for a PR session): `events.jsonl`, the session's complete record (see the [event protocol](docs/protocol.md)), and the finished results in `results/`. Code Guide never edits `.gitignore`; add `.code-guide/` to it if you like.
 
 ### Settings
 
-`~/.code-guide/settings.json` holds your defaults. A repository's `.code-guide/settings.json` overrides them key by key, and flags override both. Every key is optional:
+`~/.code-guide/settings.json` holds your defaults. For Local sessions, a repository's `.code-guide/settings.json` overrides them key by key; PR sessions use only user settings. Flags override both. Every key is optional:
 
 ```json
 {
@@ -102,9 +119,12 @@ Each session is a folder in `.code-guide/sessions/` in the repository: `events.j
   "modules": ["guide", "chat"],
   "theme": "system",
   "port": 4646,
-  "open": true
+  "open": true,
+  "keepClones": false
 }
 ```
+
+`keepClones` is a user-only setting: keep or discard temporary PR checkouts after their processes stop. Discarding also removes their session records. Failed checkout preparation is always discarded. Recent repositories are saved separately in `~/.code-guide/repositories.json`. Checkout retention is editable in the browser's or the console's settings. Other defaults can be edited in the JSON file.
 
 `modules` are the panels a new session opens, left slot first; a third and later wait in the dock. Choose from `overview`, `guide`, `quiz`, `trace`, `diff` and `chat`. `theme` is `light`, `dark` or `system`. `reviewModel` defaults to `model`, and `model` to `claude-opus-5-5` with Claude Code. An invalid settings file stops `code-guide` with the file and the problem named.
 

@@ -18,6 +18,8 @@ export const settingsSchema = z
     port: z.number().int().min(0).max(65535),
     /** Open the browser when a session starts. */
     open: z.boolean(),
+    /** Retain temporary PR checkouts after their session process stops; defaults to false. */
+    keepClones: z.boolean(),
   })
   .partial()
   .strict();

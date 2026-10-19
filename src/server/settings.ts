@@ -30,10 +30,10 @@ async function readSettings(path: string): Promise<Settings> {
 }
 
 /** The user's settings, overridden key by key by the repository's. */
-export async function loadSettings(repo: string, home = homedir()): Promise<Settings> {
+export async function loadSettings(repo?: string, home = homedir()): Promise<Settings> {
   const [user, project] = await Promise.all([
     readSettings(userSettingsPath(home)),
-    readSettings(projectSettingsPath(repo)),
+    repo ? readSettings(projectSettingsPath(repo)) : {},
   ]);
   return { ...user, ...project };
 }
