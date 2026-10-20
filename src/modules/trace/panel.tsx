@@ -138,7 +138,12 @@ export default function TracePanel({ module: m, state, channel, job }: PanelProp
         follows={scenarios?.follows}
         scenarios={scenarios?.scenarios}
         subject={state.subject?.label ?? "the code"}
-        proposing={proposing && { activity: proposing.activity }}
+        proposing={
+          proposing && {
+            activity: proposing.activity,
+            onCancel: () => channel.send({ type: "job.cancel", job: proposing.id }),
+          }
+        }
         failed={
           !proposing && latest?.status === "failed"
             ? {

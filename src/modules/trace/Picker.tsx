@@ -10,7 +10,7 @@ type Props = {
   /** The session's subject, as the status bar names it. */
   subject: string;
   /** The scenario job is running: what it's doing. */
-  proposing?: { activity?: string };
+  proposing?: { activity?: string; onCancel: () => void };
   /** The scenario job failed. */
   failed?: { error?: string; onRetry: () => void };
   /** A trace is being written for one scenario. */
@@ -39,6 +39,12 @@ export function Picker(props: Props) {
             <span className="flex items-center gap-2 font-mono text-[11.5px] text-fg-2" role="status">
               <span className="size-1.5 flex-none animate-pulse bg-accent" />
               {proposing.activity ?? "Starting"} · proposing 2–3 scenarios
+              <button
+                onClick={proposing.onCancel}
+                className="ml-1 flex h-6 flex-none items-center border border-border bg-surface px-2.5 font-sans text-[12px] text-fg hover:border-fg-3"
+              >
+                Cancel
+              </button>
             </span>
           ) : (
             scenarios && (

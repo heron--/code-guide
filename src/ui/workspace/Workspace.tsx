@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ResolvedFile } from "../../shared/guide";
 import type { ChatContext } from "../../shared/protocol";
-import { unavailable, type ModuleInfo } from "../../shared/modules";
+import { activeJobs, jobRunning, unavailable, type ModuleInfo } from "../../shared/modules";
 import { DEFAULT_VIEW } from "../../shared/settings";
 import { hasNewCommits, type SessionState } from "../../shared/state";
 import { panelFor } from "@/lib/panels";
@@ -413,6 +413,7 @@ function PanelBody({
   const { job, busy, activity, stage, failed } = panelState(m, state);
   const progress = runProgress(m, state);
   const retry = () => failed && channel.send({ type: "job.start", module: m.name, retry: failed.id });
+  const cancel = () => activeJobs(state, m.name).forEach((job) => channel.send({ type: "job.cancel", job }));
   if (m.showsProgress && Panel)
     return (
       <Suspense fallback={<Centered title="Loading…" />}>
@@ -443,6 +444,11 @@ function PanelBody({
           />
         )}
         {activity}
+        {busy && (
+          <span className="mt-3 block">
+            <CancelButton onClick={cancel} />
+          </span>
+        )}
       </Centered>
     );
   if (!Panel) return <Centered title={`${m.label} panel`}>This module's panel isn't built yet.</Centered>;
@@ -460,6 +466,7 @@ function PanelBody({
             {stage}
             {activity && ` · ${activity}`}
           </span>
+          <CancelButton onClick={cancel} />
         </div>
         {panel}
       </div>
@@ -487,6 +494,18 @@ function RetryButton({ onClick }: { onClick: () => void }) {
     >
       <Icon paths={icons.retry} size={12} />
       Retry
+    </button>
+  );
+}
+
+function CancelButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      title="Stop this module's job, so it can be started again"
+      className="inline-flex h-6 flex-none items-center border border-border bg-surface px-2.5 font-sans text-[12px] text-fg hover:border-fg-3"
+    >
+      Cancel
     </button>
   );
 }
@@ -668,7 +687,8 @@ function NewPanel({
       {openMenu && (
         <ul role="menu" className="absolute top-7 right-0 z-30 w-64 border border-rule bg-surface py-1 shadow-active">
           {modules.map((m) => {
-            const why = unavailable(m, state);
+            // A module with a job still going can't start another until it's cancelled.
+            const why = unavailable(m, state) ?? (m.needsJob ? jobRunning(m, state) : undefined);
             return (
               <li key={m.name} role="none">
                 <button
