@@ -140,6 +140,10 @@ test("a PR number or a link to one of the repository's PRs finds that PR, whatev
   }
   command.mockRejectedValueOnce(new Error("gh: Not Found (HTTP 404)"));
   expect(await github.pullRequests("acme/app", { search: "404" })).toEqual({ items: [], hasMore: false });
+  // A link to another host's PR names a different PR, so it's only searched for.
+  command.mockResolvedValueOnce(searchResult([]));
+  await github.pullRequests("acme/app", { search: "https://ghe.example.com/acme/app/pull/12" });
+  expect(command.mock.calls.at(-1)![1]).toContain("search/issues");
 });
 
 test("authentication errors are not empty PR results", async () => {

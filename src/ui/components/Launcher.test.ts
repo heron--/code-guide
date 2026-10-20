@@ -168,6 +168,19 @@ test("clicking a PR selects it; Start session starts the selected PR", async () 
   expect(posted()).toEqual([{ mode: "pr", repo: "acme/recent", number: 8 }]);
 });
 
+test("typing a PR filter clears the selection at once, before the new PRs arrive", async () => {
+  await tick();
+  await tick();
+  const list = container.querySelector('[aria-label="Pull requests"]')!;
+  await act(() => [...list.querySelectorAll("button")].find((b) => b.textContent?.includes("#8"))!.click());
+  expect(button("Start session").disabled).toBe(false);
+  const search = [...container.querySelectorAll("label")]
+    .find((label) => label.textContent?.startsWith("Search PRs"))!
+    .querySelector("input")!;
+  await type(search, "tracing");
+  expect(button("Start session").disabled).toBe(true);
+});
+
 test("the author filter suggests me, the repository's contributors, and listed PR authors", async () => {
   await tick();
   await tick();

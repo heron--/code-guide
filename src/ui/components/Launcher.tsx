@@ -172,10 +172,11 @@ export function Launcher({
   useEffect(() => {
     if (!repo && !repoSearch && mine.data?.items.length) setRepo(mine.data.items[0].name);
   }, [repo, repoSearch, mine.data]);
-  // A selection only stands while its PR is in the list shown.
+  // A selection only stands while its PR is in the list shown, so not while typing changes the filters.
   useEffect(() => {
-    if (selected !== undefined && !prs.data?.items.some((pr) => pr.number === selected)) setSelected(undefined);
-  }, [prs.data, selected]);
+    if (selected !== undefined && (!prsSettled || !prs.data?.items.some((pr) => pr.number === selected)))
+      setSelected(undefined);
+  }, [prs.data, prsSettled, selected]);
   // Suggested authors: the repository's contributors, and anyone whose PRs have been listed.
   const [seen, setSeen] = useState<Record<string, string[]>>({});
   useEffect(() => {

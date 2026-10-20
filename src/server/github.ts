@@ -163,7 +163,10 @@ export class GitHub {
     if (!["all", "open", "closed", "merged"].includes(state)) throw new Error("Invalid PR state");
     const search = options.search?.trim() ?? "";
     const link = parsePullRequestLink(search);
-    const number = link && same(link.repo, name) ? link.number : Number(search.match(/^#?(\d+)$/)?.[1]);
+    const number =
+      link && link.host === this.host.toLowerCase() && same(link.repo, name)
+        ? link.number
+        : Number(search.match(/^#?(\d+)$/)?.[1]);
     if (number > 0) return { items: await this.pullRequest(name, number, signal), hasMore: false };
 
     const author = (options.author ?? "me").trim();
