@@ -136,10 +136,16 @@ export function dropTarget(l: Layout, half: Slot): Slot {
 export function dropFromDock(l: Layout, panel: string, target: Slot): Layout {
   const occupant = l[target];
   // Over a maximized panel: it goes to the dock and the new one stays maximized. Restoring still brings back the
-  // panel maximizing hid.
+  // panel maximizing hid, unless that's the one dropped.
   if (l.maximized === target) {
     const dock = l.dock.filter((p) => p !== panel);
-    return { ...l, [target]: panel, dock: occupant && occupant !== panel ? [...dock, occupant] : dock, recent: target };
+    return {
+      ...l,
+      [target]: panel,
+      dock: occupant && occupant !== panel ? [...dock, occupant] : dock,
+      recent: target,
+      minimized: l.minimized === panel ? undefined : l.minimized,
+    };
   }
   const free = other(target);
   if (occupant && !l[free]) return { ...open({ ...l, [target]: undefined, [free]: occupant }, panel, target) };
