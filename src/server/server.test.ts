@@ -75,5 +75,7 @@ test("serves the repository's glossary terms, or none", async () => {
   expect((await get("/api/glossary")).body).toEqual([]);
   writeFileSync(join(repo, "Glossary.md"), "| Term | Definition |\n| --- | --- |\n| **Widget** | A thing. |\n");
   const again = await serve({ subject: { type: "question", question: "Q?" }, label: "" });
-  expect((await again("/api/glossary")).body).toEqual([{ term: "Widget", definition: "A thing." }]);
+  expect((await again("/api/glossary")).body).toEqual([
+    { term: "Widget", definition: "A thing.", source: "Glossary.md" },
+  ]);
 });

@@ -23,10 +23,12 @@ export function glossaryPath(repo: string): string | undefined {
   return existsSync(generated) ? generated : undefined;
 }
 
-/** The glossary's terms. No glossary, or one that doesn't parse, means no terms. */
+/** The glossary's terms, each naming the file it came from. No glossary, or one that doesn't parse, means no terms. */
 export async function readGlossary(repo: string): Promise<Term[]> {
   const path = glossaryPath(repo);
-  return path ? parseGlossary(await readFile(path, "utf8").catch(() => "")) : [];
+  if (!path) return [];
+  const source = relative(repo, path);
+  return parseGlossary(await readFile(path, "utf8").catch(() => "")).map((t) => ({ ...t, source }));
 }
 
 /** For a job that writes prose: where the glossary is, so it uses the repository's words. Empty without one. */

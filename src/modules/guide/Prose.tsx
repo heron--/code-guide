@@ -96,6 +96,7 @@ function GlossaryTerm({ text, term }: { text: string; term: Term }) {
                 <span className="font-medium">Not to be confused with:</span> {term.notConfusedWith}
               </span>
             )}
+            {term.source && <span className="mt-2 block font-mono text-[11px] text-fg-3">{term.source}</span>}
           </span>,
           document.body,
         )}
