@@ -213,7 +213,7 @@ export function Workspace({ state, modules, panels = DEFAULT_VIEW.modules, chann
           />
           <main ref={mainRef} className="flex min-h-0 flex-1 p-2.5">
             {over?.whole && dragged.current ? (
-              slot("left")
+              slot(over.slot)
             ) : shown.maximized ? (
               slot(shown.maximized)
             ) : (
@@ -265,7 +265,7 @@ function dragOver(
   const half: Slot = drag.x < r.left + r.width * (l.left && l.right ? l.split : 0.5) ? "left" : "right";
   if (drag.from === "dock") {
     const slot = dropTarget(l, half);
-    return { slot, layout: dropFromDock(l, drag.panel, slot), whole: !l.left && !l.right };
+    return { slot, layout: dropFromDock(l, drag.panel, slot), whole: !!l.maximized || (!l.left && !l.right) };
   }
   // A title bar only swaps onto the other slot. Panels go to the dock with ×, not by dragging.
   if (half === drag.from || l.maximized) return undefined;

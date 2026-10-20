@@ -124,15 +124,23 @@ export function setSplit(l: Layout, split: number): Layout {
  * Where a square dragged from the dock would land, given which half of the workspace the pointer is over:
  * - both slots full: it replaces the panel there, which goes to the dock
  * - one slot full: it opens on the pointer's side, moving the other panel aside
+ * - one maximized: it replaces that panel, and takes the whole workspace
  * - none: it takes the whole workspace (the left slot)
  */
 export function dropTarget(l: Layout, half: Slot): Slot {
+  if (l.maximized) return l.maximized;
   if (!l.left && !l.right) return "left";
   return half;
 }
 
 export function dropFromDock(l: Layout, panel: string, target: Slot): Layout {
   const occupant = l[target];
+  // Over a maximized panel: it goes to the dock and the new one stays maximized. Restoring still brings back the
+  // panel maximizing hid.
+  if (l.maximized === target) {
+    const dock = l.dock.filter((p) => p !== panel);
+    return { ...l, [target]: panel, dock: occupant && occupant !== panel ? [...dock, occupant] : dock, recent: target };
+  }
   const free = other(target);
   if (occupant && !l[free]) return { ...open({ ...l, [target]: undefined, [free]: occupant }, panel, target) };
   return open(l, panel, target);
