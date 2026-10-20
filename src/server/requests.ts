@@ -73,6 +73,7 @@ export function requestHandler(
         const running = jobRunning(m, session.state);
         if (running) throw new Error(running);
         if (req.retry) {
+          if (session.state.jobs[req.retry]?.module !== m.name) throw new Error(`${req.retry} isn't ${m.label}'s job`);
           runner.retry(req.retry);
           return;
         }

@@ -134,6 +134,8 @@ test("a module runs one job at a time: the reader cancels it before starting ano
   await handle({ type: "job.start", module: "echo" });
   await expect(handle({ type: "job.start", module: "echo" })).rejects.toThrow(/already has a job running/);
   await expect(handle({ type: "job.start", module: "guide" })).rejects.toThrow(/already has a job running/);
+  // A retry is checked against its own module, not just the one named.
+  await expect(handle({ type: "job.start", module: "recap", retry: "echo-1" })).rejects.toThrow(/isn't Recap's job/);
   await handle({ type: "job.cancel", job: "echo-1" });
   await handle({ type: "job.start", module: "echo" });
   expect(session.state.jobs["echo-2"]).toBeDefined();
