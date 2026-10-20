@@ -66,8 +66,9 @@ export class GitHub {
 
   private auth?: { at: number; result: Promise<GitHubStatus> };
 
-  /** Asks GitHub, and keeps the answer for `requireAuth`. */
+  /** Asks GitHub, and keeps the answer for `requireAuth`. The account may have changed, so its organizations go. */
   status(): Promise<GitHubStatus> {
+    this.orgs = undefined;
     const result = (async (): Promise<GitHubStatus> => {
       try {
         const { login } = await this.json<{ login: string }>(["api", "user"]);

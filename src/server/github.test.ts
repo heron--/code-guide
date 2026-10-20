@@ -213,6 +213,19 @@ test("searching your repositories is limited to you and your organizations, whic
   expect(q(4)).toBe("q=pi-extensions");
 });
 
+test("refreshing authentication forgets the organizations, since the account may have changed", async () => {
+  authenticated();
+  command.mockResolvedValueOnce('[{"login":"acme"}]');
+  command.mockResolvedValueOnce(searchResult([]));
+  await github.searchRepositories("app", "mine");
+  command.mockResolvedValueOnce('{"login":"other"}');
+  await github.status();
+  command.mockResolvedValueOnce('[{"login":"globex"}]');
+  command.mockResolvedValueOnce(searchResult([]));
+  await github.searchRepositories("app", "mine");
+  expect(q(5)).toBe("q=app user:other user:globex");
+});
+
 test("a cancelled request's signal reaches gh", async () => {
   authenticated();
   command.mockResolvedValueOnce(searchResult([]));
