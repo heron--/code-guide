@@ -30,14 +30,11 @@ let history: unknown[] = [];
 let mineMore = false;
 let prsMore = false;
 let queries: ReturnType<typeof launcherQueries>;
+let refresh: ReturnType<typeof vi.fn<() => Promise<void>>>;
 const render = (state = initial) =>
   act(() =>
     root.render(
-      createElement(
-        QueryClientProvider,
-        { client: queries },
-        createElement(Launcher, { initial: state, refresh: vi.fn() }),
-      ),
+      createElement(QueryClientProvider, { client: queries }, createElement(Launcher, { initial: state, refresh })),
     ),
   );
 /** Past a typing pause, and the requests it starts. */
@@ -59,6 +56,7 @@ beforeEach(async () => {
   mineMore = false;
   prsMore = false;
   queries = launcherQueries();
+  refresh = vi.fn(async () => {});
   vi.useFakeTimers();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   fetchMock = vi.fn<typeof fetch>().mockImplementation(async (url) => {
@@ -289,6 +287,19 @@ test("PRs page through their filters' results, starting over when a filter chang
   });
   await tick();
   expect(String(fetched("/api/pull-requests").at(-1)![0])).toContain("state=open&page=1");
+});
+
+test("Refresh GitHub asks GitHub again once authentication has been checked again", async () => {
+  await tick();
+  let checked!: () => void;
+  refresh.mockReturnValueOnce(new Promise<void>((resolve) => (checked = resolve)));
+  const before = fetched("/api/repositories?").length;
+  await act(() => button("Refresh GitHub").click());
+  await tick();
+  expect(fetched("/api/repositories?")).toHaveLength(before);
+  await act(async () => checked());
+  await tick();
+  expect(fetched("/api/repositories?")).toHaveLength(before + 1);
 });
 
 test("a pasted PR link starts that PR", async () => {

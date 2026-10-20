@@ -104,7 +104,8 @@ export function Launcher({
   refresh,
 }: {
   initial: LauncherState & { sessionUrl?: string };
-  refresh: () => void;
+  /** Asks the launcher for its state, which checks GitHub's authentication again. */
+  refresh: () => Promise<void>;
 }) {
   const [mode, setMode] = useState<"pr" | "local">("pr");
   const [repoSearch, setRepoSearch] = useState("");
@@ -220,10 +221,8 @@ export function Launcher({
             </span>
             <button
               className={buttonClass}
-              onClick={() => {
-                void queries.invalidateQueries();
-                refresh();
-              }}
+              // After authentication is checked again, so no answer is for an account that has since changed.
+              onClick={() => void refresh().then(() => queries.invalidateQueries())}
             >
               Refresh GitHub
             </button>

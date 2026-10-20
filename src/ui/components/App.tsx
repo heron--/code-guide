@@ -14,9 +14,9 @@ export function App() {
   const [error, setError] = useState<string>();
   const refresh = () => {
     setError(undefined);
-    void launcherRequest<Home>("launcher").then(setHome, (e) => setError(e.message));
+    return launcherRequest<Home>("launcher").then(setHome, (e) => setError(e.message));
   };
-  useEffect(refresh, []);
+  useEffect(() => void refresh(), []);
   useEffect(() => {
     if (home?.mode !== "launcher" || !home.sessionUrl) return;
     const timer = setTimeout(refresh, 1500);
