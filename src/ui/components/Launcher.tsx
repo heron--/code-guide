@@ -56,11 +56,12 @@ function useSettled<T>(value: T): T {
 
 /**
  * Fetch `path`; undefined fetches nothing. When `path` changes, the request for the old one is cancelled, and the
- * launcher stops its gh calls. `loading` is true until a result or error arrives.
+ * launcher stops its gh calls. `loading` is true until a result or error arrives. GitHub's answers are kept per
+ * `account`, so signing in as someone else never shows the last account's.
  */
-function useChoices<T>(path: string | undefined, options: { fresh?: boolean } = {}) {
+function useChoices<T>(path: string | undefined, options: { fresh?: boolean; account?: string } = {}) {
   const query = useQuery({
-    queryKey: [path],
+    queryKey: options.account ? [path, options.account] : [path],
     queryFn: ({ signal }) => launcherRequest<T>(path!, undefined, signal),
     enabled: path !== undefined,
     ...(options.fresh && { staleTime: 0 }),
@@ -129,13 +130,14 @@ export function Launcher({
   // History and the running session change outside the launcher's requests, so they're asked again on refresh.
   useEffect(() => void queries.invalidateQueries({ queryKey: ["history"] }), [initial]);
   const github = mode === "pr" && auth.ok;
+  const account = { account: auth.ok ? `${auth.host}/${auth.login}` : undefined };
   // A pasted PR link starts that PR; it names its repository, so there's nothing to search for.
   const link = parsePullRequestLink(repoSearch);
   const linked = link && auth.ok && link.host === auth.host.toLowerCase() ? link : undefined;
   // Your repositories, a page at a time. Partial names match the page shown at once; GitHub's search adds the
   // rest: all of GitHub, or all of your repositories.
   const [minePage, setMinePage] = usePage("mine");
-  const mine = useChoices<Page<Repository>>(github ? `repositories?page=${minePage}` : undefined);
+  const mine = useChoices<Page<Repository>>(github ? `repositories?page=${minePage}` : undefined, account);
   const typed = repoSearch.trim();
   const query = useSettled(linked ? "" : typed);
   const [foundPage, setFoundPage] = usePage(`${query} ${onlyMine}`);
@@ -143,6 +145,7 @@ export function Launcher({
     github && query
       ? `repositories/search?${new URLSearchParams({ q: query, scope: onlyMine ? "mine" : "all", page: String(foundPage) })}`
       : undefined,
+    account,
   );
   const searching = !linked && !!typed;
   const matches = (mine.data?.items ?? []).filter((r) => r.name.toLowerCase().includes(typed.toLowerCase()));
@@ -161,10 +164,14 @@ export function Launcher({
   const [prPage, setPrPage] = usePage(JSON.stringify(prFilters));
   const prs = useChoices<Page<PullRequestChoice>>(
     github && repo ? `pull-requests?${new URLSearchParams({ ...prFilters, page: String(prPage) })}` : undefined,
+    account,
   );
   // Until typing settles, the PRs shown are for the old filters.
   const prsSettled = prSearch === search && prAuthor === author;
-  const authors = useChoices<string[]>(github && repo ? `authors?${new URLSearchParams({ repo })}` : undefined);
+  const authors = useChoices<string[]>(
+    github && repo ? `authors?${new URLSearchParams({ repo })}` : undefined,
+    account,
+  );
   const settledPath = useSettled(localPath);
   const listing = useChoices<DirectoryListing>(
     mode === "local" ? `directories?${new URLSearchParams({ path: settledPath })}` : undefined,

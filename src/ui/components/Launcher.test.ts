@@ -302,6 +302,14 @@ test("Refresh GitHub asks GitHub again once authentication has been checked agai
   expect(fetched("/api/repositories?")).toHaveLength(before + 1);
 });
 
+test("signing in as someone else asks GitHub again, however the launcher learns of it", async () => {
+  await tick();
+  const before = fetched("/api/repositories?").length;
+  await render({ ...initial, github: { ok: true, login: "someone-else", host: "github.com" } });
+  await tick();
+  expect(fetched("/api/repositories?")).toHaveLength(before + 1);
+});
+
 test("a pasted PR link starts that PR", async () => {
   await tick();
   await type(repositorySearch(), "https://github.com/acme/app/pull/42");
