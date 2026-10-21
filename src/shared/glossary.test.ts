@@ -18,9 +18,9 @@ test("reads this repository's glossary", () => {
       "Console",
     ]),
   );
-  expect(terms.find((t) => t.term === "Anchor")).toMatchObject({
+  expect(terms.find((t) => t.term === "Anchor")).toEqual({
+    term: "Anchor",
     definition: expect.stringMatching(/^A link in chapter prose/),
-    notConfusedWith: expect.stringMatching(/plain hyperlink/),
   });
 });
 

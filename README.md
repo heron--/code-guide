@@ -1,8 +1,10 @@
 # Code Guide
 
-Learn unfamiliar code and code changes faster. Pick a subject (a change, a path, or a question like "how does auth work?") and Code Guide has your coding agent write a **guide**: a few brief **chapters**, each showing one idea next to the exact code that proves it.
+Understand unfamiliar code and pull requests without piecing the explanation together yourself. Choose a change, a path, or a question like “how does authentication work?” and Code Guide uses your coding agent to write a **guide**: brief **chapters**, each explaining one idea beside the code that supports it.
 
-```
+Read the explanation, follow links into the code, and ask questions as you go. You can also see the full diff, test your understanding with a quiz, or follow a scenario through the code without running it.
+
+```text
 ┌ Retry only safe requests ──────────┐ ┌ client.ts  src ──────────────── +23 -10 ┐
 │ 02 / 03  ↑ ↓  ☐ Reviewed      Ask  │ │ 10  const IDEMPOTENT = new Set([...]);  │
 │                                    │ │ 11  const RETRYABLE = new Set([...]);   │
@@ -13,141 +15,174 @@ Learn unfamiliar code and code changes faster. Pick a subject (a change, a path,
 └────────────────────────────────────┘ └─────────────────────────────────────────┘
 ```
 
-There are three parts:
+## Install and start
 
-- **[Spec](docs/spec.md)**: the guide format and its rules. `code-guide check` enforces them, and so does every guide job.
-- **Jobs**: background work by your coding agent, read-only, through a harness: Claude Code (the default, via the Claude Agent SDK) or [pi](https://github.com/badlogic/pi-mono). The guide job follows [these instructions](src/modules/guide/instructions.ts); a separate review job then judges the guide against a quality bar.
-- **Viewer**: a local web app for reading the guide chapter by chapter, with an overview, the diff, a quiz, a trace and a chat beside it.
+You'll need:
 
-Terms are defined in the [glossary](GLOSSARY.md), and a module's own terms in its glossary (Trace's is [here](src/modules/trace/GLOSSARY.md)).
-
-## Install
-
-Requires Node 22.12+, git, and Claude Code signed in (run `claude` once). To use pi instead, sign in to a model in `pi` and run `code-guide --harness pi`, with `--model provider/id` to choose one (otherwise pi's default model).
-
-The default PR selection requires the [GitHub CLI](https://cli.github.com/) (`gh`), signed in with `gh auth login`. Code Guide shows its authenticated account in the browser and console; authentication errors are visible rather than an empty PR list. Local analysis does not require GitHub authentication.
+- **Node.js 22.12 or newer** and **git**.
+- **Claude Code**, signed in. Run `claude` once to sign in. You can use [pi instead](#use-pi-instead-of-claude-code).
+- For pull requests, the **[GitHub CLI](https://cli.github.com/)**, signed in with `gh auth login`. You don't need GitHub authentication to explore local code or branches.
 
 ```sh
-npm install -g github:heron--/code-guide   # or: git clone … && npm install && npm link
+npm install -g github:heron--/code-guide
+code-guide
 ```
 
-## Use
+Code Guide opens a browser and a terminal **console**. Keep the terminal running while you use it.
 
-Run `code-guide` from any directory. It opens the console in the terminal and a browser on `127.0.0.1` for choosing a subject, without starting a session or agent work. Choosing one starts a separate session process.
+1. In the browser, choose **Pull requests** or **Local**.
+2. Select what you want to understand, then click **Start session**.
+3. Wait for the guide to appear, then read its chapters and use **Chat** for follow-up questions.
 
+Opening Code Guide alone doesn't start AI analysis. Choosing a subject and starting a session does.
+
+## Choose what to understand
+
+### A pull request
+
+In **Pull requests**, find a repository, select a PR, and click **Start session**. You can also paste a PR link into the repository search to start directly.
+
+- **Author** defaults to `me`, so you initially see your own PRs. Clear it to include everyone's, or enter another username.
+- **State** includes open, closed, and merged PRs by default.
+- **Only my repositories** includes repositories you own or collaborate on and your organizations' repositories. Turn it off to search more widely, or enter `owner/repository` directly.
+
+Already have the PR? Skip the browser selection:
+
+```sh
+# A link works from any directory
+code-guide --pr https://github.com/owner/repository/pull/123
+
+# A number uses the repository in your current directory
+code-guide --pr 123
 ```
-code-guide [dir]                   Open the console and the browser; dir opens Local's file browser there
-code-guide check <guide.json>…     Validate guides against the spec; exits 1 on errors
-code-guide --version               The version and the commit it was built from, e.g. 0.1.0#a1b2c
 
-  --pr <number|link>           start a session on this pull request at once
-  --harness <claude|pi|fake>   --model <m>   --review-model <m>    reviews default to --model
-  --port <n>                   default 4646, or the next free port after it
-  --open / --no-open           open a browser, or don't (default: open)
+PR sessions use a separate temporary checkout, so you don't need to clone the repository or switch your current branch. If new commits arrive while you're reading, **Update modules** appears in the status bar; use it to refresh the guide and overview.
+
+### Local code, a branch, or a question
+
+Choose **Local** and browse to a git repository, or start its file browser at a directory:
+
+```sh
+code-guide /path/to/repository
 ```
 
-### Pull requests and Local
+The subject inputs are optional:
 
-**Pull requests** is the default. Recently accessed repositories appear first, then your repositories: ones you own or collaborate on, and your organizations' (up to 1000, most recently pushed first). Typing filters them by any part of the name at once. **Only my repositories** (on by default) keeps the list to these; turned off, GitHub-wide search results follow your matches. GitHub's search matches whole words, so it is also used, limited to you and your organizations, when you have more repositories than the list holds. The list shows when it's loading and searching. You can also enter `owner/repository` and press **Use repository**. Selecting a repository populates its PRs in a scrolling list; click a PR to select it, then **Start session** (or double-click it). PR search accepts GitHub search syntax; **Author** defaults to `me` (the authenticated account), can name another author, or can be cleared for anyone. It suggests the repository's contributors and the authors of PRs already listed. **State** defaults to all, including open, closed, and merged PRs. Up to 100 results are shown; narrow the search when needed. `GH_HOST` selects a GitHub Enterprise host.
+| What you want to understand | What to enter |
+| --- | --- |
+| The repository as a whole | Leave all inputs blank. |
+| One part of the code | Enter a path such as `src/auth` in **Question or path**. |
+| How something works | Enter a question such as “How are retries scheduled?” in **Question or path**. |
+| A branch's changes | Enter `feature` or `origin/feature` in **Source branch**. |
+| A branch compared with a particular base | Fill in **Source branch** and **Target branch**, such as `feature` and `main`. |
+| One concern within a change | Fill in the branches and add a question, such as “What changes for existing users?” |
 
-A PR session uses an isolated temporary checkout, not your current directory. Code Guide fetches the PR's commits with blob filtering and shallow history, deepening only as needed to find the merge-base (up to 4096 commits). Changed files and root-level context are materialized; other code is available to the agent with `git show HEAD:path`. Git LFS content is not downloaded. Repository settings from PR checkouts are not applied. PRs requiring more history can be analyzed with **Local**.
+If you leave **Target branch** blank, Code Guide compares against the repository's default branch. On its own, **Question or path** also accepts a commit range such as `main...feature`.
 
-**Local** has a file browser: click a directory to open it, or `../` to go up; files are listed but can't be chosen. The directory can also be typed, with `~` for your home directory. **Start session** is available once the directory shown is inside a git repository. Local also takes an optional source branch, target branch, and question or path. A source without a target compares against the default branch. Leave the subject blank to explain the repository. Local sessions use the existing checkout and never delete it. GitHub authentication is not required.
+Click **Start session** when you're ready. Each session has one subject; use **End session** to choose another.
 
-**End session** returns to PR selection after stopping agent work. Temporary PR checkouts are discarded by default after the session process stops. To retain them, enable **Keep PR checkouts** in the browser's Settings or the console's. Quitting also stops the session and applies this setting; closing the browser alone does not end it.
+## Read and explore
 
-**Session history** (in the browser below the selection, and the console's history view) lists your sessions, newest first, with whether each PR checkout was kept and is still on disk, and where. It's saved in `~/.code-guide/history.json` (the last 100 sessions). A session the launcher couldn't end cleanly (it was killed) shows as ended unexpectedly; its checkout is left in place.
+A session starts with **Guide** on the left and **Chat** on the right. Other modules open from **New panel** or the dock along the bottom. Drag panels to rearrange them, drag the divider to resize, or maximize a panel for more room.
 
-`--pr <link>` starts a PR session as soon as the console is up, from any directory. `--pr <number>` identifies the repository through `gh` in the supplied directory (or the current one).
+### Follow the guide
 
-### Local subjects
+Each chapter pairs a short explanation with code excerpts. For a change, those excerpts show the diff; for a question, they show the existing code. Unrelated lines are collapsed so you can focus on what matters.
 
-Local offers three optional subject inputs, validated when you press **Start session**:
+- **Scroll through the code** or use the chapter arrows. The explanation follows the current chapter.
+- **Click an anchor**—a coloured link in the explanation—to highlight the exact lines it refers to. **Go back** returns you to where you were.
+- **Mark chapters or files Reviewed** to keep track of your progress. Marking a file also collapses it.
+- **Hover over dotted-underlined terms** to see their definitions from the repository's glossary.
 
-- **Source**: the branch to explain, as `branch` or `remote/branch`. Without a remote, Code Guide uses the local branch, falling back to origin if it doesn't exist locally.
-- **Target**: the branch to compare against, shown only when source is filled in. Without a remote, it uses the local branch. Omit it to use the default branch, as usual. A target without a source is rejected.
-- **Question**: focus the explanation of the change, or ask a general question without a source. On its own it also accepts a path, branch, pull request link or number (`#12`), or commit range (`main...feature`).
+With focus in Guide, use **J / K** for the next or previous chapter, **[ / ]** for files, and **R** to mark the chapter Reviewed. Your layout and Reviewed marks are saved in the browser for that session.
 
-Leave all three blank to explain the repository. The browser shows progress while checking the inputs and fetching commits, and lets you retry if either fails. A session has one subject; **End session** returns to selection. The status bar names it; a question is named by its guide's title once the guide is written, with the full question on hover.
+### Ask about what you're reading
 
-A change runs from the merge-base of its base and head to its head, or to the working tree when it has no head. Code Guide fetches remote branches first, so a stale local copy doesn't pull other people's commits into the change; offline, it uses the local copy. An explicitly chosen local source or target stays local. For a pull request it fetches the head commit without creating a branch.
+Chat knows the session's subject and its completed guide, quiz, and traces. Ask a follow-up such as “What happens if this request fails?” or “Where is this value set?”
 
-When a change comes from a pull request, the status bar links to it (with `gh`). While the subject is the pull request itself, Code Guide checks it every minute; when new commits are pushed, the status bar offers **Update modules**, which moves the session to the latest commit and writes its guide and overview again. A quiz waits for you to start it again, so it isn't built from the old guide.
+Use **Ask** on a chapter or trace step to bring it into Chat. You can also select code in Guide, Diff, or Trace—or prose in Guide—and choose **Ask about this**. The shortcut is **⌘L** on macOS or **Ctrl+L** elsewhere.
 
-### Jobs
+Answers include clickable `file:line` citations so you can check the code yourself.
 
-Choosing a subject starts two jobs: the guide and the overview. A module runs one job at a time: while one is going, **New panel** won't start it again, and **Cancel** on its panel stops it so it can be started over. Every guide goes to a review job that sees only the guide and the code. If the review asks for changes, one revision is written and reviewed again, and you see the latest guide that passed the spec. The quiz job starts when you open Quiz, once the guide is done. Opening Trace starts a quick job that proposes scenarios; picking one starts the job that writes its trace, step by step, each batch checked against the code as it's written.
+### See the subject another way
 
-A job submits its result through a tool that checks it; errors go back to the agent, which gets 5 submissions to fix them. Two jobs run at a time. The agent can read and search files inside the repository and run single read-only git commands; it can't edit anything. A failed job shows its reason in its panel and dock square, with **Retry**.
+| Module | Use it to… |
+| --- | --- |
+| **Overview** | Get a short summary before reading the chapters. For a PR, it also shows the PR description. |
+| **Diff** | Read every changed file. Turn on **Full diff** to include all the surrounding code. Available for changes. |
+| **Quiz** | Check your understanding with 3–5 multiple-choice questions, explanations, and code citations. Available once the guide is ready. |
+| **Trace** | Choose a scenario and follow its path across files, with values and a call stack beside the code. |
 
-### Console
+Trace is an AI explanation, **not a recorded execution**: it doesn't run your program. Inferred values are marked **≈**. Use its controls to step over, into, or out of calls, and go back whenever you need to reread.
 
-When `code-guide` runs on a terminal, the **console** takes over the screen. Its home view shows the version and the commit it was built from (`-dirty` if the build had uncommitted changes, so you can tell whether your install is up to date), the browser URL, the `gh` account and its status, the running session, and the checkout setting. While a session runs it shows its progress: the chat's agent (harness, model, how full its context is, and whether it's thinking, writing, in a tool call or idle) and a progress bar for each running job. Below is a log of the subject and finished and failed jobs. Color marks what each line means: green for done and authenticated, red for failures, cyan for links and progress. Set `NO_COLOR` to turn it off.
+## How it works
 
-Keys: <kbd>s</kbd> settings, <kbd>h</kbd> session history, <kbd>o</kbd> open the browser (on the running session, if there is one), <kbd>e</kbd> end the session, <kbd>q</kbd> or <kbd>Ctrl</kbd><kbd>C</kbd> quit. In settings, <kbd>↑</kbd>/<kbd>↓</kbd> select and <kbd>Space</kbd> changes and saves the selected setting; <kbd>Esc</kbd> (or **Back**) returns to the previous screen. Quitting stops the session and restores the terminal as it was before `code-guide` started. With output redirected (not a terminal), the console prints status changes and log lines instead and reads no keys.
+Code Guide runs a local browser app and uses Claude Code by default, or pi if you choose it. The agent reads and searches the repository to explain your subject. A guide and overview are prepared when a session starts; quizzes and traces are prepared when you open them. Progress appears in the browser and console. If something fails, its panel shows the reason and offers **Retry**.
 
-### Reading a guide
+The guide's links and excerpts are checked against the code, and a separate AI review checks the explanation and can request a revision. These checks help, but don't make the explanation infallible: use the anchors and citations to verify important claims.
 
-The browser shows a workspace: two slots side by side and a dock along the bottom. A new session opens Guide on the left, showing its progress while it's written, and Chat on the right. Other panels wait in the dock as squares, marked when they have a new result: click one to open it, or drag it up into a slot. Drag a panel's title bar onto the other slot to swap them, or the divider to resize. **New panel** opens any module, or says why it can't yet.
+**The agent cannot edit your source files or run your application.** Its tools are limited to reading and searching repository files and read-only git commands. Code Guide itself fetches commits as needed and saves session data under `.code-guide/`. If the repository has no root `glossary.md`, it also generates `.code-guide/glossary.md` for term definitions.
 
-- **Overview**: a short summary of the subject, an intro before the chapters. For a change with a pull request, a second tab shows the pull request's description. The summary, the description and chat replies render as Markdown; raw HTML in them shows as text.
-- **Guide**: one chapter at a time, its prose and file list beside the code. The code scrolls straight through every chapter and the prose follows: a chapter becomes current as its first file reaches the top (or, scrolling up, as its last file comes back). The prose column widens with the panel, up to a comfortable line length. Keys work while focus is in the panel (hover the chapter arrows for a reminder): <kbd>J</kbd>/<kbd>K</kbd> (or <kbd>⌥</kbd><kbd>↓</kbd>/<kbd>↑</kbd>) for chapters, <kbd>[</kbd>/<kbd>]</kbd> for files, <kbd>R</kbd> to mark the chapter Reviewed. Each file can be marked Reviewed too, which collapses it. The status bar counts the chapters you've reviewed.
-- **Anchors** (accent-coloured links in the prose) scroll the code to their lines and highlight them. **Go back** (or <kbd>⌘</kbd><kbd>[</kbd> / <kbd>Ctrl</kbd><kbd>[</kbd>, or <kbd>Esc</kbd>) jumps back.
-- **Glossary terms**: guides use the repository's own terms from its `glossary.md` (at the root, any case; a Term | Definition table, like [this one](GLOSSARY.md)). Its terms get a dotted underline in chapter prose and show their definition on hover, with the file it came from. A repository without one gets one: the first session writes `.code-guide/glossary.md` in the background, and later sessions reuse it. Add your own `glossary.md` and Code Guide uses that instead.
-- **Diff** (for changes): every changed file, like a pull request. **Full diff** shows every line of every file instead of just the changes.
-- **Quiz**: 3–5 multiple-choice questions on the guide. Each answer explains itself and cites the code.
-- **Trace**: a debugger-style walk through one scenario's path, hop by hop across files, without running anything. Pick a scenario (<kbd>1</kbd>–<kbd>3</kbd>), then step over, into and out of calls (<kbd>F10</kbd>, <kbd>F11</kbd>, <kbd>⇧</kbd><kbd>F11</kbd>, or <kbd>N</kbd>, <kbd>I</kbd>, <kbd>O</kbd>; <kbd>P</kbd> goes back). Values show inline on the lines just run and on hover elsewhere; inferred ones are marked ≈, values read from the code are plain, and a note at the top says they may not be exactly right. Branches the scenario doesn't take are collapsed with the reason. The call stack builds up as you step, with returned calls left faded; click any block to jump to its step. In a narrow slot, Code and Stack become tabs.
-- **Chat**: ask about the code as you read. It knows the subject and the finished guides, quizzes and traces. It follows a reply as it streams in, until you scroll up to reread; scroll back down, or send a message, to follow again. **Ask** on a chapter or a trace step brings it in; so does selecting lines in the Guide, Trace or Diff, or prose in the Guide, and choosing **Ask about this** (or <kbd>⌘</kbd><kbd>L</kbd> / <kbd>Ctrl</kbd><kbd>L</kbd>).
-- **Citations** (`file:line` chips in Chat, Quiz and the Overview) jump an open Trace to the step at those lines, or show them in the Guide if the current chapter has the file (whichever panel you used last first), else in the Diff, else in a file view.
-- **Maximize** a panel to send its neighbor to the dock; restoring it brings the neighbor back. A square dragged onto a maximized panel replaces it and stays maximized; clicking a square splits the workspace as usual.
+The browser runs on your machine, but analysis uses your chosen model provider. Treat the code and questions sent to that model according to your provider's data policies; a local browser does not mean offline analysis.
 
-The layout, Reviewed marks and the Full diff toggle are saved in your browser, per session.
+## End a session and manage saved data
 
-### Sessions
+**End session** stops the analysis and returns to subject selection. Quitting Code Guide also stops the session. **Closing the browser alone does not stop it.**
 
-Each session is a folder in `.code-guide/sessions/` in its repository (the temporary checkout for a PR session): `events.jsonl`, the session's complete record (see the [event protocol](docs/protocol.md)), and the finished results in `results/`. Code Guide never edits `.gitignore`; add `.code-guide/` to it if you like.
+Temporary PR checkouts and their session data are deleted by default when the session ends. To keep them, enable **Keep PR checkouts** in the browser's Settings or the console's settings before ending the session. Local sessions use your existing checkout and never delete it.
 
-### Settings
+**Session history** in the browser or console lists previous sessions and tells you whether a PR checkout was kept and where it is. Local session records and results live in `.code-guide/sessions/` inside the repository. You can add `.code-guide/` to your `.gitignore`; Code Guide doesn't change it for you.
 
-`~/.code-guide/settings.json` holds your defaults. For Local sessions, a repository's `.code-guide/settings.json` overrides them key by key; PR sessions use only user settings. Flags override both. Every key is optional:
+### Console controls
+
+The terminal shows the browser URL, GitHub account, current session, and analysis progress.
+
+| Key | Action |
+| --- | --- |
+| **o** | Open the browser again. |
+| **e** | End the current session. |
+| **h** | Show session history. |
+| **s** | Open settings; use arrow keys and **Space** to change checkout retention. |
+| **q** or **Ctrl+C** | Quit Code Guide and stop the session. |
+
+## Choose an agent and set defaults
+
+### Use pi instead of Claude Code
+
+Sign in to your chosen provider in [pi](https://github.com/badlogic/pi-mono) and select a default model, then run:
+
+```sh
+code-guide --harness pi
+
+# Or choose a model explicitly; replace provider/id with your model
+code-guide --harness pi --model provider/id
+```
+
+With either agent, `--model` chooses the model used for explanations and Chat. `--review-model` optionally chooses a different model for the guide's AI review; otherwise it uses the same model.
+
+### Save your preferences
+
+Create `~/.code-guide/settings.json` to set defaults. For example:
 
 ```json
 {
   "harness": "claude",
-  "model": "claude-opus-5-5",
-  "reviewModel": "claude-sonnet-5-5",
   "modules": ["guide", "chat"],
   "theme": "system",
-  "port": 4646,
   "open": true,
   "keepClones": false
 }
 ```
 
-`keepClones` is a user-only setting: keep or discard temporary PR checkouts after their processes stop. Discarding also removes their session records. Failed checkout preparation is always discarded. Recent repositories are saved separately in `~/.code-guide/repositories.json`. Checkout retention is editable in the browser's or the console's settings. Other defaults can be edited in the JSON file.
+Every setting is optional. `theme` can be `light`, `dark`, or `system`. `modules` chooses what opens at the start of a session: `guide`, `chat`, `overview`, `diff`, `quiz`, or `trace`. The first two appear side by side; any others wait in the dock. You can also set `model`, `reviewModel`, and `port` here.
 
-`modules` are the panels a new session opens, left slot first; a third and later wait in the dock. Choose from `overview`, `guide`, `quiz`, `trace`, `diff` and `chat`. `theme` is `light`, `dark` or `system`. `reviewModel` defaults to `model`, and `model` to `claude-opus-5-5` with Claude Code. An invalid settings file stops `code-guide` with the file and the problem named.
+For Local sessions, `.code-guide/settings.json` inside the repository can override individual defaults. PR sessions use only your user settings. Command-line flags take precedence. `keepClones` is always a user preference, not a repository setting.
 
-## Develop
+## If something isn't working
 
-```sh
-npm install          # also builds dist/
-npm run check        # typecheck, format check, tests
-npm run build        # dist/ui (Vite) + dist/cli.js (tsup)
+- **Can't connect to an agent?** Run `claude` to check its sign-in, or sign in and choose a model in pi if using `--harness pi`. The console shows connection errors.
+- **Can't find a repository or PR?** Check the GitHub account shown in the browser or console, run `gh auth status`, and check the Author and State filters. Set `GH_HOST` when using GitHub Enterprise.
+- **Browser didn't open?** Press **o** in the console or visit the URL it prints. `--no-open` lets you open it yourself. The default port is `4646`, or the next free port; use `--port 5000` to choose another.
+- **Not sure which version is installed?** Run `code-guide --version`. To update, run the install command again.
 
-# Live UI development: run the API, then Vite with a proxy to it
-node dist/cli.js --no-open --port 4646 &
-npm run dev
-npm run dev:server   # rebuilds dist/cli.js on change; restart the API to pick it up
-```
-
-`CODE_GUIDE_LIVE=1 npm test` also runs the tests that talk to a real Claude model (`CODE_GUIDE_MODEL` to choose one); they take minutes. `--harness fake` is the scripted harness those tests otherwise use; it doesn't write guides.
-
-Layout:
-
-- `src/shared`: the guide schema, prose parsing, the event protocol, and the rules for when a module can open, used by server and browser alike.
-- `src/server`: the CLI, sessions, the job runner, chat, harness adapters (`harness/`), git, validation and highlighting.
-- `src/modules`: one folder per module, with its job in `module.ts` and its panel in `panel.tsx`, registered in `index.ts`.
-- `src/ui`: the workspace (React + Tailwind).
-
-This repo has a guide about itself in `.code-chapters/how-anchors-work.json`; `code-guide check` validates it.
+Run `code-guide --help` for the full command-line options.
