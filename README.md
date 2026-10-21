@@ -76,7 +76,7 @@ When a change comes from a pull request, the status bar links to it (with `gh`).
 
 ### Jobs
 
-Choosing a subject starts two jobs: the guide and the overview. Every guide goes to a review job that sees only the guide and the code. If the review asks for changes, one revision is written and reviewed again, and you see the latest guide that passed the spec. The quiz job starts when you open Quiz, once the guide is done. Opening Trace starts a quick job that proposes scenarios; picking one starts the job that writes its trace, step by step, each batch checked against the code as it's written.
+Choosing a subject starts two jobs: the guide and the overview. A module runs one job at a time: while one is going, **New panel** won't start it again, and **Cancel** on its panel stops it so it can be started over. Every guide goes to a review job that sees only the guide and the code. If the review asks for changes, one revision is written and reviewed again, and you see the latest guide that passed the spec. The quiz job starts when you open Quiz, once the guide is done. Opening Trace starts a quick job that proposes scenarios; picking one starts the job that writes its trace, step by step, each batch checked against the code as it's written.
 
 A job submits its result through a tool that checks it; errors go back to the agent, which gets 5 submissions to fix them. Two jobs run at a time. The agent can read and search files inside the repository and run single read-only git commands; it can't edit anything. A failed job shows its reason in its panel and dock square, with **Retry**.
 

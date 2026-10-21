@@ -1,4 +1,4 @@
-import { latestDone, unavailable } from "../shared/modules.js";
+import { jobRunning, latestDone, unavailable } from "../shared/modules.js";
 import type { Subject } from "../shared/protocol.js";
 import { shortRef } from "../shared/subjects.js";
 import { hasNewCommits } from "../shared/state.js";
@@ -74,7 +74,10 @@ export function requestHandler(
         const m = modules.find((m) => m.name === req.module);
         if (!m) throw new Error(`No module named "${req.module}"`);
         if (!m.job) throw new Error(`${m.label} opens without a job`);
+        const running = jobRunning(m, session.state);
+        if (running) throw new Error(running);
         if (req.retry) {
+          if (session.state.jobs[req.retry]?.module !== m.name) throw new Error(`${req.retry} isn't ${m.label}'s job`);
           runner.retry(req.retry);
           return;
         }

@@ -129,6 +129,18 @@ test("starts a module's job, and refuses modules that can't start", async () => 
   expect(await session.readResult(session.state.jobs["recap-1"].result!)).toEqual({ text: "read echo-1" });
 });
 
+test("a module runs one job at a time: the reader cancels it before starting another", async () => {
+  await handle({ type: "subject.choose", subject: { type: "path", path: "src" } });
+  await handle({ type: "job.start", module: "echo" });
+  await expect(handle({ type: "job.start", module: "echo" })).rejects.toThrow(/already has a job running/);
+  await expect(handle({ type: "job.start", module: "guide" })).rejects.toThrow(/already has a job running/);
+  // A retry is checked against its own module, not just the one named.
+  await expect(handle({ type: "job.start", module: "recap", retry: "echo-1" })).rejects.toThrow(/isn't Recap's job/);
+  await handle({ type: "job.cancel", job: "echo-1" });
+  await handle({ type: "job.start", module: "echo" });
+  expect(session.state.jobs["echo-2"]).toBeDefined();
+});
+
 test("cancels and retries jobs", async () => {
   await handle({ type: "subject.choose", subject: { type: "path", path: "src" } });
   await handle({ type: "job.start", module: "echo" });

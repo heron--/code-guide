@@ -161,6 +161,8 @@ Moves a pull request subject to the pull request's latest commit: cancels runnin
 
 Starts the job a module runs for an option the reader picked from its latest result: here, a trace of its first scenario.
 
+Any `job.start` is refused while one of the module's jobs is still queued or running; cancel it first.
+
 ```json
 { "type": "job.cancel", "job": "quiz-1" }
 ```

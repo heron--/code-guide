@@ -38,6 +38,21 @@ export function unavailable(m: ModuleInfo, state: SessionState): string | undefi
 }
 
 /**
+ * Why a module can't start another job now: one of its jobs is still queued or running. The reader cancels it
+ * first, so a second run never races the first. Server and browser use the same rule.
+ */
+export function jobRunning(m: Pick<ModuleInfo, "name" | "label">, state: SessionState): string | undefined {
+  return moduleBusy(state, m.name) ? `${m.label} already has a job running; cancel it first` : undefined;
+}
+
+/** A module's queued and running jobs: what its Cancel stops. */
+export function activeJobs(state: SessionState, module: string): string[] {
+  return state.jobOrder.filter(
+    (id) => state.jobs[id].module === module && ["queued", "running"].includes(state.jobs[id].status),
+  );
+}
+
+/**
  * The newest done job of a kind: finished, and so are all the follow-ups its module ran on it (today, a guide's
  * review and any revision). Readers never see an unfinished result, whatever job is left: a failed job shows
  * instead, with its reason and a retry. A job the reader started by picking from a result (a trace of one of its
@@ -84,7 +99,5 @@ export function latestResult(m: ModuleInfo, state: SessionState): string | undef
 
 /** Whether any of a module's jobs (its own, or its follow-ups) is still queued or running. */
 export function moduleBusy(state: SessionState, module: string): boolean {
-  return state.jobOrder.some(
-    (id) => state.jobs[id].module === module && ["queued", "running"].includes(state.jobs[id].status),
-  );
+  return activeJobs(state, module).length > 0;
 }
