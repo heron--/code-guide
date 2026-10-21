@@ -103,6 +103,16 @@ test("dropping from the dock", () => {
   const one = open(emptyLayout, "guide");
   expect(dropFromDock(one, "quiz", dropTarget(one, "left"))).toMatchObject({ left: "quiz", right: "guide", dock: [] });
   expect(dropFromDock(one, "quiz", dropTarget(one, "right"))).toMatchObject({ left: "guide", right: "quiz", dock: [] });
+  // A maximized panel: replaced whatever half the pointer is over, and the new one stays maximized.
+  const max = addToDock(toggleMaximized(both, "right"), "quiz");
+  expect(dropTarget(max, "left")).toBe("right");
+  const dropped = dropFromDock(max, "quiz", "right");
+  expect(dropped).toMatchObject({ left: undefined, right: "quiz", maximized: "right", dock: ["guide", "chat"] });
+  expect(toggleMaximized(dropped, "right")).toMatchObject({ left: "guide", right: "quiz", dock: ["chat"] });
+  // Dropping the panel maximizing hid: it's no longer hidden, so docking it docks it.
+  const back = dropFromDock(max, "guide", "right");
+  expect(back).toMatchObject({ right: "guide", maximized: "right", minimized: undefined, dock: ["quiz", "chat"] });
+  expect(toDock(back, "right")).toMatchObject({ left: undefined, right: undefined, dock: ["quiz", "chat", "guide"] });
   // None: the whole workspace.
   expect(dropTarget(emptyLayout, "right")).toBe("left");
   expect(dropFromDock(addToDock(emptyLayout, "quiz"), "quiz", "left")).toMatchObject({ left: "quiz", dock: [] });
