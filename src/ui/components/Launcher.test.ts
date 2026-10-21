@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
+import { QueryClientProvider } from "@tanstack/react-query";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { Launcher } from "./Launcher";
+import { Launcher, launcherQueries, TYPING_PAUSE } from "./Launcher";
 import type { LauncherState } from "../../shared/launcher";
 
 let root: Root;
@@ -26,13 +27,22 @@ const listing = {
 };
 let searchResults: { name: string; recent: boolean }[] = [];
 let history: unknown[] = [];
-let mineComplete = true;
+let mineMore = false;
+let prsMore = false;
+let queries: ReturnType<typeof launcherQueries>;
+let refresh: ReturnType<typeof vi.fn<() => Promise<void>>>;
 const render = (state = initial) =>
-  act(() => root.render(createElement(Launcher, { initial: state, refresh: vi.fn() })));
-const tick = () =>
-  act(async () => {
-    await vi.advanceTimersByTimeAsync(300);
-  });
+  act(() =>
+    root.render(
+      createElement(QueryClientProvider, { client: queries }, createElement(Launcher, { initial: state, refresh })),
+    ),
+  );
+/** Past a typing pause, and the requests it starts. */
+const tick = async () => {
+  await act(() => vi.advanceTimersByTimeAsync(TYPING_PAUSE));
+  // Query results are delivered on a timer of their own.
+  await act(() => vi.advanceTimersByTimeAsync(0));
+};
 const button = (label: string) => [...container.querySelectorAll("button")].find((b) => b.textContent === label)!;
 const type = (input: HTMLInputElement, value: string) =>
   act(() => {
@@ -43,29 +53,37 @@ const type = (input: HTMLInputElement, value: string) =>
 beforeEach(async () => {
   searchResults = [{ name: "someone/pi-extensions", recent: false }];
   history = [];
-  mineComplete = true;
+  mineMore = false;
+  prsMore = false;
+  queries = launcherQueries();
+  refresh = vi.fn(async () => {});
   vi.useFakeTimers();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   fetchMock = vi.fn<typeof fetch>().mockImplementation(async (url) => {
     const path = String(url);
-    if (path.startsWith("/api/repositories/search")) return Response.json(searchResults);
+    if (path.startsWith("/api/repositories/search")) return Response.json({ items: searchResults, hasMore: false });
     if (path.startsWith("/api/repositories"))
       return Response.json({
-        repositories: [
-          { name: "acme/recent", recent: true },
-          { name: "acme/other", recent: false },
-          { name: "heron--/pi-extensions", recent: false },
-        ],
-        complete: mineComplete,
+        items: path.includes("page=2")
+          ? [{ name: "acme/second-page", recent: false }]
+          : [
+              { name: "acme/recent", recent: true },
+              { name: "acme/other", recent: false },
+              { name: "heron--/pi-extensions", recent: false },
+            ],
+        hasMore: mineMore && !path.includes("page=2"),
       });
     if (path.startsWith("/api/history")) return Response.json(history);
     if (path.startsWith("/api/authors")) return Response.json(["sam", "alex"]);
     if (path.startsWith("/api/directories")) return Response.json(listing);
     if (path.startsWith("/api/start")) return Response.json({ error: "Not started in tests" }, { status: 400 });
-    return Response.json([
-      { number: 7, title: "Fix retries", state: "CLOSED", author: { login: "reader" }, isDraft: false },
-      { number: 8, title: "Add tracing", state: "OPEN", author: { login: "kim" }, isDraft: true },
-    ]);
+    return Response.json({
+      items: [
+        { number: 7, title: "Fix retries", state: "CLOSED", author: { login: "reader" }, isDraft: false },
+        { number: 8, title: "Add tracing", state: "OPEN", author: { login: "kim" }, isDraft: true },
+      ],
+      hasMore: prsMore,
+    });
   });
   vi.stubGlobal("fetch", fetchMock);
   container = document.createElement("div");
@@ -75,6 +93,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   await act(() => root.unmount());
+  queries.clear();
   container.remove();
   vi.useRealTimers();
   vi.unstubAllGlobals();
@@ -87,7 +106,7 @@ test("PR-first, recent repository first, me and all states by default, including
   await tick();
   const request = fetchMock.mock.calls.find(([url]) => String(url).startsWith("/api/pull-requests"))!;
   expect(String(request[0])).toContain("repo=acme%2Frecent");
-  expect(String(request[0])).toContain("author=me&state=all");
+  expect(String(request[0])).toContain("author=me&state=all&page=1");
   expect(container.querySelector('[aria-label="Pull requests"]')?.textContent).toContain("closed · reader");
 });
 
@@ -104,12 +123,14 @@ test("changing a PR filter clears stale choices and sends the new filter", async
 });
 
 test("authentication errors remain visible while Local is available without GitHub", async () => {
+  queries.clear();
+  fetchMock.mockClear();
   await render({ ...initial, github: { ok: false, error: "Run gh auth login" } });
   expect(container.textContent).toContain("Run gh auth login");
   await act(() => button("Local").click());
   await tick();
   expect(button("Start session").disabled).toBe(false);
-  expect(fetchMock.mock.calls.map(([url]) => String(url).split("?")[0]).sort()).toEqual([
+  expect([...new Set(fetchMock.mock.calls.map(([url]) => String(url).split("?")[0]))].sort()).toEqual([
     "/api/directories",
     "/api/history",
   ]);
@@ -143,6 +164,19 @@ test("clicking a PR selects it; Start session starts the selected PR", async () 
   expect(posted()).toEqual([]);
   await act(async () => button("Start session").click());
   expect(posted()).toEqual([{ mode: "pr", repo: "acme/recent", number: 8 }]);
+});
+
+test("typing a PR filter clears the selection at once, before the new PRs arrive", async () => {
+  await tick();
+  await tick();
+  const list = container.querySelector('[aria-label="Pull requests"]')!;
+  await act(() => [...list.querySelectorAll("button")].find((b) => b.textContent?.includes("#8"))!.click());
+  expect(button("Start session").disabled).toBe(false);
+  const search = [...container.querySelectorAll("label")]
+    .find((label) => label.textContent?.startsWith("Search PRs"))!
+    .querySelector("input")!;
+  await type(search, "tracing");
+  expect(button("Start session").disabled).toBe(true);
 });
 
 test("the author filter suggests me, the repository's contributors, and listed PR authors", async () => {
@@ -183,13 +217,111 @@ const repositoryNames = () =>
 const repositorySearch = () => container.querySelector<HTMLInputElement>('[aria-label="Repository search"]')!;
 const fetched = (prefix: string) => fetchMock.mock.calls.filter(([url]) => String(url).startsWith(prefix));
 
-test("your repositories match partial names at once, without searching GitHub", async () => {
+test("your repositories match partial names at once; GitHub's search of yours follows when typing pauses", async () => {
   await tick();
+  await type(repositorySearch(), "pi-e");
   await type(repositorySearch(), "pi-ext");
   expect(repositoryNames()).toEqual(["heron--/pi-extensions"]);
-  await tick();
   expect(fetched("/api/repositories/search")).toEqual([]);
-  expect(fetched("/api/repositories")).toHaveLength(1);
+  await tick();
+  expect(fetched("/api/repositories/search").map(([url]) => String(url))).toEqual([
+    "/api/repositories/search?q=pi-ext&scope=mine&page=1",
+  ]);
+  expect(repositoryNames()).toEqual(["heron--/pi-extensions", "someone/pi-extensions"]);
+});
+
+test("your repositories are fetched a page at a time, and a page seen before isn't fetched again", async () => {
+  mineMore = true;
+  queries.clear();
+  fetchMock.mockClear();
+  await render({ ...initial });
+  await tick();
+  const pages = () => fetched("/api/repositories?").map(([url]) => String(url));
+  expect(pages()).toEqual(["/api/repositories?page=1"]);
+  expect(button("Previous").disabled).toBe(true);
+  await act(() => button("Next").click());
+  await tick();
+  expect(repositoryNames()).toEqual(["acme/second-page"]);
+  expect(container.textContent).toContain("Page 2");
+  await act(() => button("Previous").click());
+  await tick();
+  expect(repositoryNames()).toContain("acme/other");
+  expect(pages()).toEqual(["/api/repositories?page=1", "/api/repositories?page=2"]);
+});
+
+test("typing cancels the request for what was typed before", async () => {
+  await tick();
+  await tick();
+  const search = [...container.querySelectorAll("label")]
+    .find((label) => label.textContent?.startsWith("Search PRs"))!
+    .querySelector("input")!;
+  let first: AbortSignal | undefined;
+  fetchMock.mockImplementationOnce((_url, init) => {
+    first = init!.signal!;
+    return new Promise(() => {});
+  });
+  await type(search, "retry");
+  await tick();
+  expect(first?.aborted).toBe(false);
+  await type(search, "retries");
+  await tick();
+  expect(first?.aborted).toBe(true);
+  expect(String(fetchMock.mock.calls.at(-1)![0])).toContain("search=retries");
+});
+
+test("PRs page through their filters' results, starting over when a filter changes", async () => {
+  prsMore = true;
+  queries.clear();
+  await render({ ...initial });
+  await tick();
+  await tick();
+  const prPages = container.querySelector('[aria-label="PR pages"]')!;
+  await act(() => [...prPages.querySelectorAll("button")].find((b) => b.textContent === "Next")!.click());
+  await tick();
+  expect(String(fetched("/api/pull-requests").at(-1)![0])).toContain("page=2");
+  await act(() => (container.querySelector("select") as HTMLSelectElement).focus());
+  await act(() => {
+    const select = container.querySelector("select")!;
+    select.value = "open";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await tick();
+  expect(String(fetched("/api/pull-requests").at(-1)![0])).toContain("state=open&page=1");
+});
+
+test("Refresh GitHub asks GitHub again once authentication has been checked again", async () => {
+  await tick();
+  let checked!: () => void;
+  refresh.mockReturnValueOnce(new Promise<void>((resolve) => (checked = resolve)));
+  const before = fetched("/api/repositories?").length;
+  await act(() => button("Refresh GitHub").click());
+  await tick();
+  expect(fetched("/api/repositories?")).toHaveLength(before);
+  await act(async () => checked());
+  await tick();
+  expect(fetched("/api/repositories?")).toHaveLength(before + 1);
+});
+
+test("signing in as someone else asks GitHub again, however the launcher learns of it", async () => {
+  await tick();
+  const before = fetched("/api/repositories?").length;
+  await render({ ...initial, github: { ok: true, login: "someone-else", host: "github.com" } });
+  await tick();
+  expect(fetched("/api/repositories?")).toHaveLength(before + 1);
+});
+
+test("a pasted PR link starts that PR", async () => {
+  await tick();
+  await type(repositorySearch(), "https://github.com/acme/app/pull/42");
+  await act(async () => button("Start session on acme/app#42").click());
+  expect(posted()).toEqual([{ mode: "pr", repo: "acme/app", number: 42 }]);
+  expect(fetched("/api/repositories/search")).toEqual([]);
+});
+
+test("a PR link for another host isn't offered", async () => {
+  await tick();
+  await type(repositorySearch(), "https://ghe.example.com/acme/app/pull/42");
+  expect(button("Start session on acme/app#42")).toBeUndefined();
 });
 
 test("with Only my repositories off, GitHub-wide results follow your own matches", async () => {
@@ -202,7 +334,9 @@ test("with Only my repositories off, GitHub-wide results follow your own matches
   await type(repositorySearch(), "pi-extensions");
   expect(container.textContent).toContain("Searching GitHub…");
   await tick();
-  expect(String(fetched("/api/repositories/search")[0][0])).toBe("/api/repositories/search?q=pi-extensions&scope=all");
+  expect(String(fetched("/api/repositories/search")[0][0])).toBe(
+    "/api/repositories/search?q=pi-extensions&scope=all&page=1",
+  );
   expect(repositoryNames()).toEqual(["heron--/pi-extensions", "someone/pi-extensions"]);
   expect(container.textContent).not.toContain("Searching GitHub…");
 });
@@ -211,15 +345,6 @@ test("loading your repositories shows its progress", async () => {
   expect(container.textContent).toContain("Loading your repositories…");
   await tick();
   expect(container.textContent).not.toContain("Loading your repositories…");
-});
-
-test("when your repositories didn't all fit, a search covers yours and your organizations'", async () => {
-  mineComplete = false;
-  await render({ ...initial });
-  await tick();
-  await type(repositorySearch(), "pi-extensions");
-  await tick();
-  expect(String(fetched("/api/repositories/search").at(-1)![0])).toContain("scope=mine");
 });
 
 test("session history shows whether each PR checkout was kept and is still there", async () => {

@@ -12,6 +12,17 @@ export const selectionSchema = z.discriminatedUnion("mode", [
 export type Selection = z.infer<typeof selectionSchema>;
 export type GitHubStatus = { ok: true; login: string; host: string } | { ok: false; error: string };
 export type Repository = { name: string; recent: boolean };
+/** One page of a longer list. `hasMore` is true when the next page may have more. */
+export type Page<T> = { items: T[]; hasMore: boolean };
+/** How many repositories or PRs one page lists. */
+export const PAGE_SIZE = 25;
+
+/** The PR a link names, e.g. `https://github.com/acme/app/pull/7`, on whichever host the link is for. */
+export function parsePullRequestLink(text: string): { host: string; repo: string; number: number } | undefined {
+  const m = text.trim().match(/^https:\/\/([^/\s]+)\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)(?:[/?#]\S*)?$/);
+  const number = Number(m?.[3]);
+  return m && Number.isSafeInteger(number) && number > 0 ? { host: m[1].toLowerCase(), repo: m[2], number } : undefined;
+}
 export type PullRequestChoice = {
   number: number;
   title: string;

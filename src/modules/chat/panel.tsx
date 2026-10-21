@@ -186,7 +186,7 @@ export default function ChatPanel({ state, channel }: PanelProps) {
               }
             }}
             rows={2}
-            placeholder="Ask about the code…"
+            placeholder={state.subject?.subject.type === "change" ? "Ask about this change…" : "Ask about this code…"}
             className="min-h-10 resize-none bg-transparent text-[13.5px] leading-normal outline-none placeholder:text-fg-4"
           />
           <div className="flex items-center gap-2">

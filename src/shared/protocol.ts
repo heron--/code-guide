@@ -76,7 +76,12 @@ export const eventPayloads = {
    * The pull request a change subject comes from, as GitHub has it now. `head` (its latest commit) is watched only
    * when the subject is the pull request itself; when it differs from the subject's, the reader can update.
    */
-  "subject.remote": z.object({ number: z.number().int().positive(), url: z.string(), head: z.string().optional() }),
+  "subject.remote": z.object({
+    number: z.number().int().positive(),
+    url: z.string(),
+    title: z.string().optional(),
+    head: z.string().optional(),
+  }),
 
   /** A job was asked for. It starts when a slot under the concurrency limit is free. */
   "job.queued": z.object({

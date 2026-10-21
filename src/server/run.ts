@@ -2,13 +2,18 @@ import spawn from "cross-spawn";
 
 /**
  * Run a program and return its stdout. Through cross-spawn, so Windows' `.cmd` shims (npm-installed CLIs)
- * work like any other executable. Rejects with stderr when it exits non-zero.
+ * work like any other executable. Rejects with stderr when it exits non-zero. Aborting `signal` kills the program.
  */
-export function run(cmd: string, args: string[], opts: { cwd: string; env?: NodeJS.ProcessEnv }): Promise<string> {
+export function run(
+  cmd: string,
+  args: string[],
+  opts: { cwd: string; env?: NodeJS.ProcessEnv; signal?: AbortSignal },
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, {
       cwd: opts.cwd,
       windowsHide: true,
+      signal: opts.signal,
       ...(opts.env && { env: { ...process.env, ...opts.env } }),
     });
     const out: Buffer[] = [];

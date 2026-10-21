@@ -10,11 +10,15 @@ import type { JobRunner } from "./jobs.js";
 import type { Session } from "./session.js";
 import { prepareChange, preparePullRequest } from "./subjects.js";
 
-/** How a subject reads in the status bar, e.g. "feat/retry-policy vs main". */
+/**
+ * How a subject reads in the status bar, e.g. "feat/retry-policy vs main". A pull request is just "#12": its base
+ * is often a commit, and the status bar adds its title once GitHub reports it.
+ */
 export function subjectLabel(s: Subject): string {
   switch (s.type) {
     case "change":
-      return `${s.pr ? `#${s.pr}` : s.head ? shortRef(s.head) : "working tree"} vs ${shortRef(s.base)}`;
+      if (s.pr) return `#${s.pr}`;
+      return `${s.head ? shortRef(s.head) : "working tree"} vs ${shortRef(s.base)}`;
     case "path":
       return s.path;
     case "question":

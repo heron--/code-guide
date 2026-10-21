@@ -11,14 +11,14 @@ async function remoteOf(repo: string, s: Subject) {
   if (s.type !== "change") return undefined;
   if (!s.pr) {
     const pr = await pullRequestFor(repo, s);
-    return pr && { number: pr.number, url: pr.url };
+    return pr && { number: pr.number, url: pr.url, title: pr.title };
   }
-  const out = await run("gh", ["pr", "view", String(s.pr), "--json", "headRefOid,url"], { cwd: repo }).catch(
+  const out = await run("gh", ["pr", "view", String(s.pr), "--json", "headRefOid,url,title"], { cwd: repo }).catch(
     () => undefined,
   );
   if (!out) return undefined;
-  const { headRefOid, url } = JSON.parse(out) as { headRefOid: string; url: string };
-  return { number: s.pr, url, head: headRefOid };
+  const { headRefOid, url, title } = JSON.parse(out) as { headRefOid: string; url: string; title: string };
+  return { number: s.pr, url, title, head: headRefOid };
 }
 
 /**
