@@ -1,5 +1,5 @@
-/** A term from a repository's glossary.md. */
-export type Term = { term: string; definition: string; notConfusedWith?: string };
+/** A term from a repository's glossary.md. `source` is that file's path in the repository, when known. */
+export type Term = { term: string; definition: string; notConfusedWith?: string; source?: string };
 
 const cells = (row: string) =>
   row
