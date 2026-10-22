@@ -4,16 +4,10 @@ Understand unfamiliar code and pull requests without piecing the explanation tog
 
 Read the explanation, follow links into the code, and ask questions as you go. You can also see the full diff, test your understanding with a quiz, or follow a scenario through the code without running it.
 
-```text
-┌ Retry only safe requests ──────────┐ ┌ client.ts  src ──────────────── +23 -10 ┐
-│ 02 / 03  ↑ ↓  ☐ Reviewed      Ask  │ │ 10  const IDEMPOTENT = new Set([...]);  │
-│                                    │ │ 11  const RETRYABLE = new Set([...]);   │
-│ Only idempotent methods get more   │ │ ⇕ 7 unchanged lines                     │
-│ than one attempt; a repeated POST  │ │ 31  if (!RETRYABLE.has(res.status) ...  │
-│ could double-write.                │ │ 32    log("request failed", ...);       │
-│       ┈┈┈┈┈┈┈┈┈┈┈┈ ← anchor        │ │ 33    throw new Error(...);             │
-└────────────────────────────────────┘ └─────────────────────────────────────────┘
-```
+<img width="3776" height="2240" alt="CleanShot 2026-10-21 at 10 57 58 PM@2x" src="https://github.com/user-attachments/assets/ffd2f7d0-eb73-4595-b9b5-82a744633ae4" />
+
+<img width="3738" height="2202" alt="CleanShot 2026-10-21 at 10 59 29 PM@2x" src="https://github.com/user-attachments/assets/c3655427-c7e4-4240-85dd-0be4ba546a7e" />
+
 
 ## Install and start
 
