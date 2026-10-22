@@ -28,7 +28,7 @@ npm install -g github:heron--/code-guide
 code-guide
 ```
 
-Code Guide opens a browser and a terminal **console**. Keep the terminal running while you use it.
+Code Guide opens a browser and a **terminal UI**. Keep the terminal running while you use it.
 
 1. In the browser, choose **Pull requests** or **Local**.
 2. Select what you want to understand, then click **Start session**.
@@ -117,7 +117,7 @@ Trace is an AI explanation, **not a recorded execution**: it doesn't run your pr
 
 ## How it works
 
-Code Guide runs a local browser app and uses Claude Code by default, or pi if you choose it. The agent reads and searches the repository to explain your subject. A guide and overview are prepared when a session starts; quizzes and traces are prepared when you open them. Progress appears in the browser and console. If something fails, its panel shows the reason and offers **Retry**.
+Code Guide runs a local browser app and uses Claude Code by default, or pi if you choose it. The agent reads and searches the repository to explain your subject. A guide and overview are prepared when a session starts; quizzes and traces are prepared when you open them. Progress appears in the browser and terminal UI. If something fails, its panel shows the reason and offers **Retry**.
 
 The guide's links and excerpts are checked against the code, and a separate AI review checks the explanation and can request a revision. These checks help, but don't make the explanation infallible: use the anchors and citations to verify important claims.
 
@@ -129,11 +129,11 @@ The browser runs on your machine, but analysis uses your chosen model provider. 
 
 **End session** stops the analysis and returns to subject selection. Quitting Code Guide also stops the session. **Closing the browser alone does not stop it.**
 
-Temporary PR checkouts and their session data are deleted by default when the session ends. To keep them, enable **Keep PR checkouts** in the browser's Settings or the console's settings before ending the session. Local sessions use your existing checkout and never delete it.
+Temporary PR checkouts and their session data are deleted by default when the session ends. To keep them, enable **Keep PR checkouts** in the browser's Settings or the terminal UI's settings before ending the session. Local sessions use your existing checkout and never delete it.
 
-**Session history** in the browser or console lists previous sessions and tells you whether a PR checkout was kept and where it is. Local session records and results live in `.code-guide/sessions/` inside the repository. You can add `.code-guide/` to your `.gitignore`; Code Guide doesn't change it for you.
+**Session history** in the browser or terminal UI lists previous sessions and tells you whether a PR checkout was kept and where it is. Local session records and results live in `.code-guide/sessions/` inside the repository. You can add `.code-guide/` to your `.gitignore`; Code Guide doesn't change it for you.
 
-### Console controls
+### Terminal controls
 
 The terminal shows the browser URL, GitHub account, current session, and analysis progress.
 
@@ -180,9 +180,9 @@ For Local sessions, `.code-guide/settings.json` inside the repository can overri
 
 ## If something isn't working
 
-- **Can't connect to an agent?** Run `claude` to check its sign-in, or sign in and choose a model in pi if using `--harness pi`. The console shows connection errors.
-- **Can't find a repository or PR?** Check the GitHub account shown in the browser or console, run `gh auth status`, and check the Author and State filters. Set `GH_HOST` when using GitHub Enterprise.
-- **Browser didn't open?** Press **o** in the console or visit the URL it prints. `--no-open` lets you open it yourself. The default port is `4646`, or the next free port; use `--port 5000` to choose another.
+- **Can't connect to an agent?** Run `claude` to check its sign-in, or sign in and choose a model in pi if using `--harness pi`. The terminal UI shows connection errors.
+- **Can't find a repository or PR?** Check the GitHub account shown in the browser or terminal UI, run `gh auth status`, and check the Author and State filters. Set `GH_HOST` when using GitHub Enterprise.
+- **Browser didn't open?** Press **o** in the terminal UI or visit the URL it prints. `--no-open` lets you open it yourself. The default port is `4646`, or the next free port; use `--port 5000` to choose another.
 - **Not sure which version is installed?** Run `code-guide --version`. To update, run the install command again.
 
 Run `code-guide --help` for the full command-line options.

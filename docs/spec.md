@@ -1,6 +1,6 @@
 # Guide spec — `code-chapters/v1`
 
-A **guide** is one JSON file. It answers one question about a repository, in a few short **chapters**. Each chapter pairs a few sentences of prose with **excerpts** (files narrowed to line ranges). Prose links to exact lines with **anchors**. Terms are defined in the project glossary.
+A **guide** is one JSON file. It answers one question about a repository, in a few short **chapters**. Each chapter pairs a few sentences of prose with **excerpts** (files narrowed to line ranges). Prose links to exact lines with **anchors**. Shared concepts are defined in the [project glossary](../GLOSSARY.md); guide, chapter, and excerpt are defined in the [Guide glossary](../src/modules/guide/GLOSSARY.md).
 
 Guides never contain code. They point at files in the repository; the viewer reads the code from git when the guide is opened.
 

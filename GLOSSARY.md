@@ -1,22 +1,18 @@
 # Glossary
 
-Use these words, and only these words, for these ideas: in the spec, the skill, the app, issues, and conversation. The glossary holds only terms that are overloaded or specific to this project.
+Use these terms when discussing, building, or using Code Guide. The definitions align humans and agents on the app's core concepts, not implementation details. Ordinary software terms keep their usual meanings.
 
-"Code Guide" is the product, and is always written in full. "guide" alone means the Guide term below.
+"Code Guide" is the product, and is always written in full. "guide" alone means the concept defined in the [Guide glossary](src/modules/guide/GLOSSARY.md).
 
-A module can have its own glossary, `src/modules/<name>/GLOSSARY.md`, in the same format, for terms that name only that module's ideas, wherever those come up (its code and panel, and e.g. Chat asking about a trace step). The same rules apply there.
+Module-specific concepts live in `src/modules/<name>/GLOSSARY.md`: [Guide](src/modules/guide/GLOSSARY.md) and [Trace](src/modules/trace/GLOSSARY.md). Those definitions apply wherever the concepts come up, including in other modules.
 
-**Adding, removing or redefining a term requires the project owner's approval.** Propose the change (in an issue or PR comment) and wait for a yes before editing this file or using a new term in the spec, skill or viewer.
+**Adding, removing, or redefining a term requires the project owner's explicit approval.** Propose the change and wait for approval.
 
 | Term | Definition |
 | --- | --- |
-| **Guide** | The complete answer to one question about a codebase (or one change to it): a title, the question, a short answer, and an ordered list of chapters. |
-| **Chapter** | One idea, stated in a short title and a few sentences, shown next to the code that proves it. A guide is read one chapter at a time. |
-| **Excerpt** | One file shown with a chapter, narrowed to the lines that matter. For a change it shows the diff; for a question it shows the existing code. Everything else in the file is collapsed, not removed. |
-| **Anchor** | A link in chapter prose to one line or a range of lines inside one of that chapter's excerpts. Clicking it scrolls the code to those lines. |
-| **Subject** | What a session is about: a change, a path, or a question. |
-| **Session** | One run of Code Guide on one subject. Short-lived and disposable. |
-| **Module** | One way of working with the subject in Code Guide: Guide, Quiz, Chat, Diff, or Overview. Shown in a panel. |
-| **Job** | Background agent work that produces one result and ends when it passes validation. |
-| **Review** | A judgment of a guide against the quality bar, made by a separate job that sees only the guide and the code. |
-| **Console** | What Code Guide prints in the terminal while a session runs: the version, the URL, a log of finished and failed jobs, and a live block with the chat's agent and each running job. |
+| **Glossary** | The shared vocabulary that lets humans and agents refer to the same core ideas with the same words. |
+| **Module** | A part of Code Guide that offers one way to understand the subject, such as Guide, Chat, or Trace. |
+| **Agent job** | A one-shot agent run with a specific goal and an output, such as writing a guide or checking it. |
+| **Session** | The shared context for exploring one subject across modules, keeping the generated content and conversation together. |
+| **Subject** | The pull request, code, or question a session focuses on. |
+| **Anchor** | A link that ties an explanation to the exact code it describes. |

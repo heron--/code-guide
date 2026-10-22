@@ -4,24 +4,16 @@ import { markTerms, parseGlossary } from "./glossary";
 
 test("reads this repository's glossary", () => {
   const terms = parseGlossary(readFileSync(new URL("../../GLOSSARY.md", import.meta.url), "utf8"));
-  expect(terms.map((t) => t.term)).toEqual(
-    expect.arrayContaining([
-      "Guide",
-      "Chapter",
-      "Excerpt",
-      "Anchor",
-      "Subject",
-      "Session",
-      "Module",
-      "Job",
-      "Review",
-      "Console",
-    ]),
-  );
+  expect(terms.map((t) => t.term)).toEqual(["Glossary", "Module", "Agent job", "Session", "Subject", "Anchor"]);
   expect(terms.find((t) => t.term === "Anchor")).toEqual({
     term: "Anchor",
-    definition: expect.stringMatching(/^A link in chapter prose/),
+    definition: expect.stringMatching(/^A link that ties an explanation/),
   });
+});
+
+test("reads the Guide module's own glossary", () => {
+  const terms = parseGlossary(readFileSync(new URL("../modules/guide/GLOSSARY.md", import.meta.url), "utf8"));
+  expect(terms.map((t) => t.term)).toEqual(["Guide", "Chapter", "Excerpt"]);
 });
 
 test("reads the Trace module's own glossary", () => {

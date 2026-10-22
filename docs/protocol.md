@@ -53,9 +53,9 @@ A shorter label for the subject, replacing the one in `session.subject`. A quest
 
 The pull request a change subject comes from, reported when the subject is chosen and again whenever it changes (checked every minute with `gh`). The status bar names a pull request subject by its `title`. `head`, its latest commit, is there only when the subject is the pull request itself; when it differs from the subject's `head`, the pull request has new commits.
 
-### Jobs
+### Agent jobs
 
-A job is queued, starts when the concurrency limit allows, reports progress, and ends in exactly one of `job.finished`, `job.failed` or `job.cancelled`.
+An agent job is queued, starts when the concurrency limit allows, reports progress, and ends in exactly one of `job.finished`, `job.failed` or `job.cancelled`.
 
 ```json
 { "type": "job.queued", "payload": { "job": "quiz-1", "kind": "quiz", "label": "Writing the quiz", "module": "quiz", "inputs": ["guide-1"] } }
