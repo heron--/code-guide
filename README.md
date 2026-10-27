@@ -34,7 +34,12 @@ Opening Code Guide alone doesn't start AI analysis. Choosing a subject and start
 
 ### A pull request
 
-In **Pull requests**, find a repository, select a PR, and click **Start session**. You can also paste a PR link into the repository search to start directly.
+In **Pull requests**, find the PR either way, then click **Start session**:
+
+- **Paste a PR link** reads the repository and PR number from a link such as `https://github.com/owner/repository/pull/123`. The link must be for the host the GitHub CLI is signed in to.
+- **Browse** lets you select a repository, then lists its PRs to select from.
+
+When browsing:
 
 - **Author** defaults to `me`, so you initially see your own PRs. Clear it to include everyone's, or enter another username.
 - **State** includes open, closed, and merged PRs by default.
@@ -125,7 +130,7 @@ The browser runs on your machine, but analysis uses your chosen model provider. 
 
 Temporary PR checkouts and their session data are deleted by default when the session ends. To keep them, enable **Keep PR checkouts** in the browser's Settings or the terminal UI's settings before ending the session. Local sessions use your existing checkout and never delete it.
 
-**Session history** in the browser or terminal UI lists previous sessions and tells you whether a PR checkout was kept and where it is. Local session records and results live in `.code-guide/sessions/` inside the repository. You can add `.code-guide/` to your `.gitignore`; Code Guide doesn't change it for you.
+The browser's **Session history** tab, or the terminal UI's history, lists previous sessions and tells you whether a PR checkout was kept and where it is. Local session records and results live in `.code-guide/sessions/` inside the repository. You can add `.code-guide/` to your `.gitignore`; Code Guide doesn't change it for you.
 
 ### Terminal controls
 
