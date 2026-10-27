@@ -613,11 +613,7 @@ function PullRequestLinkForm({
           {usable ? `Start session on ${usable.repo}#${usable.number}` : "Start session"}
         </button>
       </div>
-      {problem ? (
-        <p className="text-sm text-del">{problem}</p>
-      ) : (
-        <p className="text-xs text-fg-3">Code Guide reads the repository and PR number from the link.</p>
-      )}
+      {problem && <p className="text-sm text-del">{problem}</p>}
     </form>
   );
 }
