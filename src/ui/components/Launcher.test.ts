@@ -50,6 +50,21 @@ const type = (input: HTMLInputElement, value: string) =>
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
 
+const repositoryNames = () =>
+  [...container.querySelectorAll('[aria-label="Repositories"] button')].map((b) => b.textContent);
+const repositorySearch = () => container.querySelector<HTMLInputElement>('[aria-label="Repository search"]')!;
+const prLink = () => container.querySelector<HTMLInputElement>('[aria-label="PR link"]')!;
+const fetched = (prefix: string) => fetchMock.mock.calls.filter(([url]) => String(url).startsWith(prefix));
+/** Wait for your repositories, select `name`, and wait for its PRs. */
+const listPrs = async (name = "acme/recent") => {
+  await tick();
+  const choice = [...container.querySelectorAll<HTMLButtonElement>('[aria-label="Repositories"] button')].find((b) =>
+    b.textContent?.startsWith(name),
+  )!;
+  await act(() => choice.click());
+  await tick();
+};
+
 beforeEach(async () => {
   searchResults = [{ name: "someone/pi-extensions", recent: false }];
   history = [];
@@ -99,11 +114,26 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-test("PR-first, recent repository first, me and all states by default, including closed PRs", async () => {
-  expect(button("Pull requests").getAttribute("aria-pressed")).toBe("true");
+test("PR-first: paste a PR link, or browse your repositories", async () => {
+  expect(button("Pull requests").getAttribute("role")).toBe("tab");
+  expect(button("Pull requests").getAttribute("aria-selected")).toBe("true");
   expect(container.textContent).toContain("reader · authenticated");
+  const headings = [...container.querySelectorAll("h2, h3")].map((h) => `${h.tagName} ${h.textContent}`);
+  expect(headings).toEqual(["H2 Paste a PR link", "H2 Browse", "H3 Select a repo"]);
+  expect(prLink()).not.toBeNull();
+});
+
+test("browsing shows Select a PR only once a repository is selected", async () => {
   await tick();
-  await tick();
+  expect(repositoryNames()).toEqual(["acme/recent · recent", "acme/other", "heron--/pi-extensions"]);
+  expect(container.textContent).not.toContain("Select a PR");
+  expect(fetched("/api/pull-requests")).toEqual([]);
+  await listPrs();
+  expect(container.querySelector("h3:last-of-type")?.textContent).toBe("Select a PR · acme/recent");
+});
+
+test("a selected repository lists your PRs in all states by default, including closed PRs", async () => {
+  await listPrs();
   const request = fetchMock.mock.calls.find(([url]) => String(url).startsWith("/api/pull-requests"))!;
   expect(String(request[0])).toContain("repo=acme%2Frecent");
   expect(String(request[0])).toContain("author=me&state=all&page=1");
@@ -111,8 +141,7 @@ test("PR-first, recent repository first, me and all states by default, including
 });
 
 test("changing a PR filter clears stale choices and sends the new filter", async () => {
-  await tick();
-  await tick();
+  await listPrs();
   const author = [...container.querySelectorAll("label")]
     .find((label) => label.textContent === "Author")!
     .querySelector("input")!;
@@ -127,13 +156,11 @@ test("authentication errors remain visible while Local is available without GitH
   fetchMock.mockClear();
   await render({ ...initial, github: { ok: false, error: "Run gh auth login" } });
   expect(container.textContent).toContain("Run gh auth login");
+  expect(prLink().disabled).toBe(true);
   await act(() => button("Local").click());
   await tick();
   expect(button("Start session").disabled).toBe(false);
-  expect([...new Set(fetchMock.mock.calls.map(([url]) => String(url).split("?")[0]))].sort()).toEqual([
-    "/api/directories",
-    "/api/history",
-  ]);
+  expect([...new Set(fetchMock.mock.calls.map(([url]) => String(url).split("?")[0]))]).toEqual(["/api/directories"]);
 });
 
 test("failed local startup keeps the form available for retry", async () => {
@@ -147,41 +174,41 @@ test("failed local startup keeps the form available for retry", async () => {
   expect(container.querySelector("fieldset")!.disabled).toBe(false);
 });
 
+/** The Start session button under Select a PR, not the one beside the PR link. */
+const startSelectedPr = () =>
+  [...container.querySelectorAll("button")].filter((b) => b.textContent === "Start session").at(-1)!;
 const posted = () =>
   fetchMock.mock.calls
     .filter(([url]) => String(url) === "/api/start")
     .map(([, init]) => JSON.parse(String(init!.body)));
 
 test("clicking a PR selects it; Start session starts the selected PR", async () => {
-  await tick();
-  await tick();
+  await listPrs();
   const list = container.querySelector('[aria-label="Pull requests"]')!;
   expect(list.className).toContain("overflow-auto");
-  expect(button("Start session").disabled).toBe(true);
+  expect(startSelectedPr().disabled).toBe(true);
   const pr = [...list.querySelectorAll("button")].find((b) => b.textContent?.includes("#8"))!;
   await act(() => pr.click());
   expect(pr.getAttribute("aria-pressed")).toBe("true");
   expect(posted()).toEqual([]);
-  await act(async () => button("Start session").click());
+  await act(async () => startSelectedPr().click());
   expect(posted()).toEqual([{ mode: "pr", repo: "acme/recent", number: 8 }]);
 });
 
 test("typing a PR filter clears the selection at once, before the new PRs arrive", async () => {
-  await tick();
-  await tick();
+  await listPrs();
   const list = container.querySelector('[aria-label="Pull requests"]')!;
   await act(() => [...list.querySelectorAll("button")].find((b) => b.textContent?.includes("#8"))!.click());
-  expect(button("Start session").disabled).toBe(false);
+  expect(startSelectedPr().disabled).toBe(false);
   const search = [...container.querySelectorAll("label")]
     .find((label) => label.textContent?.startsWith("Search PRs"))!
     .querySelector("input")!;
   await type(search, "tracing");
-  expect(button("Start session").disabled).toBe(true);
+  expect(startSelectedPr().disabled).toBe(true);
 });
 
 test("the author filter suggests me, the repository's contributors, and listed PR authors", async () => {
-  await tick();
-  await tick();
+  await listPrs();
   const options = [...container.querySelectorAll("#pr-authors option")].map((o) => o.getAttribute("value"));
   expect(options).toEqual(["me", "sam", "alex", "reader", "kim"]);
 });
@@ -211,11 +238,6 @@ test("Start session is unavailable outside a git repository", async () => {
     listing.repository = "/work";
   }
 });
-
-const repositoryNames = () =>
-  [...container.querySelectorAll('[aria-label="Repositories"] button')].map((b) => b.textContent);
-const repositorySearch = () => container.querySelector<HTMLInputElement>('[aria-label="Repository search"]')!;
-const fetched = (prefix: string) => fetchMock.mock.calls.filter(([url]) => String(url).startsWith(prefix));
 
 test("your repositories match partial names at once; GitHub's search of yours follows when typing pauses", async () => {
   await tick();
@@ -250,8 +272,7 @@ test("your repositories are fetched a page at a time, and a page seen before isn
 });
 
 test("typing cancels the request for what was typed before", async () => {
-  await tick();
-  await tick();
+  await listPrs();
   const search = [...container.querySelectorAll("label")]
     .find((label) => label.textContent?.startsWith("Search PRs"))!
     .querySelector("input")!;
@@ -273,8 +294,7 @@ test("PRs page through their filters' results, starting over when a filter chang
   prsMore = true;
   queries.clear();
   await render({ ...initial });
-  await tick();
-  await tick();
+  await listPrs();
   const prPages = container.querySelector('[aria-label="PR pages"]')!;
   await act(() => [...prPages.querySelectorAll("button")].find((b) => b.textContent === "Next")!.click());
   await tick();
@@ -310,18 +330,25 @@ test("signing in as someone else asks GitHub again, however the launcher learns 
   expect(fetched("/api/repositories?")).toHaveLength(before + 1);
 });
 
-test("a pasted PR link starts that PR", async () => {
-  await tick();
-  await type(repositorySearch(), "https://github.com/acme/app/pull/42");
+test("a pasted PR link starts the repository and PR it names", async () => {
+  expect(button("Start session").disabled).toBe(true);
+  await type(prLink(), "https://github.com/acme/app/pull/42/files");
   await act(async () => button("Start session on acme/app#42").click());
   expect(posted()).toEqual([{ mode: "pr", repo: "acme/app", number: 42 }]);
-  expect(fetched("/api/repositories/search")).toEqual([]);
+});
+
+test("text that isn't a PR link explains what's expected", async () => {
+  await type(prLink(), "acme/app#42");
+  expect(container.textContent).toContain("Use a link like https://github.com/owner/repository/pull/123.");
+  expect(button("Start session").disabled).toBe(true);
 });
 
 test("a PR link for another host isn't offered", async () => {
-  await tick();
-  await type(repositorySearch(), "https://ghe.example.com/acme/app/pull/42");
+  await type(prLink(), "https://ghe.example.com/acme/app/pull/42");
   expect(button("Start session on acme/app#42")).toBeUndefined();
+  expect(container.textContent).toContain(
+    "This link is for ghe.example.com; the GitHub CLI is signed in to github.com.",
+  );
 });
 
 test("with Only my repositories off, GitHub-wide results follow your own matches", async () => {
@@ -374,9 +401,19 @@ test("session history shows whether each PR checkout was kept and is still there
   ];
   await render({ ...initial });
   await tick();
+  expect(fetched("/api/history")).toEqual([]);
+  await act(() => button("Session history").click());
+  await tick();
   const items = [...container.querySelectorAll('[aria-label="Session history"] li')].map((li) => li.textContent);
   expect(items[0]).toContain("Checkout kept · still there");
   expect(items[0]).toContain("/tmp/cg-1");
   expect(items[1]).toContain("Checkout kept · since removed");
   expect(items[1]).not.toContain("/tmp/cg-0");
+});
+
+test("session history is its own tab, and says when there are no sessions", async () => {
+  await act(() => button("Session history").click());
+  await tick();
+  expect(container.textContent).toContain("No sessions yet.");
+  expect(container.querySelector("fieldset")).toBeNull();
 });
